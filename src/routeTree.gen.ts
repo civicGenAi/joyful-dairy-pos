@@ -9,8 +9,86 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VanRouteImport } from './routes/van'
+import { Route as StockRouteImport } from './routes/stock'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as ReconciliationRouteImport } from './routes/reconciliation'
+import { Route as ProductsRouteImport } from './routes/products'
+import { Route as ProductionRouteImport } from './routes/production'
+import { Route as PosRouteImport } from './routes/pos'
+import { Route as FinanceRouteImport } from './routes/finance'
+import { Route as FarmersRouteImport } from './routes/farmers'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CustomersRouteImport } from './routes/customers'
+import { Route as CollectionPointsRouteImport } from './routes/collection-points'
 import { Route as IndexRouteImport } from './routes/index'
 
+const VanRoute = VanRouteImport.update({
+  id: '/van',
+  path: '/van',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StockRoute = StockRouteImport.update({
+  id: '/stock',
+  path: '/stock',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReconciliationRoute = ReconciliationRouteImport.update({
+  id: '/reconciliation',
+  path: '/reconciliation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProductsRoute = ProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProductionRoute = ProductionRouteImport.update({
+  id: '/production',
+  path: '/production',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PosRoute = PosRouteImport.update({
+  id: '/pos',
+  path: '/pos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FinanceRoute = FinanceRouteImport.update({
+  id: '/finance',
+  path: '/finance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FarmersRoute = FarmersRouteImport.update({
+  id: '/farmers',
+  path: '/farmers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CustomersRoute = CustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CollectionPointsRoute = CollectionPointsRouteImport.update({
+  id: '/collection-points',
+  path: '/collection-points',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -19,28 +97,214 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/collection-points': typeof CollectionPointsRoute
+  '/customers': typeof CustomersRoute
+  '/dashboard': typeof DashboardRoute
+  '/farmers': typeof FarmersRoute
+  '/finance': typeof FinanceRoute
+  '/pos': typeof PosRoute
+  '/production': typeof ProductionRoute
+  '/products': typeof ProductsRoute
+  '/reconciliation': typeof ReconciliationRoute
+  '/reports': typeof ReportsRoute
+  '/settings': typeof SettingsRoute
+  '/stock': typeof StockRoute
+  '/van': typeof VanRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/collection-points': typeof CollectionPointsRoute
+  '/customers': typeof CustomersRoute
+  '/dashboard': typeof DashboardRoute
+  '/farmers': typeof FarmersRoute
+  '/finance': typeof FinanceRoute
+  '/pos': typeof PosRoute
+  '/production': typeof ProductionRoute
+  '/products': typeof ProductsRoute
+  '/reconciliation': typeof ReconciliationRoute
+  '/reports': typeof ReportsRoute
+  '/settings': typeof SettingsRoute
+  '/stock': typeof StockRoute
+  '/van': typeof VanRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/collection-points': typeof CollectionPointsRoute
+  '/customers': typeof CustomersRoute
+  '/dashboard': typeof DashboardRoute
+  '/farmers': typeof FarmersRoute
+  '/finance': typeof FinanceRoute
+  '/pos': typeof PosRoute
+  '/production': typeof ProductionRoute
+  '/products': typeof ProductsRoute
+  '/reconciliation': typeof ReconciliationRoute
+  '/reports': typeof ReportsRoute
+  '/settings': typeof SettingsRoute
+  '/stock': typeof StockRoute
+  '/van': typeof VanRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/collection-points'
+    | '/customers'
+    | '/dashboard'
+    | '/farmers'
+    | '/finance'
+    | '/pos'
+    | '/production'
+    | '/products'
+    | '/reconciliation'
+    | '/reports'
+    | '/settings'
+    | '/stock'
+    | '/van'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/collection-points'
+    | '/customers'
+    | '/dashboard'
+    | '/farmers'
+    | '/finance'
+    | '/pos'
+    | '/production'
+    | '/products'
+    | '/reconciliation'
+    | '/reports'
+    | '/settings'
+    | '/stock'
+    | '/van'
+  id:
+    | '__root__'
+    | '/'
+    | '/collection-points'
+    | '/customers'
+    | '/dashboard'
+    | '/farmers'
+    | '/finance'
+    | '/pos'
+    | '/production'
+    | '/products'
+    | '/reconciliation'
+    | '/reports'
+    | '/settings'
+    | '/stock'
+    | '/van'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CollectionPointsRoute: typeof CollectionPointsRoute
+  CustomersRoute: typeof CustomersRoute
+  DashboardRoute: typeof DashboardRoute
+  FarmersRoute: typeof FarmersRoute
+  FinanceRoute: typeof FinanceRoute
+  PosRoute: typeof PosRoute
+  ProductionRoute: typeof ProductionRoute
+  ProductsRoute: typeof ProductsRoute
+  ReconciliationRoute: typeof ReconciliationRoute
+  ReportsRoute: typeof ReportsRoute
+  SettingsRoute: typeof SettingsRoute
+  StockRoute: typeof StockRoute
+  VanRoute: typeof VanRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/van': {
+      id: '/van'
+      path: '/van'
+      fullPath: '/van'
+      preLoaderRoute: typeof VanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stock': {
+      id: '/stock'
+      path: '/stock'
+      fullPath: '/stock'
+      preLoaderRoute: typeof StockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reconciliation': {
+      id: '/reconciliation'
+      path: '/reconciliation'
+      fullPath: '/reconciliation'
+      preLoaderRoute: typeof ReconciliationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/products': {
+      id: '/products'
+      path: '/products'
+      fullPath: '/products'
+      preLoaderRoute: typeof ProductsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/production': {
+      id: '/production'
+      path: '/production'
+      fullPath: '/production'
+      preLoaderRoute: typeof ProductionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pos': {
+      id: '/pos'
+      path: '/pos'
+      fullPath: '/pos'
+      preLoaderRoute: typeof PosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/finance': {
+      id: '/finance'
+      path: '/finance'
+      fullPath: '/finance'
+      preLoaderRoute: typeof FinanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/farmers': {
+      id: '/farmers'
+      path: '/farmers'
+      fullPath: '/farmers'
+      preLoaderRoute: typeof FarmersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/customers': {
+      id: '/customers'
+      path: '/customers'
+      fullPath: '/customers'
+      preLoaderRoute: typeof CustomersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/collection-points': {
+      id: '/collection-points'
+      path: '/collection-points'
+      fullPath: '/collection-points'
+      preLoaderRoute: typeof CollectionPointsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -53,6 +317,19 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CollectionPointsRoute: CollectionPointsRoute,
+  CustomersRoute: CustomersRoute,
+  DashboardRoute: DashboardRoute,
+  FarmersRoute: FarmersRoute,
+  FinanceRoute: FinanceRoute,
+  PosRoute: PosRoute,
+  ProductionRoute: ProductionRoute,
+  ProductsRoute: ProductsRoute,
+  ReconciliationRoute: ReconciliationRoute,
+  ReportsRoute: ReportsRoute,
+  SettingsRoute: SettingsRoute,
+  StockRoute: StockRoute,
+  VanRoute: VanRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
