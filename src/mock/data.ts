@@ -293,7 +293,7 @@ export const NAV_GROUPS_BY_ROLE: Record<string, { group: string; sw: string; ite
     ]},
     { group: "Sales", sw: "Mauzo", items: [
       { to: "/pos", label: "Counter POS", sw: "Mauzo Kaunta", icon: "Receipt" },
-      { to: "/route", label: "Route module", sw: "Njia", icon: "Truck" },
+      { to: "/van", label: "Route module", sw: "Njia", icon: "Truck" },
       { to: "/customers", label: "Customers", sw: "Wateja", icon: "UserSquare2" },
     ]},
     { group: "Operations", sw: "Uendeshaji", items: [
@@ -339,7 +339,7 @@ export const NAV_GROUPS_BY_ROLE: Record<string, { group: string; sw: string; ite
     ]},
   ],
   route: [
-    { group: "Route", sw: "Njia", items: [{ to: "/route", label: "Route module", sw: "Njia", icon: "Truck" }] },
+    { group: "Route", sw: "Njia", items: [{ to: "/van", label: "Route module", sw: "Njia", icon: "Truck" }] },
   ],
   store: [
     { group: "Store", sw: "Ghala", items: [

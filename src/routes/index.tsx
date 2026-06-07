@@ -26,7 +26,7 @@ function LoginPage() {
     login(addr);
     const u = USERS.find((x) => x.email === addr);
     toast.success(t(`Karibu, ${u?.name.split(" ")[0]}`, `Welcome, ${u?.name.split(" ")[0]}`));
-    nav({ to: u?.roles[0] === "route" ? "/route" : "/dashboard" });
+    nav({ to: u?.roles[0] === "route" ? "/van" : "/dashboard" });
   };
 
   return (

@@ -84,7 +84,7 @@ export function Topbar({ title }: { title: string }) {
           <DropdownMenuLabel>{t("Badilisha jukumu (demo)", "Switch role (demo)")}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {ROLES.map((r) => (
-            <DropdownMenuItem key={r} onClick={() => { setRole(r); if (r === "route") nav({ to: "/route" }); else nav({ to: "/dashboard" }); }}>
+            <DropdownMenuItem key={r} onClick={() => { setRole(r); if (r === "route") nav({ to: "/van" }); else nav({ to: "/dashboard" }); }}>
               <span className="font-medium">{lang === "sw" ? ROLE_LABEL[r].sw : ROLE_LABEL[r].en}</span>
             </DropdownMenuItem>
           ))}
