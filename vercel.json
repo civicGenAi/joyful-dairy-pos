@@ -8,12 +8,16 @@
             "config": {
                 "distDir": "dist"
             }
+        },
+        {
+            "src": "dist/server/index.mjs",
+            "use": "@vercel/node"
         }
     ],
     "routes": [
         {
             "src": "/(.*)",
-            "dest": "/index.html"
+            "dest": "dist/server/index.mjs"
         }
     ]
 }
