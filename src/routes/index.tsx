@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useApp } from "@/app/context";
 import { USERS, ROLE_LABEL, COMPANY } from "@/mock/data";
 import { Button } from "@/components/ui/button";
@@ -7,14 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { JoyLogo } from "@/components/brand/JoyLogo";
 import { ProductShowcase } from "@/components/brand/ProductShowcase";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
-  LogIn,
   Eye,
   EyeOff,
   ShieldCheck,
-  Sparkles,
   Mail,
   Lock as LockIcon,
   Languages,
@@ -147,6 +146,16 @@ function LoginPage() {
                 </div>
               </div>
 
+              <div className="flex items-center space-x-2">
+                <Checkbox id="remember" />
+                <label
+                  htmlFor="remember"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-muted-foreground"
+                >
+                  {t("Kumbuka akaunti yangu", "Remember me")}
+                </label>
+              </div>
+
               <Button
                 type="submit"
                 disabled={submitting}
@@ -161,8 +170,8 @@ function LoginPage() {
                     {t("Inaingia…", "Signing in…")}
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5">
-                    <LogIn className="h-4 w-4" /> {t("Ingia", "Sign in")}
+                  <span>
+                    {t("Ingia", "Sign in")}
                   </span>
                 )}
               </Button>
@@ -214,9 +223,7 @@ function LoginPage() {
             </div>
           </div>
 
-          <div className="text-center text-[11px] text-muted-foreground mt-4">
-            © 2026 {COMPANY.name}. {COMPANY.city}.
-          </div>
+
         </motion.div>
       </div>
     </div>
@@ -226,21 +233,6 @@ function LoginPage() {
 // ---- Brand panel ----------------------------------------------------------
 
 function BrandPanel() {
-  const { t, lang } = useApp();
-
-  // Animated metric values, cycle every few seconds.
-  const facts = [
-    { sw: "Yamekusanywa leo", en: "Collected today", value: "880 L", icon: "🥛" },
-    { sw: "Mauzo leo", en: "Sales today", value: "TZS 1.4M", icon: "💰" },
-    { sw: "Wateja wa mkopo", en: "Credit clients", value: "12", icon: "👥" },
-    { sw: "Wafugaji", en: "Farmers", value: "15", icon: "👩🏾‍🌾" },
-  ];
-  const [factIdx, setFactIdx] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setFactIdx((i) => (i + 1) % facts.length), 3200);
-    return () => clearInterval(id);
-  }, [facts.length]);
-
   return (
     <div
       className="relative hidden lg:flex flex-col justify-between p-10 xl:p-12 text-white overflow-hidden"
@@ -248,104 +240,31 @@ function BrandPanel() {
         background: "linear-gradient(135deg, #14532D 0%, #1E7C3F 45%, #2F9E44 80%, #8CC63F 130%)",
       }}
     >
-      {/* Floating circular accents */}
-      <motion.div
-        animate={{ y: [0, -16, 0] }}
-        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute -top-24 -left-16 h-72 w-72 rounded-full bg-white/10 blur-3xl"
-      />
-      <motion.div
-        animate={{ y: [0, 14, 0] }}
-        transition={{ duration: 9, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-        className="absolute bottom-0 -right-20 h-80 w-80 rounded-full bg-[#E11B22]/25 blur-3xl"
-      />
-      <div
-        className="absolute inset-0 opacity-[0.06]"
-        style={{
-          backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)",
-          backgroundSize: "22px 22px",
-        }}
+      {/* Background Showcase */}
+      <ProductShowcase
+        aspect=""
+        rounded="rounded-none"
+        className="absolute inset-0 z-0"
+        interval={4000}
+        showCaption={false}
       />
 
+      {/* Overlay to ensure text readability */}
+      <div className="absolute inset-0 bg-black/40 z-10" />
+
       {/* Top: brand */}
-      <div className="relative flex items-center gap-3">
+      <div className="relative z-20 flex items-center gap-3">
         <JoyLogo size={48} showWordmark={false} inlineOnly={false} />
         <div>
           <div className="font-display text-xl font-bold leading-none">African Joy</div>
-          <div className="text-[11px] uppercase tracking-[0.18em] opacity-80">Dairy · Arusha</div>
+          <div className="text-[11px] uppercase tracking-[0.18em] opacity-80">Dairy &middot; Arusha</div>
         </div>
       </div>
 
-      {/* Middle: headline + rotating fact */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-        className="relative max-w-md"
-      >
-        <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider backdrop-blur">
-          <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#E11B22" }} />
-          {t("Maziwa ya Arusha", "Arusha Dairy")}
-        </div>
-        <h2 className="font-display text-3xl xl:text-4xl font-bold leading-tight mt-4">
-          {t(
-            "Maziwa bora, kuwawezesha wafugaji wanawake.",
-            "Premium dairy, empowering women farmers.",
-          )}
-        </h2>
-        <p className="mt-3 text-white/85 leading-relaxed">
-          {t(
-            "Mfumo kamili wa uzalishaji, mauzo, ghala na fedha, kwa lugha ya Kiswahili na Kiingereza.",
-            "An end-to-end system for production, sales, store and finance, built bilingual for our team.",
-          )}
-        </p>
-
-        {/* Clean product showcase, real photos visible (no heavy blur) */}
-        <div className="mt-7 rounded-2xl border border-white/20 bg-white/5 p-1.5 shadow-2xl backdrop-blur-sm">
-          <ProductShowcase aspect="aspect-[16/10]" rounded="rounded-xl" interval={3200} />
-        </div>
-
-        {/* Rotating single fact, compact line under the showcase */}
-        <div className="mt-3 flex items-center gap-2 text-sm">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={factIdx}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.3 }}
-              className="inline-flex items-center gap-2"
-            >
-              <span className="text-lg">{facts[factIdx].icon}</span>
-              <span className="font-num text-lg font-bold">{facts[factIdx].value}</span>
-              <span className="text-[11px] uppercase tracking-wider opacity-80">
-                {lang === "sw" ? facts[factIdx].sw : facts[factIdx].en}
-              </span>
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* Feature pills */}
-        <div className="mt-5 flex flex-wrap gap-2">
-          {[
-            t("Kiswahili na Kiingereza", "Bilingual SW + EN"),
-            t("Hufanya kazi bila mtandao", "Works offline"),
-            t("M-Pesa tayari", "M-Pesa ready"),
-            t("Ripoti za kila siku", "Daily reports"),
-          ].map((f) => (
-            <span
-              key={f}
-              className="inline-flex items-center gap-1 rounded-full bg-white/12 backdrop-blur px-2.5 py-1 text-[11px] font-semibold"
-            >
-              <Sparkles className="h-3 w-3" />
-              {f}
-            </span>
-          ))}
-        </div>
-      </motion.div>
-
       {/* Bottom: small footer */}
-      <div className="relative text-xs opacity-75">{COMPANY.footer}</div>
+      <div className="relative z-20 text-xs opacity-75">
+        &copy; {new Date().getFullYear()} {COMPANY.name}.
+      </div>
     </div>
   );
 }
