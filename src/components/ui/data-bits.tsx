@@ -73,11 +73,11 @@ export function SectionCard({
 }) {
   return (
     <div className={cn("rounded-2xl bg-card border border-border shadow-card", className)}>
-      <div className="flex items-center justify-between px-4 lg:px-5 py-3 border-b border-border">
-        <div className="font-display text-sm font-semibold">{title}</div>
-        <div>{action}</div>
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 lg:px-5 py-3 border-b border-border">
+        <div className="font-display text-sm font-semibold min-w-0 truncate">{title}</div>
+        {action && <div className="flex flex-wrap items-center gap-2">{action}</div>}
       </div>
-      <div className="p-4 lg:p-5">{children}</div>
+      <div className="p-3 sm:p-4 lg:p-5">{children}</div>
     </div>
   );
 }

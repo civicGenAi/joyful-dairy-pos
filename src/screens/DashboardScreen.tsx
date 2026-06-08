@@ -1,6 +1,6 @@
 import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
-import { StatCard, SectionCard, Pill } from "@/components/ui/data-bits";
+import { SectionCard, Pill } from "@/components/ui/data-bits";
 import { CountUp } from "@/components/ui/CountUp";
 import {
   ALERTS,
@@ -40,6 +40,7 @@ import {
   ClipboardCheck,
   Wallet,
   Factory,
+  type LucideIcon,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
@@ -53,54 +54,86 @@ export function DashboardScreen() {
 
   return (
     <AppShell title={t("Dashibodi", "Dashboard")}>
-      {/* Hero */}
-      <div
-        className="relative overflow-hidden rounded-3xl p-6 lg:p-8 text-white shadow-elevated mb-6"
-        style={{
-          background: "linear-gradient(135deg, #14532D 0%, #1E7C3F 35%, #2F9E44 70%, #8CC63F 130%)",
-        }}
-      >
-        <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute right-10 bottom-0 h-40 w-40 rounded-full bg-[#E11B22]/30 blur-3xl" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.2em] opacity-80">
-              {new Date(TODAY).toLocaleDateString(lang === "sw" ? "sw-TZ" : "en-GB", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
-            </div>
-            <h2 className="font-display text-2xl lg:text-3xl font-bold mt-1">
-              {t("Habari", "Hello")}, {user?.name.split(" ")[0]} 👋
-            </h2>
-            <p className="opacity-90 mt-1 max-w-lg">
-              {t(
-                "Karibu kwenye muhtasari wa leo wa African Joy Dairy.",
-                "Here's today's snapshot for African Joy Dairy.",
-              )}
-            </p>
+      {/* Greeting strip + quick stats, compact */}
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+        <div className="min-w-0">
+          <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">
+            {new Date(TODAY).toLocaleDateString(lang === "sw" ? "sw-TZ" : "en-GB", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}
           </div>
-          <div className="flex flex-wrap gap-2">
-            <span className="rounded-full bg-white/15 backdrop-blur px-3 py-1.5 text-xs font-semibold">
-              {t("Siku", "Day")}:{" "}
-              <span className="ml-1 inline-flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#8CC63F]" />{" "}
-                {t("Imefunguliwa", "Open")}
-              </span>
-            </span>
-            <span className="rounded-full bg-white/15 backdrop-blur px-3 py-1.5 text-xs font-semibold">
-              {t("Salio", "Balance")}: {t("Sawazi", "Balanced")}
-            </span>
-            <span className="rounded-full bg-white/15 backdrop-blur px-3 py-1.5 text-xs font-semibold">
-              {t("Jukumu", "Role")}: {role}
-            </span>
-          </div>
+          <h2 className="font-display text-xl sm:text-2xl font-bold mt-0.5">
+            {t("Habari", "Hello")}, {user?.name.split(" ")[0]} 👋
+          </h2>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <Pill tone="success">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#2F9E44]" />{" "}
+            {t("Siku imefunguliwa", "Day open")}
+          </Pill>
+          <Pill tone="info">{t("Salio sawa", "Balanced")}</Pill>
+          <Pill tone="slate">
+            {t("Jukumu", "Role")}, {role}
+          </Pill>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-6">
+      {/* Compact stat tiles, on top, replacing the hero */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-2.5 mb-5">
+        <MiniStat
+          accent="green"
+          label={t("Yamekusanywa", "Collected")}
+          value={<><CountUp value={882} /> L</>}
+          delta={{ up: true, text: "+4.2%" }}
+        />
+        <MiniStat
+          accent="info"
+          label={t("Mauzo", "Sales")}
+          value={<CountUp value={1428000} format={(v) => tzs(v, false)} />}
+          sub="TZS"
+        />
+        <MiniStat
+          accent="red"
+          label={t("Yameharibika", "Spoilt")}
+          value={<><CountUp value={12} /> L</>}
+          delta={{ up: false, text: "-1.5 L" }}
+        />
+        <MiniStat
+          accent="green"
+          label={t("Yamebakia", "Closing")}
+          value={<><CountUp value={214} /> L</>}
+        />
+        <MiniStat
+          accent="green"
+          label={t("Cash benki", "Cash in")}
+          value={<CountUp value={860000} format={(v) => tzs(v, false)} />}
+          sub="TZS"
+        />
+        <MiniStat
+          accent="amber"
+          label={t("Madeni", "Receivable")}
+          value={<CountUp value={3680000} format={(v) => tzs(v, false)} />}
+          sub="TZS"
+        />
+        <MiniStat
+          accent="info"
+          label={t("Wafugaji", "Payables")}
+          value={<CountUp value={4830000} format={(v) => tzs(v, false)} />}
+          sub="TZS"
+        />
+        <MiniStat
+          accent="red"
+          label={t("Tahadhari", "Alerts")}
+          value={<CountUp value={5} />}
+          sub={t("2 nje", "2 out")}
+        />
+      </div>
+
+      {/* Quick actions, capability-aware. Compact pill row, scrolls horizontally on mobile. */}
+      <div className="flex flex-wrap gap-2 mb-5">
         <QuickAction
           to="/farmers"
           icon={MapPin}
@@ -139,85 +172,12 @@ export function DashboardScreen() {
         />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <StatCard
-          label={t("Yaliyokusanywa leo", "Collected today")}
-          value={
-            <>
-              <CountUp value={882} /> L
-            </>
-          }
-          sub={
-            <>
-              <TrendingUp className="inline h-3 w-3 text-[#2F9E44]" /> +4.2%{" "}
-              {t("vs jana", "vs yesterday")}
-            </>
-          }
-          accent="green"
-        />
-        <StatCard
-          label={t("Mauzo leo (cash + mkopo)", "Sales today (cash + credit)")}
-          value={<CountUp value={1428000} format={(v) => tzs(v)} />}
-          sub={t("520 L, cash 64% / credit 36%", "520 L, cash 64% / credit 36%")}
-          accent="info"
-        />
-        <StatCard
-          label={t("Yaliyoharibika", "Spoilt today")}
-          value={
-            <>
-              <CountUp value={12} /> L
-            </>
-          }
-          sub={
-            <>
-              <TrendingDown className="inline h-3 w-3 text-[#2F9E44]" /> -1.5 L{" "}
-              {t("vs jana", "vs yesterday")}
-            </>
-          }
-          accent="red"
-        />
-        <StatCard
-          label={t("Yaliyobaki (closing)", "Closing balance")}
-          value={
-            <>
-              <CountUp value={214} /> L
-            </>
-          }
-          sub={t("Imekokotolewa kwa muda halisi", "Computed live")}
-          accent="green"
-        />
-        <StatCard
-          label={t("Cash leo", "Cash in till today")}
-          value={<CountUp value={860000} format={(v) => tzs(v)} />}
-          sub={t("Cash 60%, M-Pesa 40%", "Cash 60%, M-Pesa 40%")}
-          accent="green"
-        />
-        <StatCard
-          label={t("Madeni ya wateja", "Outstanding receivables")}
-          value={<CountUp value={3680000} format={(v) => tzs(v)} />}
-          sub={t("Wateja 12, 3 wamechelewa", "12 clients, 3 overdue")}
-          accent="amber"
-        />
-        <StatCard
-          label={t("Malipo wafugaji", "Farmer payables")}
-          value={<CountUp value={4830000} format={(v) => tzs(v)} />}
-          sub={t("Mzunguko unaomalizika 15 Juni", "Next 15-day cycle: Jun 15")}
-          accent="info"
-        />
-        <StatCard
-          label={t("Tahadhari za stock", "Low-stock alerts")}
-          value={<CountUp value={5} />}
-          sub={t("2 nje ya stock, 3 chini", "2 out, 3 low")}
-          accent="red"
-        />
-      </div>
-
-      <div className="grid lg:grid-cols-3 gap-4 mb-6">
+      <div className="grid lg:grid-cols-3 gap-3 sm:gap-4 mb-4">
         <SectionCard
-          title={t("Mwendo wa maziwa siku 30 zilizopita", "Milk movement, last 30 days")}
+          title={t("Mwendo wa maziwa, siku 30", "Milk movement, last 30 days")}
           className="lg:col-span-2"
         >
-          <div className="h-64">
+          <div className="h-56 sm:h-64">
             <ResponsiveContainer>
               <AreaChart data={MILK_TREND_30} margin={{ left: -10, right: 5 }}>
                 <defs>
@@ -231,57 +191,27 @@ export function DashboardScreen() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke="#E6EBE1" vertical={false} />
-                <XAxis
-                  dataKey="day"
-                  stroke="#6B776E"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                />
+                <XAxis dataKey="day" stroke="#6B776E" fontSize={11} tickLine={false} axisLine={false} />
                 <YAxis stroke="#6B776E" fontSize={11} tickLine={false} axisLine={false} />
                 <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #E6EBE1" }} />
-                <Area
-                  type="monotone"
-                  dataKey="collected"
-                  stroke="#1E7C3F"
-                  strokeWidth={2}
-                  fill="url(#g1)"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="sold"
-                  stroke="#8CC63F"
-                  strokeWidth={2}
-                  fill="url(#g2)"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="spoilt"
-                  stroke="#E11B22"
-                  strokeWidth={2}
-                  dot={false}
-                />
+                <Area type="monotone" dataKey="collected" stroke="#1E7C3F" strokeWidth={2} fill="url(#g1)" />
+                <Area type="monotone" dataKey="sold" stroke="#8CC63F" strokeWidth={2} fill="url(#g2)" />
+                <Line type="monotone" dataKey="spoilt" stroke="#E11B22" strokeWidth={2} dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </SectionCard>
 
         <SectionCard title={t("Njia ya mauzo", "Sales channel split")}>
-          <div className="h-64">
+          <div className="h-56 sm:h-64">
             <ResponsiveContainer>
               <PieChart>
-                <Pie
-                  data={SALES_CHANNEL_SPLIT}
-                  dataKey="value"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={3}
-                >
+                <Pie data={SALES_CHANNEL_SPLIT} dataKey="value" innerRadius={50} outerRadius={80} paddingAngle={3}>
                   {SALES_CHANNEL_SPLIT.map((_, i) => (
                     <Cell key={i} fill={GREENS[i]} />
                   ))}
                 </Pie>
-                <Legend />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
@@ -289,22 +219,13 @@ export function DashboardScreen() {
         </SectionCard>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4 mb-6">
-        <SectionCard
-          title={t("Mauzo kwa kategoria, wiki", "Sales by category, week")}
-          className="lg:col-span-2"
-        >
-          <div className="h-60">
+      <div className="grid lg:grid-cols-3 gap-3 sm:gap-4 mb-4">
+        <SectionCard title={t("Mauzo kwa kategoria, wiki", "Sales by category, week")} className="lg:col-span-2">
+          <div className="h-56">
             <ResponsiveContainer>
               <BarChart data={SALES_BY_CATEGORY_WEEK} margin={{ left: -10 }}>
                 <CartesianGrid stroke="#E6EBE1" vertical={false} />
-                <XAxis
-                  dataKey="day"
-                  stroke="#6B776E"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                />
+                <XAxis dataKey="day" stroke="#6B776E" fontSize={11} tickLine={false} axisLine={false} />
                 <YAxis stroke="#6B776E" fontSize={11} tickLine={false} axisLine={false} />
                 <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #E6EBE1" }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -319,33 +240,15 @@ export function DashboardScreen() {
           </div>
         </SectionCard>
 
-        <SectionCard title={t("Yield wiki hii", "Production yield this week")}>
-          <div className="h-60">
+        <SectionCard title={t("Yield wiki hii", "Yield this week")}>
+          <div className="h-56">
             <ResponsiveContainer>
               <LineChart data={YIELD_WEEK}>
                 <CartesianGrid stroke="#E6EBE1" vertical={false} />
-                <XAxis
-                  dataKey="day"
-                  stroke="#6B776E"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  stroke="#6B776E"
-                  fontSize={11}
-                  domain={[70, 95]}
-                  tickLine={false}
-                  axisLine={false}
-                />
+                <XAxis dataKey="day" stroke="#6B776E" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis stroke="#6B776E" fontSize={11} domain={[70, 95]} tickLine={false} axisLine={false} />
                 <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="yield"
-                  stroke="#1E7C3F"
-                  strokeWidth={3}
-                  dot={{ fill: "#2F9E44", r: 4 }}
-                />
+                <Line type="monotone" dataKey="yield" stroke="#1E7C3F" strokeWidth={3} dot={{ fill: "#2F9E44", r: 4 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -355,32 +258,14 @@ export function DashboardScreen() {
         </SectionCard>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4">
-        <SectionCard
-          title={t("Wateja wakubwa, mwezi huu", "Top customers, this month")}
-          className="lg:col-span-2"
-        >
-          <div className="h-72">
+      <div className="grid lg:grid-cols-3 gap-3 sm:gap-4">
+        <SectionCard title={t("Wateja wakubwa, mwezi", "Top customers, this month")} className="lg:col-span-2">
+          <div className="h-64 sm:h-72">
             <ResponsiveContainer>
-              <BarChart data={TOP_CUSTOMERS} layout="vertical" margin={{ left: 20 }}>
+              <BarChart data={TOP_CUSTOMERS} layout="vertical" margin={{ left: 10 }}>
                 <CartesianGrid stroke="#E6EBE1" horizontal={false} />
-                <XAxis
-                  type="number"
-                  stroke="#6B776E"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  stroke="#6B776E"
-                  fontSize={11}
-                  width={120}
-                  tickLine={false}
-                  axisLine={false}
-                />
+                <XAxis type="number" stroke="#6B776E" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                <YAxis type="category" dataKey="name" stroke="#6B776E" fontSize={11} width={110} tickLine={false} axisLine={false} />
                 <Tooltip formatter={(v: number) => tzs(v)} contentStyle={{ borderRadius: 12 }} />
                 <Bar dataKey="value" fill="#2F9E44" radius={[0, 8, 8, 0]} />
               </BarChart>
@@ -416,17 +301,9 @@ export function DashboardScreen() {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{a.title}</div>
-                      <div className="text-xs text-muted-foreground">{a.detail}</div>
+                      <div className="text-xs text-muted-foreground line-clamp-1">{a.detail}</div>
                     </div>
-                    <Pill
-                      tone={
-                        a.severity === "danger"
-                          ? "danger"
-                          : a.severity === "warning"
-                            ? "warning"
-                            : "info"
-                      }
-                    >
+                    <Pill tone={a.severity === "danger" ? "danger" : a.severity === "warning" ? "warning" : "info"}>
                       {a.timeAgo}
                     </Pill>
                   </Link>
@@ -437,11 +314,8 @@ export function DashboardScreen() {
         </SectionCard>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4 mt-4">
-        <SectionCard
-          title={t("Wafugaji bora mwezi huu", "Top farmers this month")}
-          className="lg:col-span-2"
-        >
+      <div className="grid lg:grid-cols-3 gap-3 sm:gap-4 mt-4">
+        <SectionCard title={t("Wafugaji bora mwezi huu", "Top farmers this month")} className="lg:col-span-2">
           <ul className="divide-y divide-border">
             {top.map((f, i) => (
               <li key={f.id} className="flex items-center gap-3 py-2.5">
@@ -468,11 +342,11 @@ export function DashboardScreen() {
         <SectionCard title={t("Hali ya stock", "Stock health")}>
           <div className="space-y-3">
             {[
-              { name: "Fresh milk", v: 240, max: 300, tone: "success" as const },
+              { name: t("Maziwa fresh", "Fresh milk"), v: 240, max: 300, tone: "success" as const },
               { name: "Mtindi", v: 180, max: 250, tone: "success" as const },
               { name: "Halloumi", v: 4.2, max: 10, tone: "warning" as const },
-              { name: "Butter 250g", v: 0, max: 30, tone: "danger" as const },
-              { name: "Vikopo robo", v: 140, max: 300, tone: "warning" as const },
+              { name: t("Siagi 250g", "Butter 250g"), v: 0, max: 30, tone: "danger" as const },
+              { name: t("Vikopo robo", "Vikopo robo"), v: 140, max: 300, tone: "warning" as const },
             ].map((s) => (
               <Link key={s.name} to="/stock" className="block group">
                 <div className="flex justify-between text-xs mb-1">
@@ -494,6 +368,45 @@ export function DashboardScreen() {
   );
 }
 
+function MiniStat({
+  label,
+  value,
+  sub,
+  delta,
+  accent,
+}: {
+  label: string;
+  value: React.ReactNode;
+  sub?: React.ReactNode;
+  delta?: { up: boolean; text: string };
+  accent?: "green" | "red" | "amber" | "info";
+}) {
+  const bar: Record<string, string> = {
+    green: "from-[#1E7C3F] to-[#8CC63F]",
+    red: "from-[#E11B22] to-[#ff7a7e]",
+    amber: "from-[#E5A100] to-[#ffd166]",
+    info: "from-[#1D9E75] to-[#6FBF59]",
+  };
+  return (
+    <div className="relative rounded-xl bg-card border border-border shadow-card p-2.5 sm:p-3 overflow-hidden">
+      <div className={`absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r ${bar[accent ?? "green"]}`} />
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold truncate">
+        {label}
+      </div>
+      <div className="font-num text-base sm:text-lg font-bold mt-0.5 text-foreground tabular-nums truncate">
+        {value}
+        {sub && <span className="text-[10px] font-semibold text-muted-foreground ml-1">{sub}</span>}
+      </div>
+      {delta && (
+        <div className={`text-[10px] mt-0.5 flex items-center gap-0.5 ${delta.up ? "text-[#1E7C3F]" : "text-[#1E7C3F]"}`}>
+          {delta.up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+          {delta.text}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function QuickAction({
   to,
   icon: Icon,
@@ -501,7 +414,7 @@ function QuickAction({
   show,
 }: {
   to: string;
-  icon: typeof MapPin;
+  icon: LucideIcon;
   label: string;
   show: boolean;
 }) {
@@ -509,13 +422,13 @@ function QuickAction({
   return (
     <Link
       to={to}
-      className="group rounded-2xl border border-border bg-card p-3 shadow-card hover:shadow-elevated transition flex items-center gap-2.5"
+      className="group inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 shadow-card hover:shadow-elevated hover:border-[#2F9E44] transition"
     >
       <span
-        className="grid h-9 w-9 place-items-center rounded-xl text-white shrink-0"
+        className="grid h-7 w-7 place-items-center rounded-lg text-white shrink-0"
         style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
       >
-        <Icon className="h-4 w-4" />
+        <Icon className="h-3.5 w-3.5" />
       </span>
       <span className="text-xs font-semibold leading-tight">{label}</span>
     </Link>
