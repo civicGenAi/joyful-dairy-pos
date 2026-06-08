@@ -12,6 +12,7 @@ import { num } from "@/lib/format";
 import { AlertTriangle, PackagePlus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ExportMenu } from "@/components/ui/ExportMenu";
 
 function statusOf(s: typeof STOCK[number]) {
   if (s.onHand <= 0) return "danger" as const;
@@ -55,7 +56,7 @@ export function StockScreen() {
           <TabsContent key={tab} value={tab} className="mt-4">
             <SectionCard
               title={tab === "finished" ? t("Bidhaa za kumaliza", "Finished products") : t("Vifaa vya ghala", "Consumables (Ghala)")}
-              action={<ReceiveDialog />}
+              action={<div className="flex gap-2"><ExportMenu formats={["csv", "excel"]} filename={`stock-${tab}`} /><ReceiveDialog /></div>}
             >
               <table className="w-full text-sm table-zebra">
                 <thead><tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">

@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { Wallet, Receipt, CheckCircle2, Calendar } from "lucide-react";
 import { toast } from "sonner";
+import { ExportMenu } from "@/components/ui/ExportMenu";
 
 export function FinanceScreen() {
   const { t } = useApp();
@@ -40,7 +41,7 @@ export function FinanceScreen() {
 
         <TabsContent value="receivables" className="mt-4">
           <div className="grid lg:grid-cols-3 gap-4">
-            <SectionCard title={t("Muhtasari wa madeni", "Receivables summary")} className="lg:col-span-2">
+            <SectionCard title={t("Muhtasari wa madeni", "Receivables summary")} className="lg:col-span-2" action={<ExportMenu formats={["excel", "csv"]} filename="receivables" />}>
               <table className="w-full text-sm">
                 <thead><tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border"><th className="py-2 px-3">{t("Mteja", "Customer")}</th><th>{t("Aina", "Type")}</th><th className="text-right">{t("Deni", "Outstanding")}</th><th>{t("Hali", "Status")}</th></tr></thead>
                 <tbody>

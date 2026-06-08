@@ -11,17 +11,22 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VanRouteImport } from './routes/van'
 import { Route as StockRouteImport } from './routes/stock'
+import { Route as StatusRouteImport } from './routes/status'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ReconciliationRouteImport } from './routes/reconciliation'
 import { Route as ProductsRouteImport } from './routes/products'
 import { Route as ProductionRouteImport } from './routes/production'
 import { Route as PosRouteImport } from './routes/pos'
+import { Route as OfflineRouteImport } from './routes/offline'
+import { Route as MaintenanceRouteImport } from './routes/maintenance'
 import { Route as FinanceRouteImport } from './routes/finance'
 import { Route as FarmersRouteImport } from './routes/farmers'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as CollectionPointsRouteImport } from './routes/collection-points'
+import { Route as R500RouteImport } from './routes/500'
+import { Route as R403RouteImport } from './routes/403'
 import { Route as IndexRouteImport } from './routes/index'
 
 const VanRoute = VanRouteImport.update({
@@ -32,6 +37,11 @@ const VanRoute = VanRouteImport.update({
 const StockRoute = StockRouteImport.update({
   id: '/stock',
   path: '/stock',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StatusRoute = StatusRouteImport.update({
+  id: '/status',
+  path: '/status',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -64,6 +74,16 @@ const PosRoute = PosRouteImport.update({
   path: '/pos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OfflineRoute = OfflineRouteImport.update({
+  id: '/offline',
+  path: '/offline',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MaintenanceRoute = MaintenanceRouteImport.update({
+  id: '/maintenance',
+  path: '/maintenance',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FinanceRoute = FinanceRouteImport.update({
   id: '/finance',
   path: '/finance',
@@ -89,6 +109,16 @@ const CollectionPointsRoute = CollectionPointsRouteImport.update({
   path: '/collection-points',
   getParentRoute: () => rootRouteImport,
 } as any)
+const R500Route = R500RouteImport.update({
+  id: '/500',
+  path: '/500',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const R403Route = R403RouteImport.update({
+  id: '/403',
+  path: '/403',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -97,50 +127,65 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/403': typeof R403Route
+  '/500': typeof R500Route
   '/collection-points': typeof CollectionPointsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/farmers': typeof FarmersRoute
   '/finance': typeof FinanceRoute
+  '/maintenance': typeof MaintenanceRoute
+  '/offline': typeof OfflineRoute
   '/pos': typeof PosRoute
   '/production': typeof ProductionRoute
   '/products': typeof ProductsRoute
   '/reconciliation': typeof ReconciliationRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
+  '/status': typeof StatusRoute
   '/stock': typeof StockRoute
   '/van': typeof VanRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/403': typeof R403Route
+  '/500': typeof R500Route
   '/collection-points': typeof CollectionPointsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/farmers': typeof FarmersRoute
   '/finance': typeof FinanceRoute
+  '/maintenance': typeof MaintenanceRoute
+  '/offline': typeof OfflineRoute
   '/pos': typeof PosRoute
   '/production': typeof ProductionRoute
   '/products': typeof ProductsRoute
   '/reconciliation': typeof ReconciliationRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
+  '/status': typeof StatusRoute
   '/stock': typeof StockRoute
   '/van': typeof VanRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/403': typeof R403Route
+  '/500': typeof R500Route
   '/collection-points': typeof CollectionPointsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/farmers': typeof FarmersRoute
   '/finance': typeof FinanceRoute
+  '/maintenance': typeof MaintenanceRoute
+  '/offline': typeof OfflineRoute
   '/pos': typeof PosRoute
   '/production': typeof ProductionRoute
   '/products': typeof ProductsRoute
   '/reconciliation': typeof ReconciliationRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
+  '/status': typeof StatusRoute
   '/stock': typeof StockRoute
   '/van': typeof VanRoute
 }
@@ -148,66 +193,86 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/403'
+    | '/500'
     | '/collection-points'
     | '/customers'
     | '/dashboard'
     | '/farmers'
     | '/finance'
+    | '/maintenance'
+    | '/offline'
     | '/pos'
     | '/production'
     | '/products'
     | '/reconciliation'
     | '/reports'
     | '/settings'
+    | '/status'
     | '/stock'
     | '/van'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/403'
+    | '/500'
     | '/collection-points'
     | '/customers'
     | '/dashboard'
     | '/farmers'
     | '/finance'
+    | '/maintenance'
+    | '/offline'
     | '/pos'
     | '/production'
     | '/products'
     | '/reconciliation'
     | '/reports'
     | '/settings'
+    | '/status'
     | '/stock'
     | '/van'
   id:
     | '__root__'
     | '/'
+    | '/403'
+    | '/500'
     | '/collection-points'
     | '/customers'
     | '/dashboard'
     | '/farmers'
     | '/finance'
+    | '/maintenance'
+    | '/offline'
     | '/pos'
     | '/production'
     | '/products'
     | '/reconciliation'
     | '/reports'
     | '/settings'
+    | '/status'
     | '/stock'
     | '/van'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  R403Route: typeof R403Route
+  R500Route: typeof R500Route
   CollectionPointsRoute: typeof CollectionPointsRoute
   CustomersRoute: typeof CustomersRoute
   DashboardRoute: typeof DashboardRoute
   FarmersRoute: typeof FarmersRoute
   FinanceRoute: typeof FinanceRoute
+  MaintenanceRoute: typeof MaintenanceRoute
+  OfflineRoute: typeof OfflineRoute
   PosRoute: typeof PosRoute
   ProductionRoute: typeof ProductionRoute
   ProductsRoute: typeof ProductsRoute
   ReconciliationRoute: typeof ReconciliationRoute
   ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
+  StatusRoute: typeof StatusRoute
   StockRoute: typeof StockRoute
   VanRoute: typeof VanRoute
 }
@@ -226,6 +291,13 @@ declare module '@tanstack/react-router' {
       path: '/stock'
       fullPath: '/stock'
       preLoaderRoute: typeof StockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/status': {
+      id: '/status'
+      path: '/status'
+      fullPath: '/status'
+      preLoaderRoute: typeof StatusRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -270,6 +342,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/offline': {
+      id: '/offline'
+      path: '/offline'
+      fullPath: '/offline'
+      preLoaderRoute: typeof OfflineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/maintenance': {
+      id: '/maintenance'
+      path: '/maintenance'
+      fullPath: '/maintenance'
+      preLoaderRoute: typeof MaintenanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/finance': {
       id: '/finance'
       path: '/finance'
@@ -305,6 +391,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CollectionPointsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/500': {
+      id: '/500'
+      path: '/500'
+      fullPath: '/500'
+      preLoaderRoute: typeof R500RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/403': {
+      id: '/403'
+      path: '/403'
+      fullPath: '/403'
+      preLoaderRoute: typeof R403RouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -317,30 +417,25 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  R403Route: R403Route,
+  R500Route: R500Route,
   CollectionPointsRoute: CollectionPointsRoute,
   CustomersRoute: CustomersRoute,
   DashboardRoute: DashboardRoute,
   FarmersRoute: FarmersRoute,
   FinanceRoute: FinanceRoute,
+  MaintenanceRoute: MaintenanceRoute,
+  OfflineRoute: OfflineRoute,
   PosRoute: PosRoute,
   ProductionRoute: ProductionRoute,
   ProductsRoute: ProductsRoute,
   ReconciliationRoute: ReconciliationRoute,
   ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
+  StatusRoute: StatusRoute,
   StockRoute: StockRoute,
   VanRoute: VanRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

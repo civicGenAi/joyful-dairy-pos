@@ -1,34 +1,39 @@
 import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
-import { FARMERS, COLLECTIONS_TODAY } from "@/mock/data";
+import { FARMERS } from "@/mock/data";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { tzs, L, num } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Search, Phone, MapPin, Calendar, Wallet } from "lucide-react";
+import { ExportMenu } from "@/components/ui/ExportMenu";
+import { RowActions } from "@/components/ui/RowActions";
+import type { Farmer } from "@/mock/types";
 
 export function FarmersScreen() {
   const { t } = useApp();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<string>("all");
+  const [farmers, setFarmers] = useState<Farmer[]>(FARMERS);
+  const [viewingId, setViewingId] = useState<string | null>(null);
 
-  const filtered = useMemo(() => FARMERS.filter((f) => {
+  const filtered = useMemo(() => farmers.filter((f) => {
     if (q && !f.name.toLowerCase().includes(q.toLowerCase())) return false;
     if (filter !== "all" && f.status !== filter) return false;
     return true;
-  }), [q, filter]);
+  }), [q, filter, farmers]);
 
-  const totalLitres = FARMERS.reduce((a, f) => a + f.litresThisCycle, 0);
-  const totalDue = FARMERS.reduce((a, f) => a + f.currentBalanceTZS, 0);
-  const totalFarmers = FARMERS.length;
-  const dueCount = FARMERS.filter((f) => f.status === "due" || f.status === "delayed").length;
+  const totalLitres = farmers.reduce((a, f) => a + f.litresThisCycle, 0);
+  const totalDue = farmers.reduce((a, f) => a + f.currentBalanceTZS, 0);
+  const totalFarmers = farmers.length;
+  const dueCount = farmers.filter((f) => f.status === "due" || f.status === "delayed").length;
 
   return (
     <AppShell title={t("Wafugaji", "Farmers")}>
@@ -57,6 +62,7 @@ export function FarmersScreen() {
                 <SelectItem value="paid">{t("Wamelipwa", "Paid")}</SelectItem>
               </SelectContent>
             </Select>
+            <ExportMenu formats={["excel", "csv", "pdf"]} filename="farmers" />
             <RecordCollectionDialog />
           </div>
         }
@@ -93,7 +99,12 @@ export function FarmersScreen() {
                     </Pill>
                   </td>
                   <td className="py-2.5 px-3 text-right">
-                    <FarmerDetailDrawer farmerId={f.id} />
+                    <RowActions
+                      itemName={f.name}
+                      onView={() => setViewingId(f.id)}
+                      onEdit={() => toast.success(t("Fomu ya hariri imefunguliwa", "Edit form opened"))}
+                      onDelete={() => { setFarmers((xs) => xs.filter((x) => x.id !== f.id)); toast.success(t("Mfugaji amefutwa", "Farmer deleted")); }}
+                    />
                   </td>
                 </tr>
               ))}
@@ -101,6 +112,7 @@ export function FarmersScreen() {
           </table>
         </div>
       </SectionCard>
+      {viewingId && <FarmerDetailDrawer farmerId={viewingId} open onClose={() => setViewingId(null)} />}
 
       <div className="mt-5">
         <SectionCard title={t("Mzunguko wa malipo (siku 15)", "Payment cycle (15 days)")}>
@@ -169,15 +181,13 @@ function RecordCollectionDialog() {
   );
 }
 
-function FarmerDetailDrawer({ farmerId }: { farmerId: string }) {
+function FarmerDetailDrawer({ farmerId, open, onClose }: { farmerId: string; open: boolean; onClose: () => void }) {
   const { t } = useApp();
   const f = FARMERS.find((x) => x.id === farmerId)!;
   const days = Array.from({ length: 30 }).map((_, i) => 8 + ((i + farmerId.length) * 7) % 35);
-  const collections = COLLECTIONS_TODAY.filter((c) => c.farmerId === farmerId);
 
   return (
-    <Sheet>
-      <SheetTrigger asChild><Button size="sm" variant="ghost" className="h-7 text-xs">{t("Tazama", "View")}</Button></SheetTrigger>
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-3">

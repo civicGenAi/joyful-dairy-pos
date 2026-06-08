@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
+import { ExportMenu } from "@/components/ui/ExportMenu";
 
 export function ProductsScreen() {
   const { t } = useApp();
@@ -34,7 +35,7 @@ export function ProductsScreen() {
         </TabsList>
 
         <TabsContent value="catalogue" className="mt-4">
-          <SectionCard title={t("Bidhaa zote", "All products")}>
+          <SectionCard title={t("Bidhaa zote", "All products")} action={<ExportMenu formats={["excel", "csv"]} filename="products" />}>
             <table className="w-full text-sm">
               <thead><tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
                 <th className="py-2 px-3">{t("Jina", "Name")}</th><th>{t("Kiswahili", "Swahili")}</th><th>{t("Kategoria", "Category")}</th><th>{t("Kipimo", "Unit")}</th><th>{t("Note", "Conversion")}</th><th>{t("Hai", "Active")}</th>

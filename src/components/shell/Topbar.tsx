@@ -10,6 +10,7 @@ import {
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "@tanstack/react-router";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 const ROLES: Role[] = ["admin", "finance", "production", "sales", "route", "store", "viewer"];
 
@@ -107,9 +108,17 @@ export function Topbar({ title }: { title: string }) {
             <div className="text-xs text-muted-foreground font-normal">{user.email}</div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => { logout(); nav({ to: "/" }); }}>
-            <LogOut className="h-4 w-4 mr-2" /> {t("Toka", "Sign out")}
-          </DropdownMenuItem>
+          <ConfirmDialog
+            title={t("Toka kwenye African Joy POS?", "Log out of African Joy POS?")}
+            description={t("Utahitaji kuingia tena kuendelea.", "You will need to sign in again to continue.")}
+            confirmLabel={t("Toka", "Sign out")}
+            onConfirm={() => { logout(); nav({ to: "/" }); }}
+            trigger={
+              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                <LogOut className="h-4 w-4 mr-2" /> {t("Toka", "Sign out")}
+              </DropdownMenuItem>
+            }
+          />
         </DropdownMenuContent>
       </DropdownMenu>
     </header>

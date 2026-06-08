@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Search, Wallet, Receipt, FileText, Plus } from "lucide-react";
 import type { Customer } from "@/mock/types";
+import { ExportMenu } from "@/components/ui/ExportMenu";
 
 export function CustomersScreen() {
   const { t } = useApp();
@@ -45,6 +46,7 @@ export function CustomersScreen() {
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input value={q} onChange={(e) => setQ(e.target.value)} className="h-8 w-56 pl-8 text-xs" placeholder={t("Tafuta…", "Search…")} />
             </div>
+            <ExportMenu formats={["excel", "csv"]} filename="customers" />
           </div>
         }
       >
