@@ -137,7 +137,7 @@ function CustomerDrawer({ c }: { c: Customer }) {
 
           <TabsContent value="statement" className="mt-3">
             <div className="rounded-xl border border-border p-4">
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">{t("Statimenti ya mwezi", "Monthly statement")} — May 2026</div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">{t("Statimenti ya mwezi", "Monthly statement")}, May 2026</div>
               <div className="font-display text-lg font-bold mt-1">{c.name}</div>
 
               <div className="mt-4 grid grid-cols-2 gap-2 text-sm">

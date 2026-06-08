@@ -102,8 +102,8 @@ export function SettingsScreen() {
           <SectionCard title={t("Wapokeaji wa ripoti otomatiki", "Auto-report recipients")}>
             <p className="text-sm text-muted-foreground mb-3">{t("Tumia ukurasa wa Ripoti kuona ratiba kamili.", "Use the Reports page for the full schedule grid.")}</p>
             <div className="rounded-xl bg-secondary/60 p-3 text-sm">
-              <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-[#1E7C3F]" /> owner@africanjoy.co.tz — {t("kila siku", "daily")}, {t("kila wiki", "weekly")}, {t("kila mwezi", "monthly")}</div>
-              <div className="flex items-center gap-2 mt-2"><Bell className="h-4 w-4 text-[#1E7C3F]" /> WhatsApp +255 754 100 000 — {t("muhtasari wa kila siku", "daily summary")}</div>
+              <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-[#1E7C3F]" /> owner@africanjoy.co.tz, {t("kila siku", "daily")}, {t("kila wiki", "weekly")}, {t("kila mwezi", "monthly")}</div>
+              <div className="flex items-center gap-2 mt-2"><Bell className="h-4 w-4 text-[#1E7C3F]" /> WhatsApp +255 754 100 000, {t("muhtasari wa kila siku", "daily summary")}</div>
             </div>
           </SectionCard>
         </TabsContent>

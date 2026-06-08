@@ -49,7 +49,7 @@ export function ReportsScreen() {
             <StatCard label={t("Yield", "Yield")} value="84%" accent="green" />
           </div>
 
-          <SectionCard title={t("Ripoti ya kila siku — 28 Mei 2026", "Daily report — 28 May 2026")}>
+          <SectionCard title={t("Ripoti ya kila siku, 28 Mei 2026", "Daily report, 28 May 2026")}>
             <div className="grid md:grid-cols-2 gap-3">
               {PRODUCT_BLOCKS.map((p) => (
                 <div key={p.name} className="rounded-2xl border border-border bg-card overflow-hidden">
@@ -101,7 +101,7 @@ export function ReportsScreen() {
             <StatCard label={t("Wafugaji active", "Farmers active")} value={num(15)} accent="green" />
             <StatCard label={t("Mauzo wastani siku", "Avg daily sales")} value={tzs(1370000)} accent="info" />
           </div>
-          <SectionCard title={t("Mauzo kwa wiki — Mei", "Sales by week — May")}>
+          <SectionCard title={t("Mauzo kwa wiki, Mei", "Sales by week, May")}>
             <div className="h-72"><ResponsiveContainer><BarChart data={[{ w: "W1", v: 8800000 }, { w: "W2", v: 10200000 }, { w: "W3", v: 9400000 }, { w: "W4", v: 12800000 }]}><CartesianGrid stroke="#E6EBE1" vertical={false} /><XAxis dataKey="w" stroke="#6B776E" fontSize={11} /><YAxis stroke="#6B776E" fontSize={11} tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`} /><Tooltip formatter={(v: number) => tzs(v)} /><Bar dataKey="v" fill="#2F9E44" radius={[8, 8, 0, 0]} /></BarChart></ResponsiveContainer></div>
           </SectionCard>
         </TabsContent>

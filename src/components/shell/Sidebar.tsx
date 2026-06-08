@@ -62,7 +62,7 @@ export function Sidebar() {
       </nav>
       <div className="m-3 rounded-xl p-3 text-xs text-white" style={{ background: "linear-gradient(135deg, #14532D, #1E7C3F)" }}>
         <div className="font-semibold mb-0.5">{lang === "sw" ? "Funga siku" : "Day status"}</div>
-        <div className="opacity-90">{lang === "sw" ? "Siku iko wazi — bado haijafungwa" : "Day open — not yet locked"}</div>
+        <div className="opacity-90">{lang === "sw" ? "Siku iko wazi, bado haijafungwa" : "Day open, not yet locked"}</div>
       </div>
     </aside>
   );

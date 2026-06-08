@@ -13,8 +13,17 @@ export const COMPANY = {
   name: "African Joy Dairy",
   city: "Arusha, Tanzania",
   tagline: "Premium dairy, empowering women farmers",
-  footer: "Asante kwa kuchagua African Joy — Thank you for choosing African Joy.",
+  footer: "Asante kwa kuchagua African Joy, thank you for choosing African Joy.",
+  phone: "+255 754 100 000",
+  email: "info@africanjoy.co.tz",
+  vrn: "VRN-40-123456-A",
+  tin: "TIN-123-456-789",
 };
+
+// Demo "today" used by every screen so the app is internally consistent.
+// Mutate here when refreshing the demo dataset.
+export const TODAY = "2026-05-28";
+export const TODAY_LABEL = "28 May 2026";
 
 export const USERS: User[] = [
   { id: "u1", name: "Joyce Mollel", email: "admin@africanjoy.co.tz", phone: "+255 754 100 001", roles: ["admin"], active: true, avatarColor: "#1E7C3F" },
@@ -205,12 +214,23 @@ export const STOCK: StockItem[] = [
 ];
 
 export const COLLECTIONS_TODAY: CollectionEntry[] = FARMERS.flatMap((f, i) => [
-  { id: `col-${i}-m`, farmerId: f.id, date: "2026-05-28", session: "morning", litres: Math.round(f.litresThisCycle / 15 * 0.6), point: i % 2 === 0 ? "field-a" : "main" },
-  { id: `col-${i}-e`, farmerId: f.id, date: "2026-05-28", session: "evening", litres: Math.round(f.litresThisCycle / 15 * 0.4), point: i % 3 === 0 ? "field-a" : "main" },
+  { id: `col-${i}-m`, farmerId: f.id, date: TODAY, session: "morning", litres: Math.round(f.litresThisCycle / 15 * 0.6), point: i % 2 === 0 ? "field-a" : "main" },
+  { id: `col-${i}-e`, farmerId: f.id, date: TODAY, session: "evening", litres: Math.round(f.litresThisCycle / 15 * 0.4), point: i % 3 === 0 ? "field-a" : "main" },
 ]);
 
+// Locations (collection points, main plant, vans, store) as first-class entities.
+export type LocationKind = "collection-point" | "plant" | "van" | "store";
+export interface Location { id: string; name: string; swName: string; kind: LocationKind; note?: string; active: boolean; }
+export const LOCATIONS: Location[] = [
+  { id: "loc-field-a", name: "Point A, Olasiti", swName: "Pointi A, Olasiti", kind: "collection-point", note: "Field collection, mornings + evenings", active: true },
+  { id: "loc-main", name: "Main plant, Arusha", swName: "Kiwandani, Arusha", kind: "plant", note: "Headquarters and processing", active: true },
+  { id: "loc-van1", name: "Route van #1", swName: "Gari la njia #1", kind: "van", note: "Driver: Baraka Laizer", active: true },
+  { id: "loc-van2", name: "Route van #2", swName: "Gari la njia #2", kind: "van", note: "Shared with sales team", active: true },
+  { id: "loc-store", name: "Consumables store", swName: "Ghala la vifaa", kind: "store", note: "Packaging and raw materials", active: true },
+];
+
 export const ALERTS: Alert[] = [
-  { id: "al-1", kind: "low-stock", title: "Butter 250g is out of stock", detail: "Last sale 2 days ago — reorder threshold 20 pcs", severity: "danger", timeAgo: "10 min ago" },
+  { id: "al-1", kind: "low-stock", title: "Butter 250g is out of stock", detail: "Last sale 2 days ago, reorder threshold 20 pcs", severity: "danger", timeAgo: "10 min ago" },
   { id: "al-2", kind: "low-stock", title: "Halloumi running low", detail: "On hand 4.2 kg, threshold 5 kg", severity: "warning", timeAgo: "1 hr ago" },
   { id: "al-3", kind: "low-stock", title: "Vikopo vya robo low", detail: "Balance 140 pcs, threshold 200 pcs", severity: "warning", timeAgo: "2 hr ago" },
   { id: "al-4", kind: "overdue-credit", title: "Mamis Bistro overdue", detail: "TZS 420,000 overdue 12 days", severity: "danger", timeAgo: "Today" },

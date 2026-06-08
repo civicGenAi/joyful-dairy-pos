@@ -50,7 +50,7 @@ export function DashboardScreen() {
 
       {/* Charts */}
       <div className="grid lg:grid-cols-3 gap-4 mb-6">
-        <SectionCard title={t("Mwendo wa maziwa siku 30 zilizopita", "Milk movement — last 30 days")} className="lg:col-span-2">
+        <SectionCard title={t("Mwendo wa maziwa siku 30 zilizopita", "Milk movement, last 30 days")} className="lg:col-span-2">
           <div className="h-64">
             <ResponsiveContainer>
               <AreaChart data={MILK_TREND_30} margin={{ left: -10, right: 5 }}>
@@ -86,7 +86,7 @@ export function DashboardScreen() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4 mb-6">
-        <SectionCard title={t("Mauzo kwa kategoria — wiki", "Sales by category — week")} className="lg:col-span-2">
+        <SectionCard title={t("Mauzo kwa kategoria, wiki", "Sales by category, week")} className="lg:col-span-2">
           <div className="h-60">
             <ResponsiveContainer>
               <BarChart data={SALES_BY_CATEGORY_WEEK} margin={{ left: -10 }}>
@@ -118,12 +118,12 @@ export function DashboardScreen() {
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-2 text-xs text-muted-foreground">{t("Wastani 83% — lengo 85%", "Average 83% — target 85%")}</div>
+          <div className="mt-2 text-xs text-muted-foreground">{t("Wastani 83%, lengo 85%", "Average 83%, target 85%")}</div>
         </SectionCard>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4">
-        <SectionCard title={t("Wateja wakubwa — mwezi huu", "Top customers — this month")} className="lg:col-span-2">
+        <SectionCard title={t("Wateja wakubwa, mwezi huu", "Top customers, this month")} className="lg:col-span-2">
           <div className="h-72">
             <ResponsiveContainer>
               <BarChart data={TOP_CUSTOMERS} layout="vertical" margin={{ left: 20 }}>
