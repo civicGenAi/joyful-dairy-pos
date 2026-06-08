@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Search, Wallet, Receipt, FileText, Plus } from "lucide-react";
 import type { Customer } from "@/mock/types";
+import { ExportMenu } from "@/components/ui/ExportMenu";
 
 export function CustomersScreen() {
   const { t } = useApp();

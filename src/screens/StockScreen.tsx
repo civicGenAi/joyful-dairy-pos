@@ -55,7 +55,7 @@ export function StockScreen() {
           <TabsContent key={tab} value={tab} className="mt-4">
             <SectionCard
               title={tab === "finished" ? t("Bidhaa za kumaliza", "Finished products") : t("Vifaa vya ghala", "Consumables (Ghala)")}
-              action={<ReceiveDialog />}
+              action={<div className="flex gap-2"><ExportMenu formats={["csv", "excel"]} filename={`stock-${tab}`} /><ReceiveDialog /></div>}
             >
               <table className="w-full text-sm table-zebra">
                 <thead><tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
