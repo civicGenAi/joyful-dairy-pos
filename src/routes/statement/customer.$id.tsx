@@ -10,5 +10,9 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/statement/customer/$id")({
   head: () => ({ meta: [{ title: "Customer statement, African Joy Dairy" }] }),
   validateSearch: searchSchema,
-  component: () => <RequireCap cap="customers:read"><CustomerStatementPrintScreen /></RequireCap>,
+  component: () => (
+    <RequireCap cap="customers:read">
+      <CustomerStatementPrintScreen />
+    </RequireCap>
+  ),
 });

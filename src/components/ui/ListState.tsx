@@ -42,7 +42,10 @@ export function ListState<T>({
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center text-center py-10 px-6">
-        <div className="grid h-12 w-12 place-items-center rounded-2xl text-white mb-3" style={{ background: "#E11B22" }}>
+        <div
+          className="grid h-12 w-12 place-items-center rounded-2xl text-white mb-3"
+          style={{ background: "#E11B22" }}
+        >
           <AlertOctagon className="h-5 w-5" />
         </div>
         <div className="font-display font-semibold">Couldn't load this list</div>
@@ -56,7 +59,14 @@ export function ListState<T>({
     );
   }
   if (!data || data.length === 0) {
-    return <EmptyState icon={emptyIcon} title={emptyTitle} description={emptyDescription} action={emptyAction} />;
+    return (
+      <EmptyState
+        icon={emptyIcon}
+        title={emptyTitle}
+        description={emptyDescription}
+        action={emptyAction}
+      />
+    );
   }
   return <>{children(data)}</>;
 }

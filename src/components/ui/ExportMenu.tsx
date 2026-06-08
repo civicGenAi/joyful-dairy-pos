@@ -1,4 +1,9 @@
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Download, FileSpreadsheet, FileText, FileType2 } from "lucide-react";
 import { toast } from "sonner";
@@ -18,16 +23,31 @@ const LABELS: Record<ExportFormat, { sw: string; en: string }> = {
   csv: { sw: "CSV", en: "CSV" },
 };
 
-export function ExportMenu({ formats, filename = "export" }: { formats: ExportFormat[]; filename?: string }) {
+export function ExportMenu({
+  formats,
+  filename = "export",
+}: {
+  formats: ExportFormat[];
+  filename?: string;
+}) {
   const { t } = useApp();
   const doExport = (f: ExportFormat) => {
     const ext = f === "excel" ? "xlsx" : f;
-    const blob = new Blob([`African Joy Dairy demo export\nFile: ${filename}.${ext}\nGenerated: ${new Date().toLocaleString()}\n`], { type: "text/plain" });
+    const blob = new Blob(
+      [
+        `African Joy Dairy demo export\nFile: ${filename}.${ext}\nGenerated: ${new Date().toLocaleString()}\n`,
+      ],
+      { type: "text/plain" },
+    );
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `${filename}.${ext}`; a.click();
+    a.href = url;
+    a.download = `${filename}.${ext}`;
+    a.click();
     URL.revokeObjectURL(url);
-    toast.success(t(`Imehamishwa kama ${f.toUpperCase()} (demo)`, `Exported as ${f.toUpperCase()} (demo)`));
+    toast.success(
+      t(`Imehamishwa kama ${f.toUpperCase()} (demo)`, `Exported as ${f.toUpperCase()} (demo)`),
+    );
   };
 
   if (formats.length === 1) {
