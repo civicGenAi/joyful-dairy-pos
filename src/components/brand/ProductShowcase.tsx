@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { usePrefersReducedMotion } from "@/hooks/use-local-storage";
 
 // Auto-load every product photo dropped into src/assets/allProd/*.
 // Add images there and they appear here with no code change. Filenames
@@ -61,12 +62,14 @@ export function ProductShowcase({
   }, []);
 
   const [idx, setIdx] = useState(0);
+  const reduced = usePrefersReducedMotion();
 
   useEffect(() => {
     if (slides.length <= 1) return;
+    if (reduced) return; // honor prefers-reduced-motion, no auto-rotation
     const id = setInterval(() => setIdx((i) => (i + 1) % slides.length), interval);
     return () => clearInterval(id);
-  }, [slides.length, interval]);
+  }, [slides.length, interval, reduced]);
 
   const current = slides[idx];
 

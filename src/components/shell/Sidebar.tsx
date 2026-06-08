@@ -75,7 +75,7 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
                 <button
                   onClick={onCloseMobile}
                   className="rounded-lg p-1.5 hover:bg-accent"
-                  aria-label="Close menu"
+                  aria-label={t("Funga menyu", "Close menu")}
                 >
                   <X className="h-4 w-4" />
                 </button>

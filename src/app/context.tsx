@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useState, useMemo, useEffect, type ReactNode } from "react";
 import { USERS } from "@/mock/data";
 import type { Role, User } from "@/mock/types";
 import { capabilitiesFor, hasCap, type Capability } from "@/lib/auth";
+import { useLocalStorage } from "@/hooks/use-local-storage";
 
 type Lang = "sw" | "en";
 
@@ -31,7 +32,15 @@ const Ctx = createContext<AppCtx | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [viewAs, setViewAs] = useState<Role>("admin");
-  const [lang, setLang] = useState<Lang>("sw");
+  const [lang, setLang] = useLocalStorage<Lang>("ajd:lang", "sw");
+
+  // Keep <html lang> in sync so screen readers and search bots pick the right
+  // language pronunciation/indexing automatically.
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("lang", lang === "sw" ? "sw" : "en");
+    }
+  }, [lang]);
 
   const value = useMemo<AppCtx>(() => {
     const roles = user?.roles ?? [];
@@ -57,7 +66,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setLang,
       t: (sw, en) => (lang === "sw" ? sw : en),
     };
-  }, [user, viewAs, lang]);
+  }, [user, viewAs, lang, setLang]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

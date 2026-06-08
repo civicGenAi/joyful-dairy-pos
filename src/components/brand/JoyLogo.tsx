@@ -29,6 +29,8 @@ export function JoyLogo({ size = 36, showWordmark = true, className, inlineOnly 
           alt="African Joy Dairy"
           width={size}
           height={size}
+          loading="lazy"
+          decoding="async"
           className="rounded-full object-contain shrink-0"
           style={{ width: size, height: size }}
         />

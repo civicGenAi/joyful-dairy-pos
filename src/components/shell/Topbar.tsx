@@ -87,6 +87,7 @@ export function Topbar({
             {q && (
               <button
                 onClick={() => setQ("")}
+                aria-label={t("Futa utafutaji", "Clear search")}
                 className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 hover:bg-accent"
               >
                 <X className="h-3 w-3" />
@@ -123,7 +124,10 @@ export function Topbar({
 
       <Popover>
         <PopoverTrigger asChild>
-          <button className="relative rounded-lg border border-border bg-card p-2 hover:bg-accent">
+          <button
+            className="relative rounded-lg border border-border bg-card p-2 hover:bg-accent"
+            aria-label={t("Arifa", "Notifications")}
+          >
             <Bell className="h-4 w-4" />
             <span
               className="absolute -top-1 -right-1 grid place-items-center h-4 min-w-4 px-1 rounded-full text-[10px] font-bold text-white"

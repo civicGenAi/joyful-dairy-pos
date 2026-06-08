@@ -4,21 +4,14 @@ import { Topbar } from "./Topbar";
 import { Navigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { useEffect, useState, type ReactNode } from "react";
+import { useLocalStorage, usePrefersReducedMotion } from "@/hooks/use-local-storage";
 
 export function AppShell({ title, children }: { title: string; children: ReactNode }) {
-  const { user } = useApp();
+  const { user, t } = useApp();
   // Persist the collapsed state so opening a new tab keeps the user's choice.
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("ajd:sidebar-collapsed") === "1";
-  });
+  const [collapsed, setCollapsed] = useLocalStorage<boolean>("ajd:sidebar-collapsed", false);
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("ajd:sidebar-collapsed", collapsed ? "1" : "0");
-    }
-  }, [collapsed]);
+  const reducedMotion = usePrefersReducedMotion();
 
   // Close mobile drawer on resize up to desktop.
   useEffect(() => {
@@ -33,6 +26,14 @@ export function AppShell({ title, children }: { title: string; children: ReactNo
 
   return (
     <div className="flex min-h-screen w-full bg-background">
+      {/* Skip-link for keyboard users, visible only on focus */}
+      <a
+        href="#ajd-main"
+        className="sr-only focus:not-sr-only fixed top-2 left-2 z-50 rounded-lg bg-foreground text-background px-3 py-2 text-sm font-semibold shadow-elevated"
+      >
+        {t("Ruka kwenye yaliyomo", "Skip to main content")}
+      </a>
+
       <Sidebar
         collapsed={collapsed}
         onToggleCollapsed={() => setCollapsed((c) => !c)}
@@ -42,11 +43,13 @@ export function AppShell({ title, children }: { title: string; children: ReactNo
       <div className="flex-1 min-w-0 flex flex-col">
         <Topbar title={title} onOpenMobileNav={() => setMobileOpen(true)} />
         <motion.main
+          id="ajd-main"
           key={title}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, ease: "easeOut" }}
-          className="flex-1 px-3 sm:px-4 lg:px-6 py-4 sm:py-5 lg:py-7"
+          tabIndex={-1}
+          initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+          animate={reducedMotion ? undefined : { opacity: 1, y: 0 }}
+          transition={reducedMotion ? { duration: 0 } : { duration: 0.25, ease: "easeOut" }}
+          className="flex-1 px-3 sm:px-4 lg:px-6 py-4 sm:py-5 lg:py-7 focus:outline-none"
         >
           {children}
         </motion.main>
