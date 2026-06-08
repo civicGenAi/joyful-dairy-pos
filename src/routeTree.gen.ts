@@ -28,6 +28,11 @@ import { Route as CollectionPointsRouteImport } from './routes/collection-points
 import { Route as R500RouteImport } from './routes/500'
 import { Route as R403RouteImport } from './routes/403'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ReceiptIdRouteImport } from './routes/receipt/$id'
+import { Route as StatementFarmerIdRouteImport } from './routes/statement/farmer.$id'
+import { Route as StatementCustomerIdRouteImport } from './routes/statement/customer.$id'
+import { Route as ReportDayCloseDateRouteImport } from './routes/report/day-close.$date'
+import { Route as ReceiptDepositIdRouteImport } from './routes/receipt/deposit.$id'
 
 const VanRoute = VanRouteImport.update({
   id: '/van',
@@ -124,6 +129,31 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReceiptIdRoute = ReceiptIdRouteImport.update({
+  id: '/receipt/$id',
+  path: '/receipt/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StatementFarmerIdRoute = StatementFarmerIdRouteImport.update({
+  id: '/statement/farmer/$id',
+  path: '/statement/farmer/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StatementCustomerIdRoute = StatementCustomerIdRouteImport.update({
+  id: '/statement/customer/$id',
+  path: '/statement/customer/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportDayCloseDateRoute = ReportDayCloseDateRouteImport.update({
+  id: '/report/day-close/$date',
+  path: '/report/day-close/$date',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReceiptDepositIdRoute = ReceiptDepositIdRouteImport.update({
+  id: '/receipt/deposit/$id',
+  path: '/receipt/deposit/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -145,6 +175,11 @@ export interface FileRoutesByFullPath {
   '/status': typeof StatusRoute
   '/stock': typeof StockRoute
   '/van': typeof VanRoute
+  '/receipt/$id': typeof ReceiptIdRoute
+  '/receipt/deposit/$id': typeof ReceiptDepositIdRoute
+  '/report/day-close/$date': typeof ReportDayCloseDateRoute
+  '/statement/customer/$id': typeof StatementCustomerIdRoute
+  '/statement/farmer/$id': typeof StatementFarmerIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -166,6 +201,11 @@ export interface FileRoutesByTo {
   '/status': typeof StatusRoute
   '/stock': typeof StockRoute
   '/van': typeof VanRoute
+  '/receipt/$id': typeof ReceiptIdRoute
+  '/receipt/deposit/$id': typeof ReceiptDepositIdRoute
+  '/report/day-close/$date': typeof ReportDayCloseDateRoute
+  '/statement/customer/$id': typeof StatementCustomerIdRoute
+  '/statement/farmer/$id': typeof StatementFarmerIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -188,6 +228,11 @@ export interface FileRoutesById {
   '/status': typeof StatusRoute
   '/stock': typeof StockRoute
   '/van': typeof VanRoute
+  '/receipt/$id': typeof ReceiptIdRoute
+  '/receipt/deposit/$id': typeof ReceiptDepositIdRoute
+  '/report/day-close/$date': typeof ReportDayCloseDateRoute
+  '/statement/customer/$id': typeof StatementCustomerIdRoute
+  '/statement/farmer/$id': typeof StatementFarmerIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -211,6 +256,11 @@ export interface FileRouteTypes {
     | '/status'
     | '/stock'
     | '/van'
+    | '/receipt/$id'
+    | '/receipt/deposit/$id'
+    | '/report/day-close/$date'
+    | '/statement/customer/$id'
+    | '/statement/farmer/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -232,6 +282,11 @@ export interface FileRouteTypes {
     | '/status'
     | '/stock'
     | '/van'
+    | '/receipt/$id'
+    | '/receipt/deposit/$id'
+    | '/report/day-close/$date'
+    | '/statement/customer/$id'
+    | '/statement/farmer/$id'
   id:
     | '__root__'
     | '/'
@@ -253,6 +308,11 @@ export interface FileRouteTypes {
     | '/status'
     | '/stock'
     | '/van'
+    | '/receipt/$id'
+    | '/receipt/deposit/$id'
+    | '/report/day-close/$date'
+    | '/statement/customer/$id'
+    | '/statement/farmer/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -275,6 +335,11 @@ export interface RootRouteChildren {
   StatusRoute: typeof StatusRoute
   StockRoute: typeof StockRoute
   VanRoute: typeof VanRoute
+  ReceiptIdRoute: typeof ReceiptIdRoute
+  ReceiptDepositIdRoute: typeof ReceiptDepositIdRoute
+  ReportDayCloseDateRoute: typeof ReportDayCloseDateRoute
+  StatementCustomerIdRoute: typeof StatementCustomerIdRoute
+  StatementFarmerIdRoute: typeof StatementFarmerIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -412,6 +477,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/receipt/$id': {
+      id: '/receipt/$id'
+      path: '/receipt/$id'
+      fullPath: '/receipt/$id'
+      preLoaderRoute: typeof ReceiptIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/statement/farmer/$id': {
+      id: '/statement/farmer/$id'
+      path: '/statement/farmer/$id'
+      fullPath: '/statement/farmer/$id'
+      preLoaderRoute: typeof StatementFarmerIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/statement/customer/$id': {
+      id: '/statement/customer/$id'
+      path: '/statement/customer/$id'
+      fullPath: '/statement/customer/$id'
+      preLoaderRoute: typeof StatementCustomerIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/report/day-close/$date': {
+      id: '/report/day-close/$date'
+      path: '/report/day-close/$date'
+      fullPath: '/report/day-close/$date'
+      preLoaderRoute: typeof ReportDayCloseDateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/receipt/deposit/$id': {
+      id: '/receipt/deposit/$id'
+      path: '/receipt/deposit/$id'
+      fullPath: '/receipt/deposit/$id'
+      preLoaderRoute: typeof ReceiptDepositIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -435,6 +535,11 @@ const rootRouteChildren: RootRouteChildren = {
   StatusRoute: StatusRoute,
   StockRoute: StockRoute,
   VanRoute: VanRoute,
+  ReceiptIdRoute: ReceiptIdRoute,
+  ReceiptDepositIdRoute: ReceiptDepositIdRoute,
+  ReportDayCloseDateRoute: ReportDayCloseDateRoute,
+  StatementCustomerIdRoute: StatementCustomerIdRoute,
+  StatementFarmerIdRoute: StatementFarmerIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

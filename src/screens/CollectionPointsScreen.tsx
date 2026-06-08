@@ -20,16 +20,16 @@ export function CollectionPointsScreen() {
   return (
     <AppShell title={t("Pointi za ukusanyaji", "Collection points")}>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        <StatCard label={t("Point A — Shambani", "Point A — Field")} value={L(pointA)} sub={t("Wafugaji 8 leo", "8 farmers today")} accent="green" />
-        <StatCard label={t("Main — Kiwandani", "Main — Plant")} value={L(main)} sub={t("Wafugaji 7 leo", "7 farmers today")} accent="info" />
+        <StatCard label={t("Point A, Shambani", "Point A, Field")} value={L(pointA)} sub={t("Wafugaji 8 leo", "8 farmers today")} accent="green" />
+        <StatCard label={t("Main, Kiwandani", "Main, Plant")} value={L(main)} sub={t("Wafugaji 7 leo", "7 farmers today")} accent="info" />
         <StatCard label={t("Jumla leo", "Total today")} value={L(pointA + main)} accent="green" />
         <StatCard label={t("Wahamishaji", "Transfers")} value={num(3)} sub={t("Field A → Plant", "Field A → Plant")} accent="amber" />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4 mb-5">
         {[
-          { id: "field-a", name: "Point A — Olasiti", swName: "Point A — Olasiti", intake: pointA },
-          { id: "main", name: "Main plant — Arusha", swName: "Kiwandani — Arusha", intake: main },
+          { id: "field-a", name: "Point A, Olasiti", swName: "Point A, Olasiti", intake: pointA },
+          { id: "main", name: "Main plant, Arusha", swName: "Kiwandani, Arusha", intake: main },
         ].map((p) => (
           <div key={p.id} className="rounded-2xl overflow-hidden border border-border shadow-card bg-card">
             <div className="p-5 text-white" style={{ background: "linear-gradient(135deg, #1E7C3F, #2F9E44 70%, #8CC63F)" }}>
@@ -46,7 +46,7 @@ export function CollectionPointsScreen() {
         ))}
       </div>
 
-      <SectionCard title={t("Matokeo ya leo — daftari", "Today's intake log")}>
+      <SectionCard title={t("Matokeo ya leo, daftari", "Today's intake log")}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -80,9 +80,9 @@ export function CollectionPointsScreen() {
         <SectionCard title={t("Uhamishaji wa hivi karibuni", "Recent transfers")}>
           <ul className="divide-y divide-border text-sm">
             {[
-              { from: "Point A — Olasiti", to: "Main plant", litres: 240, time: "08:42" },
+              { from: "Point A, Olasiti", to: "Main plant", litres: 240, time: "08:42" },
               { from: "Main plant", to: "Route van #1", litres: 120, time: "09:10" },
-              { from: "Point A — Olasiti", to: "Route van #2", litres: 80, time: "09:20" },
+              { from: "Point A, Olasiti", to: "Route van #2", litres: 80, time: "09:20" },
             ].map((tx, i) => (
               <li key={i} className="flex items-center gap-3 py-3">
                 <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />

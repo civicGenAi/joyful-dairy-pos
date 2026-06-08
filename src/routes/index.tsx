@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Briefcase, LogIn } from "lucide-react";
 
 export const Route = createFileRoute("/")({
-  head: () => ({ meta: [{ title: "Sign in — African Joy Dairy" }] }),
+  head: () => ({ meta: [{ title: "Sign in, African Joy Dairy" }] }),
   component: LoginPage,
 });
 
@@ -61,8 +61,8 @@ function LoginPage() {
           </h2>
           <p className="mt-3 text-white/85 leading-relaxed">
             {t(
-              "Mfumo kamili wa uzalishaji, mauzo, ghala na fedha — kwa lugha ya Kiswahili na Kiingereza.",
-              "An end-to-end system for production, sales, store and finance — built bilingual for our team."
+              "Mfumo kamili wa uzalishaji, mauzo, ghala na fedha, kwa lugha ya Kiswahili na Kiingereza.",
+              "An end-to-end system for production, sales, store and finance, built bilingual for our team."
             )}
           </p>
           <div className="mt-8 grid grid-cols-3 gap-3 text-center">

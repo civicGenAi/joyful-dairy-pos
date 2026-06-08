@@ -47,7 +47,7 @@ export function ProductsScreen() {
                     <td className="py-2.5 text-muted-foreground">{p.swName}</td>
                     <td className="py-2.5"><Pill tone="info">{p.category}</Pill></td>
                     <td className="py-2.5 font-num">{p.unit}</td>
-                    <td className="py-2.5 text-xs text-muted-foreground">{p.conversionNote ?? "—"}</td>
+                    <td className="py-2.5 text-xs text-muted-foreground">{p.conversionNote ?? "·"}</td>
                     <td className="py-2.5"><Switch defaultChecked={p.active} /></td>
                   </tr>
                 ))}
@@ -58,7 +58,7 @@ export function ProductsScreen() {
 
         <TabsContent value="prices" className="mt-4">
           <SectionCard
-            title={t("Bei (TZS) — inahaririwa", "Price matrix (TZS) — editable")}
+            title={t("Bei (TZS), inahaririwa", "Price matrix (TZS), editable")}
             action={<Button size="sm" className="text-white" style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }} onClick={() => toast.success(t("Bei zimehifadhiwa", "Prices saved"))}><Save className="h-3.5 w-3.5 mr-1.5" />{t("Hifadhi", "Save")}</Button>}
           >
             <div className="overflow-x-auto">

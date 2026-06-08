@@ -58,7 +58,7 @@ export function FinanceScreen() {
         </TabsContent>
 
         <TabsContent value="payables" className="mt-4">
-          <SectionCard title={t("Malipo yajayo — mzunguko wa siku 15", "Upcoming payouts — 15-day cycle")}>
+          <SectionCard title={t("Malipo yajayo, mzunguko wa siku 15", "Upcoming payouts, 15-day cycle")}>
             <div className="rounded-xl bg-[#1E7C3F]/10 p-4 mb-4 flex items-center gap-3">
               <Calendar className="h-5 w-5 text-[#1E7C3F]" />
               <div>
@@ -82,9 +82,9 @@ export function FinanceScreen() {
               <thead><tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border"><th className="py-2 px-3">{t("Wakati", "Time")}</th><th>{t("Rejea", "Reference")}</th><th>{t("Chanzo", "Source")}</th><th>{t("Aina", "Type")}</th><th className="text-right">{t("Kiasi", "Amount")}</th><th /></tr></thead>
               <tbody>
                 {[
-                  { t: "08:15", ref: "RCT-5810", src: "Route van #1 — Baraka", k: "Route cash-up", a: 540000 },
+                  { t: "08:15", ref: "RCT-5810", src: "Route van #1, Baraka", k: "Route cash-up", a: 540000 },
                   { t: "10:42", ref: "RCT-5811", src: "Mamis Bistro", k: "Customer deposit", a: 150000 },
-                  { t: "12:05", ref: "RCT-5812", src: "POS — counter", k: "Cash banking", a: 320000 },
+                  { t: "12:05", ref: "RCT-5812", src: "POS, counter", k: "Cash banking", a: 320000 },
                   { t: "14:30", ref: "RCT-5813", src: "Jovinary Hotel", k: "Customer deposit", a: 200000 },
                 ].map((d) => (
                   <tr key={d.ref} className="border-b border-border last:border-0">

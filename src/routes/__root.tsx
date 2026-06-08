@@ -29,7 +29,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "African Joy Dairy — Operations" },
+      { title: "African Joy Dairy, Operations" },
       { name: "description", content: "Operations and POS for African Joy Dairy, Arusha." },
     ],
     links: [

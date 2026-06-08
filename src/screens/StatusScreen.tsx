@@ -80,7 +80,7 @@ export function StatusScreen() {
                       return <span key={i} className="h-6 flex-1 rounded-[2px]" style={{ background: `${color}cc` }} />;
                     })}
                   </div>
-                  <div className="text-[10px] text-muted-foreground mt-1.5">90 days ago — today</div>
+                  <div className="text-[10px] text-muted-foreground mt-1.5">90 days ago, today</div>
                 </li>
               );
             })}
