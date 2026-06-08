@@ -105,7 +105,15 @@ export function ReconciliationScreen() {
         <SectionCard title={t("Funga siku", "Day close")}>
           <p className="text-sm text-muted-foreground mb-4">{t("Baada ya kufunga, salio la mwisho linakuwa salio la awali la kesho. Inahitajika jukumu la Production au Admin.", "After locking, closing balances become tomorrow's opening. Requires Production Manager or Admin role.")}</p>
           <div className="flex gap-2">
-            <Button disabled={!canLock || locked} onClick={() => { setLocked(true); toast.success(t("Siku imefungwa", "Day locked")); }} className="text-white" style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}><Lock className="h-4 w-4 mr-1.5" />{locked ? t("Imefungwa", "Locked") : t("Funga siku", "Lock day")}</Button>
+            <ConfirmDialog
+              title={t("Funga siku?", "Lock the day?")}
+              description={t("Mara baada ya kufunga, takwimu za siku haziwezi kubadilishwa. Salio la mwisho litakuwa la awali la kesho.", "Once locked, today's figures become read-only and tomorrow opens from these closing balances.")}
+              confirmLabel={t("Funga siku", "Lock day")}
+              onConfirm={() => { setLocked(true); toast.success(t("Siku imefungwa", "Day locked")); }}
+              trigger={
+                <Button disabled={!canLock || locked} className="text-white" style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}><Lock className="h-4 w-4 mr-1.5" />{locked ? t("Imefungwa", "Locked") : t("Funga siku", "Lock day")}</Button>
+              }
+            />
             {!canLock && <Pill tone="warning">{t("Huna ruhusa", "No permission")}</Pill>}
           </div>
         </SectionCard>
