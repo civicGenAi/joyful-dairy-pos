@@ -477,3 +477,118 @@ export function DepositSlipPrintScreen() {
     </PrintShell>
   );
 }
+
+// ---- Farmer payout slip ----------------------------------------------------
+
+export function FarmerPayoutSlipScreen() {
+  const { t } = useApp();
+  const { id } = useParams({ from: "/payout/farmer/$id" });
+  const search = useSearch({ from: "/payout/farmer/$id" }) as { cycle?: string };
+  const cycle = search.cycle ?? "01-15 Jun 2026";
+  const f: Farmer | undefined = FARMERS.find((x) => x.id === id);
+
+  if (!f) {
+    return (
+      <PrintShell backTo="/farmers" title="Farmer not found">
+        <div>No farmer with id {id}.</div>
+      </PrintShell>
+    );
+  }
+
+  // For demo, the payout amount is the farmer's current balance.
+  const litres = Math.round(f.litresThisCycle / 2); // litres earned in this cycle
+  const gross = litres * f.ratePerL;
+  const deductions = Math.round(gross * 0.02); // 2% Sacco contribution, demo
+  const net = gross - deductions;
+
+  return (
+    <PrintShell
+      backTo="/farmers"
+      title={t("Karatasi ya malipo", "Payout slip")}
+      subtitle={`${f.name} · ${f.village} · ${cycle}`}
+    >
+      <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+        <div className="rounded-xl bg-secondary/60 p-3">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Mfugaji", "Farmer")}
+          </div>
+          <div className="font-semibold">{f.name}</div>
+          <div className="text-xs text-muted-foreground">{f.phone}</div>
+        </div>
+        <div className="rounded-xl bg-secondary/60 p-3 text-right">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Mzunguko", "Cycle")}
+          </div>
+          <div className="font-semibold">{cycle}</div>
+          <div className="text-xs text-muted-foreground">{f.village}</div>
+        </div>
+      </div>
+
+      <table className="w-full text-sm font-num">
+        <tbody>
+          <tr className="border-b border-border">
+            <td className="py-2.5 text-muted-foreground">
+              {t("Litre zilizokusanywa", "Litres collected")}
+            </td>
+            <td className="py-2.5 text-right">{litres} L</td>
+          </tr>
+          <tr className="border-b border-border">
+            <td className="py-2.5 text-muted-foreground">{t("Bei", "Rate")}</td>
+            <td className="py-2.5 text-right">{num(f.ratePerL)} / L</td>
+          </tr>
+          <tr className="border-b border-border">
+            <td className="py-2.5 font-sans text-muted-foreground">{t("Jumla ghafi", "Gross")}</td>
+            <td className="py-2.5 text-right font-semibold">{tzs(gross)}</td>
+          </tr>
+          <tr className="border-b border-border text-[#E11B22]">
+            <td className="py-2.5 font-sans">
+              {t("Mchango wa Sacco (2%)", "Sacco contribution (2%)")}
+            </td>
+            <td className="py-2.5 text-right">-{tzs(deductions)}</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr className="border-t-2 border-border">
+            <td className="py-3 font-sans font-bold text-base">
+              {t("Malipo halisi", "Net payable")}
+            </td>
+            <td className="py-3 text-right font-bold text-base text-[#1E7C3F]">{tzs(net)}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
+        <div className="rounded-xl border border-border p-3">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Njia ya malipo", "Pay method")}
+          </div>
+          <div className="font-semibold">M-Pesa</div>
+          <div className="text-xs text-muted-foreground">{f.phone}</div>
+        </div>
+        <div className="rounded-xl border border-border p-3">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Hali", "Status")}
+          </div>
+          <div className="font-semibold capitalize">{f.status}</div>
+        </div>
+      </div>
+
+      <div className="mt-10 grid grid-cols-2 gap-6 text-sm">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-8">
+            {t("Saini, mfugaji", "Farmer signature")}
+          </div>
+          <div className="border-t border-border pt-1 text-xs text-muted-foreground">{f.name}</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-8">
+            {t("Saini, Finance", "Finance signature")}
+          </div>
+          <div className="border-t border-border pt-1 text-xs text-muted-foreground">
+            Asha Mwakasege
+          </div>
+        </div>
+      </div>
+    </PrintShell>
+  );
+}

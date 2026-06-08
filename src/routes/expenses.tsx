@@ -2,12 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { RequireCap } from "@/components/shell/RequireCap";
 import { lazyScreen } from "@/components/shell/lazyScreen";
 
-const ProductionScreen = lazyScreen(() => import("@/screens/ProductionScreen"), "ProductionScreen");
+const ExpensesScreen = lazyScreen(() => import("@/screens/ExpensesScreen"), "ExpensesScreen");
 
-export const Route = createFileRoute("/production")({
+export const Route = createFileRoute("/expenses")({
   component: () => (
-    <RequireCap cap="production:read">
-      <ProductionScreen />
+    <RequireCap cap="finance:read">
+      <ExpensesScreen />
     </RequireCap>
   ),
 });

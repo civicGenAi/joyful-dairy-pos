@@ -13,6 +13,7 @@ import { Route as VanRouteImport } from './routes/van'
 import { Route as StockRouteImport } from './routes/stock'
 import { Route as StatusRouteImport } from './routes/status'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SearchRouteImport } from './routes/search'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ReconciliationRouteImport } from './routes/reconciliation'
 import { Route as ProductsRouteImport } from './routes/products'
@@ -20,8 +21,10 @@ import { Route as ProductionRouteImport } from './routes/production'
 import { Route as PosRouteImport } from './routes/pos'
 import { Route as OfflineRouteImport } from './routes/offline'
 import { Route as MaintenanceRouteImport } from './routes/maintenance'
+import { Route as HelpRouteImport } from './routes/help'
 import { Route as FinanceRouteImport } from './routes/finance'
 import { Route as FarmersRouteImport } from './routes/farmers'
+import { Route as ExpensesRouteImport } from './routes/expenses'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as CollectionPointsRouteImport } from './routes/collection-points'
@@ -33,6 +36,7 @@ import { Route as StatementFarmerIdRouteImport } from './routes/statement/farmer
 import { Route as StatementCustomerIdRouteImport } from './routes/statement/customer.$id'
 import { Route as ReportDayCloseDateRouteImport } from './routes/report/day-close.$date'
 import { Route as ReceiptDepositIdRouteImport } from './routes/receipt/deposit.$id'
+import { Route as PayoutFarmerIdRouteImport } from './routes/payout/farmer.$id'
 
 const VanRoute = VanRouteImport.update({
   id: '/van',
@@ -52,6 +56,11 @@ const StatusRoute = StatusRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SearchRoute = SearchRouteImport.update({
+  id: '/search',
+  path: '/search',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsRoute = ReportsRouteImport.update({
@@ -89,6 +98,11 @@ const MaintenanceRoute = MaintenanceRouteImport.update({
   path: '/maintenance',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HelpRoute = HelpRouteImport.update({
+  id: '/help',
+  path: '/help',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FinanceRoute = FinanceRouteImport.update({
   id: '/finance',
   path: '/finance',
@@ -97,6 +111,11 @@ const FinanceRoute = FinanceRouteImport.update({
 const FarmersRoute = FarmersRouteImport.update({
   id: '/farmers',
   path: '/farmers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExpensesRoute = ExpensesRouteImport.update({
+  id: '/expenses',
+  path: '/expenses',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -154,6 +173,11 @@ const ReceiptDepositIdRoute = ReceiptDepositIdRouteImport.update({
   path: '/receipt/deposit/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PayoutFarmerIdRoute = PayoutFarmerIdRouteImport.update({
+  id: '/payout/farmer/$id',
+  path: '/payout/farmer/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -162,8 +186,10 @@ export interface FileRoutesByFullPath {
   '/collection-points': typeof CollectionPointsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
+  '/expenses': typeof ExpensesRoute
   '/farmers': typeof FarmersRoute
   '/finance': typeof FinanceRoute
+  '/help': typeof HelpRoute
   '/maintenance': typeof MaintenanceRoute
   '/offline': typeof OfflineRoute
   '/pos': typeof PosRoute
@@ -171,11 +197,13 @@ export interface FileRoutesByFullPath {
   '/products': typeof ProductsRoute
   '/reconciliation': typeof ReconciliationRoute
   '/reports': typeof ReportsRoute
+  '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
   '/stock': typeof StockRoute
   '/van': typeof VanRoute
   '/receipt/$id': typeof ReceiptIdRoute
+  '/payout/farmer/$id': typeof PayoutFarmerIdRoute
   '/receipt/deposit/$id': typeof ReceiptDepositIdRoute
   '/report/day-close/$date': typeof ReportDayCloseDateRoute
   '/statement/customer/$id': typeof StatementCustomerIdRoute
@@ -188,8 +216,10 @@ export interface FileRoutesByTo {
   '/collection-points': typeof CollectionPointsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
+  '/expenses': typeof ExpensesRoute
   '/farmers': typeof FarmersRoute
   '/finance': typeof FinanceRoute
+  '/help': typeof HelpRoute
   '/maintenance': typeof MaintenanceRoute
   '/offline': typeof OfflineRoute
   '/pos': typeof PosRoute
@@ -197,11 +227,13 @@ export interface FileRoutesByTo {
   '/products': typeof ProductsRoute
   '/reconciliation': typeof ReconciliationRoute
   '/reports': typeof ReportsRoute
+  '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
   '/stock': typeof StockRoute
   '/van': typeof VanRoute
   '/receipt/$id': typeof ReceiptIdRoute
+  '/payout/farmer/$id': typeof PayoutFarmerIdRoute
   '/receipt/deposit/$id': typeof ReceiptDepositIdRoute
   '/report/day-close/$date': typeof ReportDayCloseDateRoute
   '/statement/customer/$id': typeof StatementCustomerIdRoute
@@ -215,8 +247,10 @@ export interface FileRoutesById {
   '/collection-points': typeof CollectionPointsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
+  '/expenses': typeof ExpensesRoute
   '/farmers': typeof FarmersRoute
   '/finance': typeof FinanceRoute
+  '/help': typeof HelpRoute
   '/maintenance': typeof MaintenanceRoute
   '/offline': typeof OfflineRoute
   '/pos': typeof PosRoute
@@ -224,11 +258,13 @@ export interface FileRoutesById {
   '/products': typeof ProductsRoute
   '/reconciliation': typeof ReconciliationRoute
   '/reports': typeof ReportsRoute
+  '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
   '/stock': typeof StockRoute
   '/van': typeof VanRoute
   '/receipt/$id': typeof ReceiptIdRoute
+  '/payout/farmer/$id': typeof PayoutFarmerIdRoute
   '/receipt/deposit/$id': typeof ReceiptDepositIdRoute
   '/report/day-close/$date': typeof ReportDayCloseDateRoute
   '/statement/customer/$id': typeof StatementCustomerIdRoute
@@ -243,8 +279,10 @@ export interface FileRouteTypes {
     | '/collection-points'
     | '/customers'
     | '/dashboard'
+    | '/expenses'
     | '/farmers'
     | '/finance'
+    | '/help'
     | '/maintenance'
     | '/offline'
     | '/pos'
@@ -252,11 +290,13 @@ export interface FileRouteTypes {
     | '/products'
     | '/reconciliation'
     | '/reports'
+    | '/search'
     | '/settings'
     | '/status'
     | '/stock'
     | '/van'
     | '/receipt/$id'
+    | '/payout/farmer/$id'
     | '/receipt/deposit/$id'
     | '/report/day-close/$date'
     | '/statement/customer/$id'
@@ -269,8 +309,10 @@ export interface FileRouteTypes {
     | '/collection-points'
     | '/customers'
     | '/dashboard'
+    | '/expenses'
     | '/farmers'
     | '/finance'
+    | '/help'
     | '/maintenance'
     | '/offline'
     | '/pos'
@@ -278,11 +320,13 @@ export interface FileRouteTypes {
     | '/products'
     | '/reconciliation'
     | '/reports'
+    | '/search'
     | '/settings'
     | '/status'
     | '/stock'
     | '/van'
     | '/receipt/$id'
+    | '/payout/farmer/$id'
     | '/receipt/deposit/$id'
     | '/report/day-close/$date'
     | '/statement/customer/$id'
@@ -295,8 +339,10 @@ export interface FileRouteTypes {
     | '/collection-points'
     | '/customers'
     | '/dashboard'
+    | '/expenses'
     | '/farmers'
     | '/finance'
+    | '/help'
     | '/maintenance'
     | '/offline'
     | '/pos'
@@ -304,11 +350,13 @@ export interface FileRouteTypes {
     | '/products'
     | '/reconciliation'
     | '/reports'
+    | '/search'
     | '/settings'
     | '/status'
     | '/stock'
     | '/van'
     | '/receipt/$id'
+    | '/payout/farmer/$id'
     | '/receipt/deposit/$id'
     | '/report/day-close/$date'
     | '/statement/customer/$id'
@@ -322,8 +370,10 @@ export interface RootRouteChildren {
   CollectionPointsRoute: typeof CollectionPointsRoute
   CustomersRoute: typeof CustomersRoute
   DashboardRoute: typeof DashboardRoute
+  ExpensesRoute: typeof ExpensesRoute
   FarmersRoute: typeof FarmersRoute
   FinanceRoute: typeof FinanceRoute
+  HelpRoute: typeof HelpRoute
   MaintenanceRoute: typeof MaintenanceRoute
   OfflineRoute: typeof OfflineRoute
   PosRoute: typeof PosRoute
@@ -331,11 +381,13 @@ export interface RootRouteChildren {
   ProductsRoute: typeof ProductsRoute
   ReconciliationRoute: typeof ReconciliationRoute
   ReportsRoute: typeof ReportsRoute
+  SearchRoute: typeof SearchRoute
   SettingsRoute: typeof SettingsRoute
   StatusRoute: typeof StatusRoute
   StockRoute: typeof StockRoute
   VanRoute: typeof VanRoute
   ReceiptIdRoute: typeof ReceiptIdRoute
+  PayoutFarmerIdRoute: typeof PayoutFarmerIdRoute
   ReceiptDepositIdRoute: typeof ReceiptDepositIdRoute
   ReportDayCloseDateRoute: typeof ReportDayCloseDateRoute
   StatementCustomerIdRoute: typeof StatementCustomerIdRoute
@@ -370,6 +422,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/search': {
+      id: '/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof SearchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports': {
@@ -421,6 +480,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MaintenanceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/help': {
+      id: '/help'
+      path: '/help'
+      fullPath: '/help'
+      preLoaderRoute: typeof HelpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/finance': {
       id: '/finance'
       path: '/finance'
@@ -433,6 +499,13 @@ declare module '@tanstack/react-router' {
       path: '/farmers'
       fullPath: '/farmers'
       preLoaderRoute: typeof FarmersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/expenses': {
+      id: '/expenses'
+      path: '/expenses'
+      fullPath: '/expenses'
+      preLoaderRoute: typeof ExpensesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -512,6 +585,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReceiptDepositIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/payout/farmer/$id': {
+      id: '/payout/farmer/$id'
+      path: '/payout/farmer/$id'
+      fullPath: '/payout/farmer/$id'
+      preLoaderRoute: typeof PayoutFarmerIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -522,8 +602,10 @@ const rootRouteChildren: RootRouteChildren = {
   CollectionPointsRoute: CollectionPointsRoute,
   CustomersRoute: CustomersRoute,
   DashboardRoute: DashboardRoute,
+  ExpensesRoute: ExpensesRoute,
   FarmersRoute: FarmersRoute,
   FinanceRoute: FinanceRoute,
+  HelpRoute: HelpRoute,
   MaintenanceRoute: MaintenanceRoute,
   OfflineRoute: OfflineRoute,
   PosRoute: PosRoute,
@@ -531,11 +613,13 @@ const rootRouteChildren: RootRouteChildren = {
   ProductsRoute: ProductsRoute,
   ReconciliationRoute: ReconciliationRoute,
   ReportsRoute: ReportsRoute,
+  SearchRoute: SearchRoute,
   SettingsRoute: SettingsRoute,
   StatusRoute: StatusRoute,
   StockRoute: StockRoute,
   VanRoute: VanRoute,
   ReceiptIdRoute: ReceiptIdRoute,
+  PayoutFarmerIdRoute: PayoutFarmerIdRoute,
   ReceiptDepositIdRoute: ReceiptDepositIdRoute,
   ReportDayCloseDateRoute: ReportDayCloseDateRoute,
   StatementCustomerIdRoute: StatementCustomerIdRoute,
