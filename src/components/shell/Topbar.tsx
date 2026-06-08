@@ -8,6 +8,7 @@ import {
   ArrowLeftRight,
   X,
   Menu,
+  Settings,
 } from "lucide-react";
 import { useApp } from "@/app/context";
 import { ALERTS, ROLE_LABEL, USERS, CUSTOMERS, FARMERS, PRODUCTS } from "@/mock/data";
@@ -29,8 +30,14 @@ import { useMemo, useState } from "react";
 
 const ROLES: Role[] = ["admin", "finance", "production", "sales", "route", "store", "viewer"];
 
-export function Topbar({ title, onOpenMobileNav }: { title: string; onOpenMobileNav?: () => void }) {
-  const { user, role, setRole, resetRole, lang, setLang, logout, t, roles } = useApp();
+export function Topbar({
+  title,
+  onOpenMobileNav,
+}: {
+  title: string;
+  onOpenMobileNav?: () => void;
+}) {
+  const { user, role, setRole, resetRole, lang, setLang, logout, t, roles, can } = useApp();
   const nav = useNavigate();
   const isAdmin = roles.includes("admin");
   const [q, setQ] = useState("");
@@ -248,6 +255,30 @@ export function Topbar({ title, onOpenMobileNav }: { title: string; onOpenMobile
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+
+          {/* Language switcher inside the user menu */}
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              setLang(lang === "sw" ? "en" : "sw");
+            }}
+          >
+            <Languages className="h-4 w-4 mr-2" />
+            <span className="flex-1">{t("Lugha", "Language")}</span>
+            <span className="text-[10px] font-semibold rounded-md bg-secondary px-1.5 py-0.5">
+              {lang === "sw" ? "Kiswahili" : "English"}
+            </span>
+          </DropdownMenuItem>
+
+          {/* Settings gear, only when the user can reach it */}
+          {can("settings:write") && (
+            <DropdownMenuItem onClick={() => nav({ to: "/settings" })}>
+              <Settings className="h-4 w-4 mr-2" />
+              {t("Mipangilio", "Settings")}
+            </DropdownMenuItem>
+          )}
+
+          <DropdownMenuSeparator />
           <ConfirmDialog
             title={t("Toka kwenye African Joy POS?", "Log out of African Joy POS?")}
             description={t(
@@ -260,7 +291,10 @@ export function Topbar({ title, onOpenMobileNav }: { title: string; onOpenMobile
               nav({ to: "/" });
             }}
             trigger={
-              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <DropdownMenuItem
+                onSelect={(e) => e.preventDefault()}
+                className="text-[#E11B22] focus:text-[#E11B22]"
+              >
                 <LogOut className="h-4 w-4 mr-2" /> {t("Toka", "Sign out")}
               </DropdownMenuItem>
             }

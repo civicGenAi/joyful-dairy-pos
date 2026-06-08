@@ -37,7 +37,8 @@ export type Capability =
   // Admin
   | "users:read"
   | "users:write"
-  | "settings:write";
+  | "settings:write"
+  | "audit:read";
 
 const ROLE_CAPS: Record<Role, Capability[]> = {
   admin: [
@@ -70,6 +71,7 @@ const ROLE_CAPS: Record<Role, Capability[]> = {
     "users:read",
     "users:write",
     "settings:write",
+    "audit:read",
   ],
   finance: [
     "view:dashboard",

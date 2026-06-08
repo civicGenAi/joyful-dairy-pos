@@ -5,8 +5,11 @@ import {
   ROLE_LABEL,
   COMPANY,
   LOCATIONS,
+  AUDIT_LOG,
   type Location,
   type LocationKind,
+  type AuditAction,
+  type AuditModule,
 } from "@/mock/data";
 import type { Role, User } from "@/mock/types";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
@@ -31,10 +34,33 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { UserCog, Mail, Bell, Building2, MapPin, Plus, Trash2, Tag } from "lucide-react";
+import {
+  UserCog,
+  Mail,
+  Bell,
+  Building2,
+  MapPin,
+  Plus,
+  Trash2,
+  Tag,
+  Search,
+  LogIn,
+  LogOut as LogOutIcon,
+  Pencil,
+  Lock,
+  CheckCircle2,
+  Wallet,
+  DollarSign,
+  Printer,
+  Download,
+  ShieldCheck,
+  FileClock,
+} from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ExportMenu } from "@/components/ui/ExportMenu";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const ALL_ROLES: Role[] = ["admin", "finance", "production", "sales", "route", "store", "viewer"];
 
@@ -46,7 +72,7 @@ const LOCATION_KIND_LABEL: Record<LocationKind, { sw: string; en: string }> = {
 };
 
 export function SettingsScreen() {
-  const { t, lang } = useApp();
+  const { t, lang, can } = useApp();
   const [users, setUsers] = useState<User[]>(USERS);
   const [locations, setLocations] = useState<Location[]>(LOCATIONS);
 
@@ -56,6 +82,9 @@ export function SettingsScreen() {
         <TabsList>
           <TabsTrigger value="users">{t("Watumiaji & majukumu", "Users & roles")}</TabsTrigger>
           <TabsTrigger value="locations">{t("Maeneo", "Locations")}</TabsTrigger>
+          {can("audit:read") && (
+            <TabsTrigger value="audit">{t("Kumbukumbu", "Audit trail")}</TabsTrigger>
+          )}
           <TabsTrigger value="company">{t("Kampuni", "Company")}</TabsTrigger>
           <TabsTrigger value="alerts">{t("Vituo vya arifa", "Alert thresholds")}</TabsTrigger>
           <TabsTrigger value="schedule">{t("Ratiba ya ripoti", "Report schedule")}</TabsTrigger>
@@ -249,6 +278,12 @@ export function SettingsScreen() {
             </table>
           </SectionCard>
         </TabsContent>
+
+        {can("audit:read") && (
+          <TabsContent value="audit" className="mt-4">
+            <AuditTrail />
+          </TabsContent>
+        )}
 
         <TabsContent value="company" className="mt-4">
           <SectionCard
@@ -665,5 +700,209 @@ function AddLocationDialog({ onAdd }: { onAdd: (loc: Location) => void }) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const ACTION_META: Record<
+  AuditAction,
+  {
+    icon: typeof LogIn;
+    tone: "success" | "warning" | "danger" | "info" | "slate";
+    sw: string;
+    en: string;
+  }
+> = {
+  login: { icon: LogIn, tone: "info", sw: "Kuingia", en: "Login" },
+  logout: { icon: LogOutIcon, tone: "slate", sw: "Kutoka", en: "Logout" },
+  create: { icon: Plus, tone: "success", sw: "Kuunda", en: "Create" },
+  edit: { icon: Pencil, tone: "warning", sw: "Kuhariri", en: "Edit" },
+  delete: { icon: Trash2, tone: "danger", sw: "Kufuta", en: "Delete" },
+  "lock-day": { icon: Lock, tone: "info", sw: "Kufunga siku", en: "Lock day" },
+  confirm: { icon: CheckCircle2, tone: "success", sw: "Kuthibitisha", en: "Confirm" },
+  payout: { icon: Wallet, tone: "warning", sw: "Malipo", en: "Payout" },
+  deposit: { icon: DollarSign, tone: "success", sw: "Amana", en: "Deposit" },
+  "price-change": { icon: Tag, tone: "warning", sw: "Bei", en: "Price change" },
+  "role-change": { icon: ShieldCheck, tone: "warning", sw: "Jukumu", en: "Role change" },
+  export: { icon: Download, tone: "slate", sw: "Kuhamisha", en: "Export" },
+  print: { icon: Printer, tone: "slate", sw: "Kuchapisha", en: "Print" },
+};
+
+function AuditTrail() {
+  const { t, lang } = useApp();
+  const [q, setQ] = useState("");
+  const [action, setAction] = useState<AuditAction | "all">("all");
+  const [moduleFilter, setModuleFilter] = useState<AuditModule | "all">("all");
+
+  const modules: AuditModule[] = [
+    "auth",
+    "farmers",
+    "customers",
+    "production",
+    "stock",
+    "reconciliation",
+    "finance",
+    "products",
+    "settings",
+    "pos",
+    "route",
+  ];
+
+  const filtered = useMemo(
+    () =>
+      AUDIT_LOG.filter((e) => {
+        if (action !== "all" && e.action !== action) return false;
+        if (moduleFilter !== "all" && e.module !== moduleFilter) return false;
+        if (q) {
+          const needle = q.toLowerCase();
+          const text = `${e.actor} ${e.summary.en} ${e.summary.sw}`.toLowerCase();
+          if (!text.includes(needle)) return false;
+        }
+        return true;
+      }),
+    [q, action, moduleFilter],
+  );
+
+  const fmtTime = (iso: string) =>
+    new Date(iso).toLocaleString(lang === "sw" ? "sw-TZ" : "en-GB", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+  return (
+    <>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <StatCard
+          label={t("Vitendo leo", "Actions today")}
+          value={AUDIT_LOG.length}
+          accent="green"
+        />
+        <StatCard
+          label={t("Kuingia", "Logins")}
+          value={AUDIT_LOG.filter((e) => e.action === "login").length}
+          accent="info"
+        />
+        <StatCard
+          label={t("Mabadiliko", "Edits & deletes")}
+          value={AUDIT_LOG.filter((e) => e.action === "edit" || e.action === "delete").length}
+          accent="amber"
+        />
+        <StatCard
+          label={t("Watumiaji hai", "Distinct actors")}
+          value={new Set(AUDIT_LOG.map((e) => e.actor)).size}
+          accent="green"
+        />
+      </div>
+
+      <SectionCard
+        title={
+          <span className="inline-flex items-center gap-1.5">
+            <FileClock className="h-4 w-4" /> {t("Kumbukumbu za matendo", "Audit trail")}
+          </span>
+        }
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className="h-8 w-44 pl-8 text-xs"
+                placeholder={t("Tafuta…", "Search…")}
+              />
+            </div>
+            <Select value={action} onValueChange={(v) => setAction(v as AuditAction | "all")}>
+              <SelectTrigger className="h-8 w-32 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("Vitendo vyote", "All actions")}</SelectItem>
+                {(Object.keys(ACTION_META) as AuditAction[]).map((a) => (
+                  <SelectItem key={a} value={a}>
+                    {lang === "sw" ? ACTION_META[a].sw : ACTION_META[a].en}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={moduleFilter}
+              onValueChange={(v) => setModuleFilter(v as AuditModule | "all")}
+            >
+              <SelectTrigger className="h-8 w-32 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("Moduli zote", "All modules")}</SelectItem>
+                {modules.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <ExportMenu formats={["csv", "excel"]} filename="audit-trail" />
+          </div>
+        }
+      >
+        {filtered.length === 0 ? (
+          <EmptyState
+            icon={FileClock}
+            title={t("Hakuna kumbukumbu", "No matching entries")}
+            description={t("Badilisha kichujio au utafutaji.", "Adjust the filter or search.")}
+          />
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                <th className="py-2 px-3">{t("Wakati", "Time")}</th>
+                <th>{t("Mtumiaji", "Actor")}</th>
+                <th>{t("Kitendo", "Action")}</th>
+                <th>{t("Moduli", "Module")}</th>
+                <th>{t("Maelezo", "Details")}</th>
+                <th>IP</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((e) => {
+                const meta = ACTION_META[e.action];
+                const Icon = meta.icon;
+                return (
+                  <tr
+                    key={e.id}
+                    className="border-b border-border last:border-0 hover:bg-accent/40"
+                  >
+                    <td className="py-2.5 px-3 font-num text-xs text-muted-foreground whitespace-nowrap">
+                      {fmtTime(e.at)}
+                    </td>
+                    <td className="py-2.5">
+                      <div className="font-medium">{e.actor}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                        {e.actorRole}
+                      </div>
+                    </td>
+                    <td className="py-2.5">
+                      <Pill tone={meta.tone}>
+                        <Icon className="h-3 w-3" />
+                        {lang === "sw" ? meta.sw : meta.en}
+                      </Pill>
+                    </td>
+                    <td className="py-2.5 text-xs text-muted-foreground">{e.module}</td>
+                    <td className="py-2.5">{lang === "sw" ? e.summary.sw : e.summary.en}</td>
+                    <td className="py-2.5 font-num text-xs text-muted-foreground">{e.ip}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+        <div className="mt-3 text-xs text-muted-foreground">
+          {t(
+            "Kumbukumbu hii inaonyesha kila kitendo cha mfumo, kuingia, kuhariri, kufuta, kufunga siku na zaidi. Admin pekee ndiye anaweza kuiona.",
+            "This log captures every system action, logins, edits, deletes, day-close and more. Only Admin can view it.",
+          )}
+        </div>
+      </SectionCard>
+    </>
   );
 }

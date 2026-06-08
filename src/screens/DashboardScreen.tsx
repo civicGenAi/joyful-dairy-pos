@@ -40,35 +40,27 @@ import {
   ClipboardCheck,
   Wallet,
   Factory,
+  Clock,
+  CalendarDays,
   type LucideIcon,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { ProductShowcase } from "@/components/brand/ProductShowcase";
 
 const GREENS = ["#1E7C3F", "#2F9E44", "#6FBF59", "#8CC63F", "#1D9E75", "#14532D"];
 
 export function DashboardScreen() {
-  const { t, lang, user, role, can } = useApp();
+  const { t, lang, role, can } = useApp();
   const top = FARMERS.slice()
     .sort((a, b) => b.litresThisCycle - a.litresThisCycle)
     .slice(0, 6);
 
   return (
     <AppShell title={t("Dashibodi", "Dashboard")}>
-      {/* Greeting strip + quick stats, compact */}
+      {/* Date + live clock strip, compact */}
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
-        <div className="min-w-0">
-          <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">
-            {new Date(TODAY).toLocaleDateString(lang === "sw" ? "sw-TZ" : "en-GB", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
-          </div>
-          <h2 className="font-display text-xl sm:text-2xl font-bold mt-0.5">
-            {t("Habari", "Hello")}, {user?.name.split(" ")[0]} 👋
-          </h2>
-        </div>
+        <LiveDateTime />
         <div className="flex flex-wrap gap-1.5">
           <Pill tone="success">
             <span className="h-1.5 w-1.5 rounded-full bg-[#2F9E44]" />{" "}
@@ -86,7 +78,11 @@ export function DashboardScreen() {
         <MiniStat
           accent="green"
           label={t("Yamekusanywa", "Collected")}
-          value={<><CountUp value={882} /> L</>}
+          value={
+            <>
+              <CountUp value={882} /> L
+            </>
+          }
           delta={{ up: true, text: "+4.2%" }}
         />
         <MiniStat
@@ -98,13 +94,21 @@ export function DashboardScreen() {
         <MiniStat
           accent="red"
           label={t("Yameharibika", "Spoilt")}
-          value={<><CountUp value={12} /> L</>}
+          value={
+            <>
+              <CountUp value={12} /> L
+            </>
+          }
           delta={{ up: false, text: "-1.5 L" }}
         />
         <MiniStat
           accent="green"
           label={t("Yamebakia", "Closing")}
-          value={<><CountUp value={214} /> L</>}
+          value={
+            <>
+              <CountUp value={214} /> L
+            </>
+          }
         />
         <MiniStat
           accent="green"
@@ -191,12 +195,36 @@ export function DashboardScreen() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke="#E6EBE1" vertical={false} />
-                <XAxis dataKey="day" stroke="#6B776E" fontSize={11} tickLine={false} axisLine={false} />
+                <XAxis
+                  dataKey="day"
+                  stroke="#6B776E"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                />
                 <YAxis stroke="#6B776E" fontSize={11} tickLine={false} axisLine={false} />
                 <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #E6EBE1" }} />
-                <Area type="monotone" dataKey="collected" stroke="#1E7C3F" strokeWidth={2} fill="url(#g1)" />
-                <Area type="monotone" dataKey="sold" stroke="#8CC63F" strokeWidth={2} fill="url(#g2)" />
-                <Line type="monotone" dataKey="spoilt" stroke="#E11B22" strokeWidth={2} dot={false} />
+                <Area
+                  type="monotone"
+                  dataKey="collected"
+                  stroke="#1E7C3F"
+                  strokeWidth={2}
+                  fill="url(#g1)"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="sold"
+                  stroke="#8CC63F"
+                  strokeWidth={2}
+                  fill="url(#g2)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="spoilt"
+                  stroke="#E11B22"
+                  strokeWidth={2}
+                  dot={false}
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -206,7 +234,13 @@ export function DashboardScreen() {
           <div className="h-56 sm:h-64">
             <ResponsiveContainer>
               <PieChart>
-                <Pie data={SALES_CHANNEL_SPLIT} dataKey="value" innerRadius={50} outerRadius={80} paddingAngle={3}>
+                <Pie
+                  data={SALES_CHANNEL_SPLIT}
+                  dataKey="value"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={3}
+                >
                   {SALES_CHANNEL_SPLIT.map((_, i) => (
                     <Cell key={i} fill={GREENS[i]} />
                   ))}
@@ -220,12 +254,21 @@ export function DashboardScreen() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-3 sm:gap-4 mb-4">
-        <SectionCard title={t("Mauzo kwa kategoria, wiki", "Sales by category, week")} className="lg:col-span-2">
+        <SectionCard
+          title={t("Mauzo kwa kategoria, wiki", "Sales by category, week")}
+          className="lg:col-span-2"
+        >
           <div className="h-56">
             <ResponsiveContainer>
               <BarChart data={SALES_BY_CATEGORY_WEEK} margin={{ left: -10 }}>
                 <CartesianGrid stroke="#E6EBE1" vertical={false} />
-                <XAxis dataKey="day" stroke="#6B776E" fontSize={11} tickLine={false} axisLine={false} />
+                <XAxis
+                  dataKey="day"
+                  stroke="#6B776E"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                />
                 <YAxis stroke="#6B776E" fontSize={11} tickLine={false} axisLine={false} />
                 <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #E6EBE1" }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -245,10 +288,28 @@ export function DashboardScreen() {
             <ResponsiveContainer>
               <LineChart data={YIELD_WEEK}>
                 <CartesianGrid stroke="#E6EBE1" vertical={false} />
-                <XAxis dataKey="day" stroke="#6B776E" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="#6B776E" fontSize={11} domain={[70, 95]} tickLine={false} axisLine={false} />
+                <XAxis
+                  dataKey="day"
+                  stroke="#6B776E"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  stroke="#6B776E"
+                  fontSize={11}
+                  domain={[70, 95]}
+                  tickLine={false}
+                  axisLine={false}
+                />
                 <Tooltip />
-                <Line type="monotone" dataKey="yield" stroke="#1E7C3F" strokeWidth={3} dot={{ fill: "#2F9E44", r: 4 }} />
+                <Line
+                  type="monotone"
+                  dataKey="yield"
+                  stroke="#1E7C3F"
+                  strokeWidth={3}
+                  dot={{ fill: "#2F9E44", r: 4 }}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -259,13 +320,31 @@ export function DashboardScreen() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-3 sm:gap-4">
-        <SectionCard title={t("Wateja wakubwa, mwezi", "Top customers, this month")} className="lg:col-span-2">
+        <SectionCard
+          title={t("Wateja wakubwa, mwezi", "Top customers, this month")}
+          className="lg:col-span-2"
+        >
           <div className="h-64 sm:h-72">
             <ResponsiveContainer>
               <BarChart data={TOP_CUSTOMERS} layout="vertical" margin={{ left: 10 }}>
                 <CartesianGrid stroke="#E6EBE1" horizontal={false} />
-                <XAxis type="number" stroke="#6B776E" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                <YAxis type="category" dataKey="name" stroke="#6B776E" fontSize={11} width={110} tickLine={false} axisLine={false} />
+                <XAxis
+                  type="number"
+                  stroke="#6B776E"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  stroke="#6B776E"
+                  fontSize={11}
+                  width={110}
+                  tickLine={false}
+                  axisLine={false}
+                />
                 <Tooltip formatter={(v: number) => tzs(v)} contentStyle={{ borderRadius: 12 }} />
                 <Bar dataKey="value" fill="#2F9E44" radius={[0, 8, 8, 0]} />
               </BarChart>
@@ -303,7 +382,15 @@ export function DashboardScreen() {
                       <div className="text-sm font-medium truncate">{a.title}</div>
                       <div className="text-xs text-muted-foreground line-clamp-1">{a.detail}</div>
                     </div>
-                    <Pill tone={a.severity === "danger" ? "danger" : a.severity === "warning" ? "warning" : "info"}>
+                    <Pill
+                      tone={
+                        a.severity === "danger"
+                          ? "danger"
+                          : a.severity === "warning"
+                            ? "warning"
+                            : "info"
+                      }
+                    >
                       {a.timeAgo}
                     </Pill>
                   </Link>
@@ -315,7 +402,10 @@ export function DashboardScreen() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-3 sm:gap-4 mt-4">
-        <SectionCard title={t("Wafugaji bora mwezi huu", "Top farmers this month")} className="lg:col-span-2">
+        <SectionCard
+          title={t("Wafugaji bora mwezi huu", "Top farmers this month")}
+          className="lg:col-span-2"
+        >
           <ul className="divide-y divide-border">
             {top.map((f, i) => (
               <li key={f.id} className="flex items-center gap-3 py-2.5">
@@ -364,7 +454,100 @@ export function DashboardScreen() {
           </div>
         </SectionCard>
       </div>
+
+      {/* Product showcase, clean rotating photos */}
+      <div className="grid lg:grid-cols-3 gap-3 sm:gap-4 mt-4">
+        <SectionCard
+          title={t("Bidhaa zetu", "Our products")}
+          className="lg:col-span-1"
+          action={
+            <Link to="/products" className="text-xs font-semibold text-[#1E7C3F] hover:underline">
+              {t("Tazama zote", "View all")}
+            </Link>
+          }
+        >
+          <ProductShowcase aspect="aspect-[4/3]" interval={3000} />
+        </SectionCard>
+
+        <SectionCard
+          title={t("Mauzo kwa njia, leo", "Sales by channel, today")}
+          className="lg:col-span-2"
+        >
+          <div className="grid sm:grid-cols-3 gap-3">
+            {[
+              { label: t("Kaunta", "Counter"), value: tzs(685000), pct: 48, to: "/pos" },
+              { label: t("Njia", "Route"), value: tzs(485000), pct: 34, to: "/van" },
+              { label: "M-Pesa", value: tzs(258000), pct: 18, to: "/finance" },
+            ].map((c) => (
+              <Link
+                key={c.label}
+                to={c.to}
+                className="rounded-2xl border border-border bg-card p-4 hover:shadow-card hover:border-[#2F9E44] transition"
+              >
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  {c.label}
+                </div>
+                <div className="font-num text-lg font-bold mt-1">{c.value}</div>
+                <div className="mt-2 h-1.5 rounded-full bg-secondary overflow-hidden">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${c.pct}%`,
+                      background: "linear-gradient(90deg, #1E7C3F, #8CC63F)",
+                    }}
+                  />
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-1">{c.pct}%</div>
+              </Link>
+            ))}
+          </div>
+        </SectionCard>
+      </div>
     </AppShell>
+  );
+}
+
+function LiveDateTime() {
+  const { lang, t } = useApp();
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Demo date for the dataset, clock is real wall-time.
+  const dateLabel = new Date(TODAY).toLocaleDateString(lang === "sw" ? "sw-TZ" : "en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const timeLabel = now.toLocaleTimeString(lang === "sw" ? "sw-TZ" : "en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+
+  return (
+    <div className="flex items-center gap-3 min-w-0">
+      <div
+        className="grid h-12 w-12 place-items-center rounded-2xl text-white shadow-card shrink-0"
+        style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+      >
+        <CalendarDays className="h-5 w-5" />
+      </div>
+      <div className="min-w-0">
+        <div className="font-display text-lg sm:text-xl font-bold leading-tight truncate">
+          {dateLabel}
+        </div>
+        <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-0.5">
+          <Clock className="h-3.5 w-3.5" />
+          <span className="font-num tabular-nums">{timeLabel}</span>
+          <span className="hidden sm:inline">· {t("Arusha", "Arusha")}</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -389,7 +572,9 @@ function MiniStat({
   };
   return (
     <div className="relative rounded-xl bg-card border border-border shadow-card p-2.5 sm:p-3 overflow-hidden">
-      <div className={`absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r ${bar[accent ?? "green"]}`} />
+      <div
+        className={`absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r ${bar[accent ?? "green"]}`}
+      />
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold truncate">
         {label}
       </div>
@@ -398,7 +583,9 @@ function MiniStat({
         {sub && <span className="text-[10px] font-semibold text-muted-foreground ml-1">{sub}</span>}
       </div>
       {delta && (
-        <div className={`text-[10px] mt-0.5 flex items-center gap-0.5 ${delta.up ? "text-[#1E7C3F]" : "text-[#1E7C3F]"}`}>
+        <div
+          className={`text-[10px] mt-0.5 flex items-center gap-0.5 ${delta.up ? "text-[#1E7C3F]" : "text-[#1E7C3F]"}`}
+        >
           {delta.up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
           {delta.text}
         </div>

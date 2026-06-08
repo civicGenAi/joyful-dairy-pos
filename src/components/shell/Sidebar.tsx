@@ -1,11 +1,12 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import * as Icons from "lucide-react";
 import { useApp } from "@/app/context";
 import { NAV_GROUPS_BY_ROLE } from "@/mock/data";
 import { JoyLogo } from "@/components/brand/JoyLogo";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, LogOut } from "lucide-react";
 
 interface Props {
   collapsed: boolean;
@@ -98,7 +99,11 @@ function SidebarBody({
   extraTopRight,
 }: {
   collapsed: boolean;
-  groups: { group: string; sw: string; items: { to: string; label: string; sw: string; icon: string }[] }[];
+  groups: {
+    group: string;
+    sw: string;
+    items: { to: string; label: string; sw: string; icon: string }[];
+  }[];
   lang: "sw" | "en";
   pathname: string;
   t: (sw: string, en: string) => string;
@@ -108,7 +113,12 @@ function SidebarBody({
 }) {
   return (
     <>
-      <div className={cn("px-3 py-4 border-b border-border flex items-center justify-between gap-2", collapsed && "px-2 justify-center")}>
+      <div
+        className={cn(
+          "px-3 py-4 border-b border-border flex items-center justify-between gap-2",
+          collapsed && "px-2 justify-center",
+        )}
+      >
         <JoyLogo size={collapsed ? 32 : 36} showWordmark={!collapsed} />
         {extraTopRight}
         {onToggleCollapsed && !collapsed && (
@@ -147,8 +157,7 @@ function SidebarBody({
                 const Icon =
                   (Icons as unknown as Record<string, typeof Icons.Circle>)[it.icon] ??
                   Icons.Circle;
-                const active =
-                  pathname === it.to || (it.to !== "/" && pathname.startsWith(it.to));
+                const active = pathname === it.to || (it.to !== "/" && pathname.startsWith(it.to));
                 return (
                   <li key={it.to}>
                     <Link
@@ -157,16 +166,17 @@ function SidebarBody({
                       title={collapsed ? (lang === "sw" ? it.sw : it.label) : undefined}
                       className={cn(
                         "relative flex items-center rounded-xl text-sm font-medium transition-all",
-                        collapsed
-                          ? "h-10 w-10 mx-auto justify-center"
-                          : "gap-2.5 px-2.5 py-2",
+                        collapsed ? "h-10 w-10 mx-auto justify-center" : "gap-2.5 px-2.5 py-2",
                         active
                           ? "text-white shadow-card"
                           : "text-foreground/80 hover:bg-accent hover:text-foreground",
                       )}
                       style={
                         active
-                          ? { background: "linear-gradient(135deg, #1E7C3F 0%, #2F9E44 55%, #8CC63F 120%)" }
+                          ? {
+                              background:
+                                "linear-gradient(135deg, #1E7C3F 0%, #2F9E44 55%, #8CC63F 120%)",
+                            }
                           : undefined
                       }
                     >
@@ -174,7 +184,10 @@ function SidebarBody({
                         <motion.span
                           layoutId="nav-active"
                           className="absolute inset-0 -z-0 rounded-xl"
-                          style={{ background: "linear-gradient(135deg, #1E7C3F 0%, #2F9E44 55%, #8CC63F 120%)" }}
+                          style={{
+                            background:
+                              "linear-gradient(135deg, #1E7C3F 0%, #2F9E44 55%, #8CC63F 120%)",
+                          }}
                           transition={{ type: "spring", stiffness: 380, damping: 32 }}
                         />
                       )}
@@ -193,17 +206,79 @@ function SidebarBody({
         ))}
       </nav>
 
-      {!collapsed && (
-        <div
-          className="m-3 rounded-xl p-3 text-xs text-white"
-          style={{ background: "linear-gradient(135deg, #14532D, #1E7C3F)" }}
-        >
-          <div className="font-semibold mb-0.5">{lang === "sw" ? "Funga siku" : "Day status"}</div>
-          <div className="opacity-90">
-            {lang === "sw" ? "Siku iko wazi, bado haijafungwa" : "Day open, not yet locked"}
-          </div>
-        </div>
-      )}
+      <SidebarFooter collapsed={collapsed} t={t} onNavigate={onNavigate} />
     </>
+  );
+}
+
+function SidebarFooter({
+  collapsed,
+  t,
+  onNavigate,
+}: {
+  collapsed: boolean;
+  t: (sw: string, en: string) => string;
+  onNavigate?: () => void;
+}) {
+  const { logout } = useApp();
+  const nav = useNavigate();
+
+  const signOut = () => {
+    onNavigate?.();
+    logout();
+    nav({ to: "/" });
+  };
+
+  if (collapsed) {
+    return (
+      <div className="p-2 border-t border-border">
+        <ConfirmDialog
+          destructive
+          title={t("Toka kwenye African Joy POS?", "Log out of African Joy POS?")}
+          description={t(
+            "Utahitaji kuingia tena kuendelea.",
+            "You will need to sign in again to continue.",
+          )}
+          confirmLabel={t("Toka", "Sign out")}
+          onConfirm={signOut}
+          trigger={
+            <button
+              className="grid h-10 w-10 mx-auto place-items-center rounded-xl text-[#E11B22] hover:bg-[#E11B22]/10"
+              title={t("Toka", "Sign out")}
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          }
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-3 border-t border-border space-y-2">
+      <div className="flex items-center gap-2 rounded-xl bg-secondary/60 px-3 py-2 text-xs">
+        <span className="h-2 w-2 rounded-full bg-[#2F9E44]" />
+        <span className="font-medium">{t("Siku imefunguliwa", "Day open")}</span>
+        <span className="ml-auto text-[10px] text-muted-foreground">
+          {t("Haijafungwa", "Not locked")}
+        </span>
+      </div>
+      <ConfirmDialog
+        destructive
+        title={t("Toka kwenye African Joy POS?", "Log out of African Joy POS?")}
+        description={t(
+          "Utahitaji kuingia tena kuendelea.",
+          "You will need to sign in again to continue.",
+        )}
+        confirmLabel={t("Toka", "Sign out")}
+        onConfirm={signOut}
+        trigger={
+          <button className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-[#E11B22] hover:bg-[#E11B22]/10 transition-colors">
+            <LogOut className="h-4 w-4" />
+            {t("Toka", "Sign out")}
+          </button>
+        }
+      />
+    </div>
   );
 }
