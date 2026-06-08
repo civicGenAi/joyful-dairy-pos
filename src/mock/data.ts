@@ -984,3 +984,220 @@ export const NAV_GROUPS_BY_ROLE: Record<
     },
   ],
 };
+
+// Audit trail, admin oversight of every action in the system.
+export type AuditAction =
+  | "login"
+  | "logout"
+  | "create"
+  | "edit"
+  | "delete"
+  | "lock-day"
+  | "confirm"
+  | "payout"
+  | "deposit"
+  | "price-change"
+  | "role-change"
+  | "export"
+  | "print";
+
+export type AuditModule =
+  | "auth"
+  | "farmers"
+  | "customers"
+  | "production"
+  | "stock"
+  | "reconciliation"
+  | "finance"
+  | "products"
+  | "settings"
+  | "pos"
+  | "route";
+
+export interface AuditEntry {
+  id: string;
+  at: string; // ISO timestamp
+  actor: string;
+  actorRole: string;
+  action: AuditAction;
+  module: AuditModule;
+  summary: { sw: string; en: string };
+  ip?: string;
+}
+
+export const AUDIT_LOG: AuditEntry[] = [
+  {
+    id: "au-1",
+    at: "2026-05-28T16:42:00",
+    actor: "Joyce Mollel",
+    actorRole: "admin",
+    action: "login",
+    module: "auth",
+    summary: { sw: "Ameingia kwenye mfumo", en: "Signed in to the system" },
+    ip: "10.0.4.21",
+  },
+  {
+    id: "au-2",
+    at: "2026-05-28T16:30:00",
+    actor: "Daudi Massawe",
+    actorRole: "production",
+    action: "lock-day",
+    module: "reconciliation",
+    summary: { sw: "Amefunga siku 2026-05-28", en: "Locked day 2026-05-28" },
+    ip: "10.0.4.18",
+  },
+  {
+    id: "au-3",
+    at: "2026-05-28T15:58:00",
+    actor: "Asha Mwakasege",
+    actorRole: "finance",
+    action: "deposit",
+    module: "finance",
+    summary: {
+      sw: "Amerekodi amana TZS 200,000 (Jovinary Hotel)",
+      en: "Recorded deposit TZS 200,000 (Jovinary Hotel)",
+    },
+    ip: "10.0.4.12",
+  },
+  {
+    id: "au-4",
+    at: "2026-05-28T15:20:00",
+    actor: "Joyce Mollel",
+    actorRole: "admin",
+    action: "price-change",
+    module: "products",
+    summary: {
+      sw: "Amebadilisha bei ya Fresh milk (own) 1400 → 1500",
+      en: "Changed Fresh milk price (own) 1400 → 1500",
+    },
+    ip: "10.0.4.21",
+  },
+  {
+    id: "au-5",
+    at: "2026-05-28T14:45:00",
+    actor: "Neema Kileo",
+    actorRole: "sales",
+    action: "create",
+    module: "pos",
+    summary: {
+      sw: "Amekamilisha mauzo RCT-2107 (TZS 42,000)",
+      en: "Completed sale RCT-2107 (TZS 42,000)",
+    },
+    ip: "10.0.4.30",
+  },
+  {
+    id: "au-6",
+    at: "2026-05-28T14:10:00",
+    actor: "Mama Esther",
+    actorRole: "store",
+    action: "edit",
+    module: "stock",
+    summary: {
+      sw: "Amerekebisha stock ya Cream (-2 L, spoilage)",
+      en: "Adjusted Cream stock (-2 L, spoilage)",
+    },
+    ip: "10.0.4.25",
+  },
+  {
+    id: "au-7",
+    at: "2026-05-28T13:30:00",
+    actor: "Joyce Mollel",
+    actorRole: "admin",
+    action: "role-change",
+    module: "settings",
+    summary: {
+      sw: "Amempa Peter Sanare jukumu la 'store'",
+      en: "Granted Peter Sanare the 'store' role",
+    },
+    ip: "10.0.4.21",
+  },
+  {
+    id: "au-8",
+    at: "2026-05-28T12:05:00",
+    actor: "Baraka Laizer",
+    actorRole: "route",
+    action: "deposit",
+    module: "route",
+    summary: { sw: "Cash-up ya gari #1 TZS 540,000", en: "Van #1 cash-up TZS 540,000" },
+    ip: "mobile",
+  },
+  {
+    id: "au-9",
+    at: "2026-05-28T11:20:00",
+    actor: "Joyce Mollel",
+    actorRole: "admin",
+    action: "delete",
+    module: "farmers",
+    summary: { sw: "Amefuta mfugaji wa majaribio", en: "Deleted a test farmer record" },
+    ip: "10.0.4.21",
+  },
+  {
+    id: "au-10",
+    at: "2026-05-28T10:42:00",
+    actor: "Asha Mwakasege",
+    actorRole: "finance",
+    action: "payout",
+    module: "finance",
+    summary: {
+      sw: "Ameanzisha malipo ya mzunguko TZS 4,830,000",
+      en: "Initiated cycle payout TZS 4,830,000",
+    },
+    ip: "10.0.4.12",
+  },
+  {
+    id: "au-11",
+    at: "2026-05-28T09:15:00",
+    actor: "Daudi Massawe",
+    actorRole: "production",
+    action: "create",
+    module: "production",
+    summary: {
+      sw: "Amerekodi batch ya Mozzarella (20 kg)",
+      en: "Recorded Mozzarella batch (20 kg)",
+    },
+    ip: "10.0.4.18",
+  },
+  {
+    id: "au-12",
+    at: "2026-05-28T08:30:00",
+    actor: "Asha Mwakasege",
+    actorRole: "finance",
+    action: "export",
+    module: "finance",
+    summary: {
+      sw: "Amehamisha ripoti ya madeni (Excel)",
+      en: "Exported receivables report (Excel)",
+    },
+    ip: "10.0.4.12",
+  },
+  {
+    id: "au-13",
+    at: "2026-05-28T08:12:00",
+    actor: "Joyce Mollel",
+    actorRole: "admin",
+    action: "create",
+    module: "farmers",
+    summary: { sw: "Amesajili mfugaji mpya (Mama Joy)", en: "Registered a new farmer (Mama Joy)" },
+    ip: "10.0.4.21",
+  },
+  {
+    id: "au-14",
+    at: "2026-05-28T07:50:00",
+    actor: "Glory Mushi",
+    actorRole: "viewer",
+    action: "login",
+    module: "auth",
+    summary: { sw: "Ameingia kwenye mfumo", en: "Signed in to the system" },
+    ip: "10.0.4.40",
+  },
+  {
+    id: "au-15",
+    at: "2026-05-28T07:05:00",
+    actor: "Daudi Massawe",
+    actorRole: "production",
+    action: "print",
+    module: "reconciliation",
+    summary: { sw: "Amechapisha ripoti ya kufunga siku", en: "Printed the day-close report" },
+    ip: "10.0.4.18",
+  },
+];

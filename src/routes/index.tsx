@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { JoyLogo } from "@/components/brand/JoyLogo";
+import { ProductShowcase } from "@/components/brand/ProductShowcase";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -66,10 +67,7 @@ function LoginPage() {
                   {t("Karibu tena", "Welcome back")}
                 </div>
                 <div className="text-xs sm:text-sm text-muted-foreground">
-                  {t(
-                    "Ingia kwenye mfumo wa African Joy",
-                    "Sign in to the African Joy system",
-                  )}
+                  {t("Ingia kwenye mfumo wa African Joy", "Sign in to the African Joy system")}
                 </div>
               </div>
             </div>
@@ -92,7 +90,10 @@ function LoginPage() {
               className="space-y-4"
             >
               <div className="space-y-1.5">
-                <Label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Label
+                  htmlFor="email"
+                  className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   {t("Barua pepe", "Email")}
                 </Label>
                 <div className="relative">
@@ -111,7 +112,10 @@ function LoginPage() {
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="pwd" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <Label
+                    htmlFor="pwd"
+                    className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                  >
                     {t("Nenosiri", "Password")}
                   </Label>
                   <button
@@ -241,8 +245,7 @@ function BrandPanel() {
     <div
       className="relative hidden lg:flex flex-col justify-between p-10 xl:p-12 text-white overflow-hidden"
       style={{
-        background:
-          "linear-gradient(135deg, #14532D 0%, #1E7C3F 45%, #2F9E44 80%, #8CC63F 130%)",
+        background: "linear-gradient(135deg, #14532D 0%, #1E7C3F 45%, #2F9E44 80%, #8CC63F 130%)",
       }}
     >
       {/* Floating circular accents */}
@@ -282,7 +285,7 @@ function BrandPanel() {
       >
         <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider backdrop-blur">
           <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#E11B22" }} />
-          Tanzania
+          {t("Maziwa ya Arusha", "Arusha Dairy")}
         </div>
         <h2 className="font-display text-3xl xl:text-4xl font-bold leading-tight mt-4">
           {t(
@@ -297,32 +300,27 @@ function BrandPanel() {
           )}
         </p>
 
-        {/* Rotating fact card */}
-        <div className="mt-8 relative h-24">
+        {/* Clean product showcase, real photos visible (no heavy blur) */}
+        <div className="mt-7 rounded-2xl border border-white/20 bg-white/5 p-1.5 shadow-2xl backdrop-blur-sm">
+          <ProductShowcase aspect="aspect-[16/10]" rounded="rounded-xl" interval={3200} />
+        </div>
+
+        {/* Rotating single fact, compact line under the showcase */}
+        <div className="mt-3 flex items-center gap-2 text-sm">
           <AnimatePresence mode="wait">
             <motion.div
               key={factIdx}
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.35 }}
-              className="absolute inset-0 rounded-2xl bg-white/12 backdrop-blur p-4 flex items-center gap-4"
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.3 }}
+              className="inline-flex items-center gap-2"
             >
-              <div className="text-3xl">{facts[factIdx].icon}</div>
-              <div>
-                <div className="font-num text-2xl font-bold">{facts[factIdx].value}</div>
-                <div className="text-[11px] uppercase tracking-wider opacity-80">
-                  {lang === "sw" ? facts[factIdx].sw : facts[factIdx].en}
-                </div>
-              </div>
-              <div className="ml-auto flex gap-1">
-                {facts.map((_, i) => (
-                  <span
-                    key={i}
-                    className={`h-1.5 w-1.5 rounded-full transition ${i === factIdx ? "bg-white" : "bg-white/40"}`}
-                  />
-                ))}
-              </div>
+              <span className="text-lg">{facts[factIdx].icon}</span>
+              <span className="font-num text-lg font-bold">{facts[factIdx].value}</span>
+              <span className="text-[11px] uppercase tracking-wider opacity-80">
+                {lang === "sw" ? facts[factIdx].sw : facts[factIdx].en}
+              </span>
             </motion.div>
           </AnimatePresence>
         </div>
