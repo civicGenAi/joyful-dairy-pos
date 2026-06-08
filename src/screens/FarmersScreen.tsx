@@ -1,6 +1,6 @@
 import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
-import { FARMERS } from "@/mock/data";
+import { FARMERS, TODAY } from "@/mock/data";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { tzs, L, num } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Search, Phone, MapPin, Calendar, Wallet } from "lucide-react";
+import { Plus, Search, Phone, MapPin, Calendar, Wallet, FileText, Users, UserPlus } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { RowActions } from "@/components/ui/RowActions";
 import type { Farmer } from "@/mock/types";
@@ -23,6 +25,7 @@ export function FarmersScreen() {
   const [filter, setFilter] = useState<string>("all");
   const [farmers, setFarmers] = useState<Farmer[]>(FARMERS);
   const [viewingId, setViewingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const filtered = useMemo(() => farmers.filter((f) => {
     if (q && !f.name.toLowerCase().includes(q.toLowerCase())) return false;
@@ -63,10 +66,18 @@ export function FarmersScreen() {
               </SelectContent>
             </Select>
             <ExportMenu formats={["excel", "csv", "pdf"]} filename="farmers" />
+            <AddFarmerDialog onAdd={(nf) => setFarmers((xs) => [nf, ...xs])} />
             <RecordCollectionDialog />
           </div>
         }
       >
+        {filtered.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title={t("Hakuna wafugaji wanaolingana", "No matching farmers")}
+            description={t("Jaribu kubadili kichujio au utafutaji.", "Try adjusting the filter or search.")}
+          />
+        ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm table-zebra">
             <thead>
@@ -102,7 +113,7 @@ export function FarmersScreen() {
                     <RowActions
                       itemName={f.name}
                       onView={() => setViewingId(f.id)}
-                      onEdit={() => toast.success(t("Fomu ya hariri imefunguliwa", "Edit form opened"))}
+                      onEdit={() => setEditingId(f.id)}
                       onDelete={() => { setFarmers((xs) => xs.filter((x) => x.id !== f.id)); toast.success(t("Mfugaji amefutwa", "Farmer deleted")); }}
                     />
                   </td>
@@ -111,8 +122,16 @@ export function FarmersScreen() {
             </tbody>
           </table>
         </div>
+        )}
       </SectionCard>
       {viewingId && <FarmerDetailDrawer farmerId={viewingId} open onClose={() => setViewingId(null)} />}
+      {editingId && (
+        <EditFarmerDialog
+          farmer={farmers.find((x) => x.id === editingId)!}
+          onClose={() => setEditingId(null)}
+          onSave={(upd) => { setFarmers((xs) => xs.map((x) => x.id === upd.id ? upd : x)); setEditingId(null); }}
+        />
+      )}
 
       <div className="mt-5">
         <SectionCard title={t("Mzunguko wa malipo (siku 15)", "Payment cycle (15 days)")}>
@@ -161,7 +180,7 @@ function RecordCollectionDialog() {
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5"><Label>{t("Tarehe", "Date")}</Label><Input type="date" defaultValue="2026-05-28" /></div>
+            <div className="grid gap-1.5"><Label>{t("Tarehe", "Date")}</Label><Input type="date" defaultValue={TODAY} /></div>
             <div className="grid gap-1.5"><Label>{t("Kipindi", "Session")}</Label>
               <Select defaultValue="morning"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="morning">{t("Asubuhi", "Morning")}</SelectItem><SelectItem value="evening">{t("Jioni", "Evening")}</SelectItem></SelectContent></Select>
             </div>
@@ -208,13 +227,28 @@ function FarmerDetailDrawer({ farmerId, open, onClose }: { farmerId: string; ope
         </div>
 
         <div className="mt-5">
-          <div className="text-xs font-semibold mb-2 flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> {t("Ukusanyaji wa mwezi", "Monthly collection")}</div>
-          <div className="grid grid-cols-10 gap-1">
-            {days.map((d, i) => (
-              <div key={i} className="aspect-square rounded-md grid place-items-center text-[10px] font-num font-semibold" style={{ background: `rgba(47,158,68,${0.15 + d / 80})`, color: "#14532D" }}>{d}</div>
+          <div className="text-xs font-semibold mb-2 flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> {t("Ukusanyaji wa mwezi, Mei 2026", "Monthly collection, May 2026")}</div>
+          <div className="grid grid-cols-7 gap-1">
+            {["M","T","W","T","F","S","S"].map((d, i) => (
+              <div key={i} className="text-center text-[10px] uppercase tracking-wider text-muted-foreground font-semibold pb-1">{d}</div>
             ))}
+            {Array.from({ length: 31 }).map((_, i) => {
+              const v = days[i % days.length];
+              const isToday = i + 1 === 28;
+              return (
+                <div
+                  key={i}
+                  className={`aspect-square rounded-md p-1 text-[10px] font-num font-semibold flex flex-col justify-between ${isToday ? "ring-2 ring-[#1E7C3F]" : ""}`}
+                  style={{ background: `rgba(47,158,68,${0.10 + v / 100})`, color: "#14532D" }}
+                  title={`Day ${i + 1}: ${v} L`}
+                >
+                  <span className="text-[9px] opacity-70">{i + 1}</span>
+                  <span className="text-right text-[10px]">{v}</span>
+                </div>
+              );
+            })}
           </div>
-          <div className="text-xs text-muted-foreground mt-2">{t("Kila kisanduku = litre kwa siku", "Each cell = litres per day")}</div>
+          <div className="text-xs text-muted-foreground mt-2">{t("Kila kisanduku, litre kwa siku", "Each cell, litres per day")}</div>
         </div>
 
         <div className="mt-5">
@@ -233,11 +267,157 @@ function FarmerDetailDrawer({ farmerId, open, onClose }: { farmerId: string; ope
         </div>
 
         <div className="mt-5 flex gap-2">
-          <Button className="flex-1 text-white" style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }} onClick={() => toast.success(t("Malipo yamerekodiwa", "Payment recorded"))}>
-            <Wallet className="h-3.5 w-3.5 mr-1.5" /> {t("Rekodi malipo", "Record payment")}
+          <RecordFarmerPaymentDialog farmer={f} />
+          <Button asChild variant="outline" className="rounded-xl">
+            <Link to="/statement/farmer/$id" params={{ id: f.id }}>
+              <FileText className="h-3.5 w-3.5 mr-1.5" />{t("Statimenti", "Statement")}
+            </Link>
           </Button>
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function AddFarmerDialog({ onAdd }: { onAdd: (f: Farmer) => void }) {
+  const { t } = useApp();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [village, setVillage] = useState("Olasiti");
+  const [rate, setRate] = useState(1200);
+
+  const save = () => {
+    if (!name.trim()) return;
+    const f: Farmer = {
+      id: `f-new-${Date.now()}`,
+      name,
+      phone,
+      village,
+      litresThisCycle: 0,
+      ratePerL: rate,
+      lastPaymentTZS: 0,
+      lastPaymentDate: TODAY,
+      currentBalanceTZS: 0,
+      status: "active",
+    };
+    onAdd(f);
+    toast.success(t("Mfugaji ameongezwa", "Farmer added"));
+    setOpen(false);
+    setName(""); setPhone("");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="h-8">
+          <UserPlus className="h-3.5 w-3.5 mr-1" /> {t("Mfugaji mpya", "Add farmer")}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>{t("Sajili mfugaji mpya", "Register a new farmer")}</DialogTitle></DialogHeader>
+        <div className="grid gap-3">
+          <div className="grid gap-1.5"><Label>{t("Jina kamili", "Full name")}</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Mama Joy" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5"><Label>{t("Simu", "Phone")}</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+255 7xx xxx xxx" /></div>
+            <div className="grid gap-1.5"><Label>{t("Kijiji", "Village")}</Label>
+              <Select value={village} onValueChange={setVillage}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["Olasiti", "Sakina", "Kisongo", "Ngaramtoni", "Tengeru", "Usa River"].map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid gap-1.5"><Label>{t("Bei (TZS/L)", "Rate (TZS/L)")}</Label><Input type="number" value={rate} onChange={(e) => setRate(Number(e.target.value))} /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>{t("Ghairi", "Cancel")}</Button>
+          <Button onClick={save} className="text-white" style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}>{t("Sajili", "Register")}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditFarmerDialog({ farmer, onClose, onSave }: { farmer: Farmer; onClose: () => void; onSave: (f: Farmer) => void }) {
+  const { t } = useApp();
+  const [name, setName] = useState(farmer.name);
+  const [phone, setPhone] = useState(farmer.phone);
+  const [village, setVillage] = useState(farmer.village);
+  const [rate, setRate] = useState(farmer.ratePerL);
+  const [active, setActive] = useState(farmer.status !== "delayed");
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>{t("Hariri mfugaji", "Edit farmer")}</DialogTitle></DialogHeader>
+        <div className="grid gap-3">
+          <div className="grid gap-1.5"><Label>{t("Jina", "Name")}</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5"><Label>{t("Simu", "Phone")}</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
+            <div className="grid gap-1.5"><Label>{t("Kijiji", "Village")}</Label>
+              <Select value={village} onValueChange={setVillage}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{["Olasiti", "Sakina", "Kisongo", "Ngaramtoni", "Tengeru", "Usa River"].map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid gap-1.5"><Label>{t("Bei (TZS/L)", "Rate (TZS/L)")}</Label><Input type="number" value={rate} onChange={(e) => setRate(Number(e.target.value))} /></div>
+          <label className="flex items-center gap-2 text-sm rounded-xl border border-border p-2.5">
+            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> {t("Mfugaji hai", "Farmer active")}
+          </label>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>{t("Ghairi", "Cancel")}</Button>
+          <Button onClick={() => { onSave({ ...farmer, name, phone, village, ratePerL: rate }); toast.success(t("Imehifadhiwa", "Saved")); }}>{t("Hifadhi", "Save")}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
+  const { t } = useApp();
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState(Math.min(farmer.currentBalanceTZS, 540000));
+  const [method, setMethod] = useState("mpesa");
+  const [ref, setRef] = useState(`PAY-${Date.now().toString().slice(-4)}`);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button className="flex-1 text-white" style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}>
+          <Wallet className="h-3.5 w-3.5 mr-1.5" /> {t("Rekodi malipo", "Record payment")}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>{t("Lipa", "Pay")} {farmer.name}</DialogTitle></DialogHeader>
+        <div className="grid gap-3">
+          <div className="rounded-xl bg-secondary/60 p-3 flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">{t("Salio la sasa", "Current balance")}</span>
+            <span className="font-num font-bold">{tzs(farmer.currentBalanceTZS)}</span>
+          </div>
+          <div className="grid gap-1.5"><Label>{t("Kiasi (TZS)", "Amount (TZS)")}</Label><Input type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5"><Label>{t("Njia", "Method")}</Label>
+              <Select value={method} onValueChange={setMethod}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mpesa">M-Pesa</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="bank">Bank transfer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5"><Label>{t("Rejea", "Reference")}</Label><Input value={ref} onChange={(e) => setRef(e.target.value)} /></div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>{t("Ghairi", "Cancel")}</Button>
+          <Button onClick={() => { toast.success(t(`Malipo ${tzs(amount)} yamerekodiwa`, `Payment ${tzs(amount)} recorded`)); setOpen(false); }} className="text-white" style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}>{t("Lipa sasa", "Pay now")}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

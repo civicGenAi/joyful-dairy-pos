@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Minus, Trash2, Printer, ShoppingBasket } from "lucide-react";
 import { motion } from "framer-motion";
+import { useNavigate } from "@tanstack/react-router";
 
 const CATS: { id: ProductCategory; label: { sw: string; en: string }; color: string }[] = [
   { id: "fresh-milk", label: { sw: "Maziwa Fresh", en: "Fresh milk" }, color: "#1E7C3F" },
@@ -28,6 +29,7 @@ interface CartLine { productId: string; qty: number; tier: PriceTier; }
 
 export function POSScreen() {
   const { t, lang } = useApp();
+  const nav = useNavigate();
   const [cat, setCat] = useState<ProductCategory>("fresh-milk");
   const [tier, setTier] = useState<PriceTier>("own");
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -194,7 +196,13 @@ export function POSScreen() {
               <div className="text-center text-[10px] text-muted-foreground mt-3">{t("Asante kwa kuchagua African Joy", "Thank you for choosing African Joy")}</div>
             </div>
           )}
-          <Button onClick={() => { toast.success(t("Imechapishwa", "Printed")); setReceipt(null); }} className="text-white" style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}><Printer className="h-4 w-4 mr-1.5" />{t("Chapisha", "Print")}</Button>
+          <Button
+            onClick={() => { if (receipt) { const id = receipt.id; setReceipt(null); nav({ to: "/receipt/$id", params: { id } }); } }}
+            className="text-white"
+            style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+          >
+            <Printer className="h-4 w-4 mr-1.5" />{t("Fungua kwa kuchapisha", "Open print view")}
+          </Button>
         </DialogContent>
       </Dialog>
     </AppShell>
