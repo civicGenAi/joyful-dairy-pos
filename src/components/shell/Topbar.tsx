@@ -9,6 +9,9 @@ import {
   X,
   Menu,
   Settings,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
 import { useApp } from "@/app/context";
 import { ALERTS, ROLE_LABEL, USERS, CUSTOMERS, FARMERS, PRODUCTS } from "@/mock/data";
@@ -37,7 +40,8 @@ export function Topbar({
   title: string;
   onOpenMobileNav?: () => void;
 }) {
-  const { user, role, setRole, resetRole, lang, setLang, logout, t, roles, can } = useApp();
+  const { user, role, setRole, resetRole, lang, setLang, logout, t, roles, can, theme, setTheme } =
+    useApp();
   const nav = useNavigate();
   const isAdmin = roles.includes("admin");
   const [q, setQ] = useState("");
@@ -273,6 +277,35 @@ export function Topbar({
               {lang === "sw" ? "Kiswahili" : "English"}
             </span>
           </DropdownMenuItem>
+
+          {/* Theme switcher, three-way: light / dark / system */}
+          <div className="px-2 py-1.5">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5 px-1">
+              {t("Mwonekano", "Theme")}
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              {(
+                [
+                  { id: "light", icon: Sun, label: t("Mwanga", "Light") },
+                  { id: "dark", icon: Moon, label: t("Giza", "Dark") },
+                  { id: "system", icon: Monitor, label: t("Mfumo", "System") },
+                ] as const
+              ).map((opt) => {
+                const Icon = opt.icon;
+                const active = theme === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() => setTheme(opt.id)}
+                    className={`flex flex-col items-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-semibold transition ${active ? "bg-[#1E7C3F] text-white" : "bg-secondary text-foreground hover:bg-accent"}`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Settings gear, only when the user can reach it */}
           {can("settings:write") && (
