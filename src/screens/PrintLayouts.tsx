@@ -1,6 +1,14 @@
 import { JoyLogo } from "@/components/brand/JoyLogo";
 import { Button } from "@/components/ui/button";
-import { COMPANY, CUSTOMERS, FARMERS, PRICE_MATRIX, PRODUCTS, RECON_TODAY, TODAY_LABEL } from "@/mock/data";
+import {
+  COMPANY,
+  CUSTOMERS,
+  FARMERS,
+  PRICE_MATRIX,
+  PRODUCTS,
+  RECON_TODAY,
+  TODAY_LABEL,
+} from "@/mock/data";
 import type { Customer, Farmer } from "@/mock/types";
 import { L, kg, num, tzs } from "@/lib/format";
 import { ArrowLeft, Printer } from "lucide-react";
@@ -24,11 +32,19 @@ function PrintShell({
     <div className="min-h-screen bg-background">
       <header className="no-print sticky top-0 z-10 border-b border-border bg-card">
         <div className="mx-auto max-w-3xl flex items-center justify-between px-5 py-3">
-          <Link to={backTo} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+          <Link
+            to={backTo}
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          >
             <ArrowLeft className="h-4 w-4" /> {t("Rudi", "Back")}
           </Link>
           <div className="text-sm font-semibold">{title}</div>
-          <Button onClick={() => window.print()} size="sm" className="text-white" style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}>
+          <Button
+            onClick={() => window.print()}
+            size="sm"
+            className="text-white"
+            style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+          >
             <Printer className="h-3.5 w-3.5 mr-1.5" /> {t("Chapisha", "Print")}
           </Button>
         </div>
@@ -42,7 +58,9 @@ function PrintShell({
               <div>{COMPANY.city}</div>
               <div>{COMPANY.phone}</div>
               <div>{COMPANY.email}</div>
-              <div className="mt-1">{COMPANY.tin} · {COMPANY.vrn}</div>
+              <div className="mt-1">
+                {COMPANY.tin} · {COMPANY.vrn}
+              </div>
             </div>
           </div>
           <div className="mb-6">
@@ -78,7 +96,11 @@ export function ReceiptPrintScreen() {
   ];
   const total = lines.reduce((a, l) => a + PRICE_MATRIX[l.productId][l.tier] * l.qty, 0);
   return (
-    <PrintShell backTo="/pos" title={t("Risiti ya mauzo", "Sale receipt")} subtitle={`${id} · ${new Date().toLocaleString()}`}>
+    <PrintShell
+      backTo="/pos"
+      title={t("Risiti ya mauzo", "Sale receipt")}
+      subtitle={`${id} · ${new Date().toLocaleString()}`}
+    >
       <table className="w-full text-sm font-num">
         <thead>
           <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
@@ -94,8 +116,13 @@ export function ReceiptPrintScreen() {
             const price = PRICE_MATRIX[l.productId][l.tier];
             return (
               <tr key={i} className="border-b border-border last:border-0">
-                <td className="py-2.5">{p.name}<span className="text-xs text-muted-foreground"> / {p.swName}</span></td>
-                <td className="py-2.5 text-right">{l.qty} {p.unit}</td>
+                <td className="py-2.5">
+                  {p.name}
+                  <span className="text-xs text-muted-foreground"> / {p.swName}</span>
+                </td>
+                <td className="py-2.5 text-right">
+                  {l.qty} {p.unit}
+                </td>
                 <td className="py-2.5 text-right">{num(price)}</td>
                 <td className="py-2.5 text-right font-semibold">{num(price * l.qty)}</td>
               </tr>
@@ -104,18 +131,24 @@ export function ReceiptPrintScreen() {
         </tbody>
         <tfoot>
           <tr className="border-t-2 border-border">
-            <td colSpan={3} className="py-3 text-right font-semibold">{t("Jumla", "Total")}</td>
+            <td colSpan={3} className="py-3 text-right font-semibold">
+              {t("Jumla", "Total")}
+            </td>
             <td className="py-3 text-right font-bold text-lg">{tzs(total)}</td>
           </tr>
         </tfoot>
       </table>
       <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
         <div className="rounded-xl bg-secondary/60 p-3">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("Aina ya malipo", "Payment")}</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Aina ya malipo", "Payment")}
+          </div>
           <div className="font-semibold">Cash</div>
         </div>
         <div className="rounded-xl bg-secondary/60 p-3">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("Mteja", "Customer")}</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Mteja", "Customer")}
+          </div>
           <div className="font-semibold">{t("Mteja wa kupita", "Walk-in")}</div>
         </div>
       </div>
@@ -129,8 +162,14 @@ export function CustomerStatementPrintScreen() {
   const { t } = useApp();
   const { id } = useParams({ from: "/statement/customer/$id" });
   const c: Customer | undefined = CUSTOMERS.find((x) => x.id === id);
-  const month = (useSearch({ from: "/statement/customer/$id" }) as { month?: string }).month ?? "May 2026";
-  if (!c) return <PrintShell backTo="/customers" title="Customer not found"><div>No customer with id {id}.</div></PrintShell>;
+  const month =
+    (useSearch({ from: "/statement/customer/$id" }) as { month?: string }).month ?? "May 2026";
+  if (!c)
+    return (
+      <PrintShell backTo="/customers" title="Customer not found">
+        <div>No customer with id {id}.</div>
+      </PrintShell>
+    );
 
   const takings = (c.monthlyActivity ?? []).reduce((a, x) => a + x.amountTZS, 0);
   const deposits = (c.deposits ?? []).reduce((a, x) => a + x.amountTZS, 0);
@@ -138,17 +177,27 @@ export function CustomerStatementPrintScreen() {
   const closing = opening + takings - deposits;
 
   return (
-    <PrintShell backTo="/customers" title={t("Statimenti ya mwezi", "Monthly statement")} subtitle={`${c.name} · ${month}`}>
+    <PrintShell
+      backTo="/customers"
+      title={t("Statimenti ya mwezi", "Monthly statement")}
+      subtitle={`${c.name} · ${month}`}
+    >
       <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
         <div className="rounded-xl bg-secondary/60 p-3">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("Mteja", "Customer")}</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Mteja", "Customer")}
+          </div>
           <div className="font-semibold">{c.name}</div>
           <div className="text-xs text-muted-foreground">{c.phone}</div>
         </div>
         <div className="rounded-xl bg-secondary/60 p-3 text-right">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("Aina", "Type")}</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Aina", "Type")}
+          </div>
           <div className="font-semibold capitalize">{c.type}</div>
-          <div className="text-xs text-muted-foreground">{t("Salio la sasa", "Current balance")}: {tzs(c.outstandingTZS)}</div>
+          <div className="text-xs text-muted-foreground">
+            {t("Salio la sasa", "Current balance")}: {tzs(c.outstandingTZS)}
+          </div>
         </div>
       </div>
 
@@ -168,7 +217,9 @@ export function CustomerStatementPrintScreen() {
               <tr key={a.id} className="border-b border-border last:border-0">
                 <td className="py-1.5 text-xs">{a.date}</td>
                 <td className="py-1.5">{p?.name}</td>
-                <td className="py-1.5 text-right">{a.qty} {a.unit}</td>
+                <td className="py-1.5 text-right">
+                  {a.qty} {a.unit}
+                </td>
                 <td className="py-1.5 text-right">{num(a.amountTZS)}</td>
               </tr>
             );
@@ -177,10 +228,22 @@ export function CustomerStatementPrintScreen() {
       </table>
 
       <div className="mt-6 grid grid-cols-2 gap-2 text-sm">
-        <div className="flex justify-between border-b border-border py-2"><span>{t("Salio la awali", "Opening balance")}</span><span className="font-num">{tzs(opening)}</span></div>
-        <div className="flex justify-between border-b border-border py-2"><span>{t("Manunuzi", "Total takings")}</span><span className="font-num text-[#1E7C3F]">+{tzs(takings)}</span></div>
-        <div className="flex justify-between border-b border-border py-2"><span>{t("Amana", "Deposits")}</span><span className="font-num text-[#E11B22]">-{tzs(deposits)}</span></div>
-        <div className="flex justify-between border-b border-border py-2 font-bold"><span>{t("Salio la mwisho", "Closing balance")}</span><span className="font-num">{tzs(closing)}</span></div>
+        <div className="flex justify-between border-b border-border py-2">
+          <span>{t("Salio la awali", "Opening balance")}</span>
+          <span className="font-num">{tzs(opening)}</span>
+        </div>
+        <div className="flex justify-between border-b border-border py-2">
+          <span>{t("Manunuzi", "Total takings")}</span>
+          <span className="font-num text-[#1E7C3F]">+{tzs(takings)}</span>
+        </div>
+        <div className="flex justify-between border-b border-border py-2">
+          <span>{t("Amana", "Deposits")}</span>
+          <span className="font-num text-[#E11B22]">-{tzs(deposits)}</span>
+        </div>
+        <div className="flex justify-between border-b border-border py-2 font-bold">
+          <span>{t("Salio la mwisho", "Closing balance")}</span>
+          <span className="font-num">{tzs(closing)}</span>
+        </div>
       </div>
     </PrintShell>
   );
@@ -192,20 +255,48 @@ export function FarmerStatementPrintScreen() {
   const { t } = useApp();
   const { id } = useParams({ from: "/statement/farmer/$id" });
   const f: Farmer | undefined = FARMERS.find((x) => x.id === id);
-  if (!f) return <PrintShell backTo="/farmers" title="Farmer not found"><div>No farmer with id {id}.</div></PrintShell>;
+  if (!f)
+    return (
+      <PrintShell backTo="/farmers" title="Farmer not found">
+        <div>No farmer with id {id}.</div>
+      </PrintShell>
+    );
   const daily = Array.from({ length: 15 }).map((_, i) => {
-    const litres = Math.round(8 + ((i + parseInt(f.id.slice(1)) || 0) * 7) % 35);
-    return { date: `2026-05-${String(14 + i).padStart(2, "0")}`, session: i % 2 === 0 ? "morning" : "evening", litres };
+    const litres = Math.round(8 + (((i + parseInt(f.id.slice(1)) || 0) * 7) % 35));
+    return {
+      date: `2026-05-${String(14 + i).padStart(2, "0")}`,
+      session: i % 2 === 0 ? "morning" : "evening",
+      litres,
+    };
   });
   const total = daily.reduce((a, d) => a + d.litres, 0);
   const earnings = total * f.ratePerL;
 
   return (
-    <PrintShell backTo="/farmers" title={t("Statimenti ya mfugaji", "Farmer statement")} subtitle={`${f.name} · ${f.village} · ${t("Mzunguko", "Cycle")} 01-15 Jun 2026`}>
+    <PrintShell
+      backTo="/farmers"
+      title={t("Statimenti ya mfugaji", "Farmer statement")}
+      subtitle={`${f.name} · ${f.village} · ${t("Mzunguko", "Cycle")} 01-15 Jun 2026`}
+    >
       <div className="grid grid-cols-3 gap-3 mb-6 text-sm">
-        <div className="rounded-xl bg-secondary/60 p-3"><div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("Bei", "Rate")}</div><div className="font-num font-semibold">{num(f.ratePerL)}/L</div></div>
-        <div className="rounded-xl bg-secondary/60 p-3"><div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("Litre", "Litres")}</div><div className="font-num font-semibold">{L(total)}</div></div>
-        <div className="rounded-xl bg-secondary/60 p-3"><div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("Kiasi", "Earnings")}</div><div className="font-num font-semibold text-[#1E7C3F]">{tzs(earnings)}</div></div>
+        <div className="rounded-xl bg-secondary/60 p-3">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Bei", "Rate")}
+          </div>
+          <div className="font-num font-semibold">{num(f.ratePerL)}/L</div>
+        </div>
+        <div className="rounded-xl bg-secondary/60 p-3">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Litre", "Litres")}
+          </div>
+          <div className="font-num font-semibold">{L(total)}</div>
+        </div>
+        <div className="rounded-xl bg-secondary/60 p-3">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Kiasi", "Earnings")}
+          </div>
+          <div className="font-num font-semibold text-[#1E7C3F]">{tzs(earnings)}</div>
+        </div>
       </div>
 
       <table className="w-full text-sm font-num">
@@ -229,7 +320,9 @@ export function FarmerStatementPrintScreen() {
         </tbody>
         <tfoot>
           <tr className="border-t-2 border-border">
-            <td colSpan={2} className="py-3 font-semibold">{t("Jumla", "Total")}</td>
+            <td colSpan={2} className="py-3 font-semibold">
+              {t("Jumla", "Total")}
+            </td>
             <td className="py-3 text-right font-bold">{total} L</td>
             <td className="py-3 text-right font-bold text-[#1E7C3F]">{tzs(earnings)}</td>
           </tr>
@@ -237,8 +330,19 @@ export function FarmerStatementPrintScreen() {
       </table>
 
       <div className="mt-6 text-sm grid grid-cols-2 gap-3">
-        <div className="rounded-xl bg-secondary/60 p-3"><div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("Malipo ya mwisho", "Last payment")}</div><div className="font-num font-semibold">{tzs(f.lastPaymentTZS)}</div><div className="text-xs text-muted-foreground">{f.lastPaymentDate}</div></div>
-        <div className="rounded-xl bg-secondary/60 p-3"><div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("Inayodaiwa", "Outstanding payable")}</div><div className="font-num font-semibold text-[#E11B22]">{tzs(f.currentBalanceTZS)}</div></div>
+        <div className="rounded-xl bg-secondary/60 p-3">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Malipo ya mwisho", "Last payment")}
+          </div>
+          <div className="font-num font-semibold">{tzs(f.lastPaymentTZS)}</div>
+          <div className="text-xs text-muted-foreground">{f.lastPaymentDate}</div>
+        </div>
+        <div className="rounded-xl bg-secondary/60 p-3">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Inayodaiwa", "Outstanding payable")}
+          </div>
+          <div className="font-num font-semibold text-[#E11B22]">{tzs(f.currentBalanceTZS)}</div>
+        </div>
       </div>
     </PrintShell>
   );
@@ -250,7 +354,11 @@ export function DayCloseReportScreen() {
   const { t } = useApp();
   const { date } = useParams({ from: "/report/day-close/$date" });
   return (
-    <PrintShell backTo="/reconciliation" title={t("Ripoti ya kufunga siku", "Day-close report")} subtitle={`${date} · ${TODAY_LABEL}`}>
+    <PrintShell
+      backTo="/reconciliation"
+      title={t("Ripoti ya kufunga siku", "Day-close report")}
+      subtitle={`${date} · ${TODAY_LABEL}`}
+    >
       <table className="w-full text-sm font-num">
         <thead>
           <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
@@ -278,29 +386,42 @@ export function DayCloseReportScreen() {
               <td className="py-2 px-2 text-right">{num(r.separated)}</td>
               <td className="py-2 px-2 text-right text-[#E11B22]">{num(r.spoilt)}</td>
               <td className="py-2 px-2 text-right">{num(r.returned)}</td>
-              <td className="py-2 px-2 text-right font-bold">{num(r.closing, r.closing % 1 ? 2 : 0)}</td>
+              <td className="py-2 px-2 text-right font-bold">
+                {num(r.closing, r.closing % 1 ? 2 : 0)}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
 
       <div className="mt-6 rounded-xl bg-[#1E7C3F]/10 p-4 text-sm">
-        <div className="font-display font-semibold mb-1">{t("Kanuni ya usawazishaji", "Conservation rule")}</div>
+        <div className="font-display font-semibold mb-1">
+          {t("Kanuni ya usawazishaji", "Conservation rule")}
+        </div>
         <div className="text-xs font-num text-[#14532D]">
-          Opening + Collected + Produced = Sold cash + Sold credit + Separated + Spoilt + Returned + Closing
+          Opening + Collected + Produced = Sold cash + Sold credit + Separated + Spoilt + Returned +
+          Closing
         </div>
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-4 text-sm">
         <div className="rounded-xl border border-border p-3">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("Imefungwa na", "Locked by")}</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Imefungwa na", "Locked by")}
+          </div>
           <div className="font-semibold">Daudi Massawe</div>
-          <div className="text-xs text-muted-foreground">Production Manager · {new Date().toLocaleTimeString()}</div>
+          <div className="text-xs text-muted-foreground">
+            Production Manager · {new Date().toLocaleTimeString()}
+          </div>
         </div>
         <div className="rounded-xl border border-border p-3">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("Imethibitishwa na", "Confirmed by")}</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Imethibitishwa na", "Confirmed by")}
+          </div>
           <div className="font-semibold">Asha Mwakasege</div>
-          <div className="text-xs text-muted-foreground">Finance · {new Date().toLocaleTimeString()}</div>
+          <div className="text-xs text-muted-foreground">
+            Finance · {new Date().toLocaleTimeString()}
+          </div>
         </div>
       </div>
     </PrintShell>
@@ -316,21 +437,41 @@ export function DepositSlipPrintScreen() {
   return (
     <PrintShell backTo="/finance" title={t("Risiti ya amana", "Deposit slip")} subtitle={`${id}`}>
       <div className="grid grid-cols-2 gap-4 text-sm">
-        <div className="rounded-xl bg-secondary/60 p-3"><div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("Chanzo", "Source")}</div><div className="font-semibold">Route van #1, Baraka Laizer</div></div>
-        <div className="rounded-xl bg-secondary/60 p-3"><div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("Aina", "Type")}</div><div className="font-semibold">Route cash-up</div></div>
+        <div className="rounded-xl bg-secondary/60 p-3">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Chanzo", "Source")}
+          </div>
+          <div className="font-semibold">Route van #1, Baraka Laizer</div>
+        </div>
+        <div className="rounded-xl bg-secondary/60 p-3">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Aina", "Type")}
+          </div>
+          <div className="font-semibold">Route cash-up</div>
+        </div>
         <div className="rounded-xl bg-secondary/60 p-3 col-span-2 text-center py-6">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("Kiasi", "Amount")}</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Kiasi", "Amount")}
+          </div>
           <div className="font-num text-4xl font-bold mt-1 text-[#1E7C3F]">{tzs(amount)}</div>
         </div>
       </div>
       <div className="mt-6 grid grid-cols-2 gap-6 text-sm">
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-8">{t("Saini, mleta", "Signature, depositor")}</div>
-          <div className="border-t border-border pt-1 text-xs text-muted-foreground">Baraka Laizer</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-8">
+            {t("Saini, mleta", "Signature, depositor")}
+          </div>
+          <div className="border-t border-border pt-1 text-xs text-muted-foreground">
+            Baraka Laizer
+          </div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-8">{t("Saini, mpokeaji", "Signature, receiver")}</div>
-          <div className="border-t border-border pt-1 text-xs text-muted-foreground">Asha Mwakasege, Finance</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-8">
+            {t("Saini, mpokeaji", "Signature, receiver")}
+          </div>
+          <div className="border-t border-border pt-1 text-xs text-muted-foreground">
+            Asha Mwakasege, Finance
+          </div>
         </div>
       </div>
     </PrintShell>

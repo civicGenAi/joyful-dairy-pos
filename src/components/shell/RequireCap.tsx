@@ -9,7 +9,13 @@ import type { ReactNode } from "react";
  * "view as" override, so an admin previewing as `route` can still see admin
  * screens by typing the URL.
  */
-export function RequireCap({ cap, children }: { cap: Capability | Capability[]; children: ReactNode }) {
+export function RequireCap({
+  cap,
+  children,
+}: {
+  cap: Capability | Capability[];
+  children: ReactNode;
+}) {
   const { user, can } = useApp();
   if (!user) return <Navigate to="/" />;
   const needed = Array.isArray(cap) ? cap : [cap];

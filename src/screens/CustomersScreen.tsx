@@ -8,8 +8,21 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Search, FileText, Plus, UserPlus, Send, Users } from "lucide-react";
@@ -42,25 +55,41 @@ export function CustomersScreen() {
   const [tab, setTab] = useState("all");
   const [q, setQ] = useState("");
 
-  const filtered = useMemo(() => customers.filter((c) => {
-    if (q && !c.name.toLowerCase().includes(q.toLowerCase())) return false;
-    if (tab === "all") return true;
-    if (tab === "overdue") return c.status === "overdue";
-    return c.type === (tab as CustomerType);
-  }), [tab, q, customers]);
+  const filtered = useMemo(
+    () =>
+      customers.filter((c) => {
+        if (q && !c.name.toLowerCase().includes(q.toLowerCase())) return false;
+        if (tab === "all") return true;
+        if (tab === "overdue") return c.status === "overdue";
+        return c.type === (tab as CustomerType);
+      }),
+    [tab, q, customers],
+  );
 
   const outstanding = customers.reduce((a, c) => a + c.outstandingTZS, 0);
   const overdue = customers.filter((c) => c.status === "overdue").length;
 
   const updateCustomer = (id: string, fn: (c: Customer) => Customer) =>
-    setCustomers((xs) => xs.map((c) => c.id === id ? fn(c) : c));
+    setCustomers((xs) => xs.map((c) => (c.id === id ? fn(c) : c)));
 
   return (
     <AppShell title={t("Wateja na Madeni", "Customers & receivables")}>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        <StatCard label={t("Jumla wateja", "Total customers")} value={num(customers.length)} accent="green" />
-        <StatCard label={t("Wateja wa mkopo", "Credit customers")} value={num(customers.filter((c) => c.type !== "cash").length)} accent="info" />
-        <StatCard label={t("Madeni jumla", "Outstanding")} value={tzs(outstanding)} accent="amber" />
+        <StatCard
+          label={t("Jumla wateja", "Total customers")}
+          value={num(customers.length)}
+          accent="green"
+        />
+        <StatCard
+          label={t("Wateja wa mkopo", "Credit customers")}
+          value={num(customers.filter((c) => c.type !== "cash").length)}
+          accent="info"
+        />
+        <StatCard
+          label={t("Madeni jumla", "Outstanding")}
+          value={tzs(outstanding)}
+          accent="amber"
+        />
         <StatCard label={t("Wamechelewa kulipa", "Overdue")} value={num(overdue)} accent="red" />
       </div>
 
@@ -70,7 +99,12 @@ export function CustomersScreen() {
           <div className="flex items-center gap-2">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input value={q} onChange={(e) => setQ(e.target.value)} className="h-8 w-56 pl-8 text-xs" placeholder={t("Tafuta…", "Search…")} />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className="h-8 w-56 pl-8 text-xs"
+                placeholder={t("Tafuta…", "Search…")}
+              />
             </div>
             <AddCustomerDialog onAdd={(c) => setCustomers((xs) => [c, ...xs])} />
             <ExportMenu formats={["excel", "csv"]} filename="customers" />
@@ -90,31 +124,65 @@ export function CustomersScreen() {
               <EmptyState
                 icon={Users}
                 title={t("Hakuna wateja kwenye kichujio hiki", "No customers in this view")}
-                description={t("Jaribu kichujio kingine au ongeza mteja mpya.", "Try another filter or add a new customer.")}
+                description={t(
+                  "Jaribu kichujio kingine au ongeza mteja mpya.",
+                  "Try another filter or add a new customer.",
+                )}
               />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm table-zebra">
-                  <thead><tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                    <th className="py-2 px-3">{t("Mteja", "Customer")}</th>
-                    <th className="py-2 px-3">{t("Aina", "Type")}</th>
-                    <th className="py-2 px-3 text-right">{t("Deni", "Outstanding")}</th>
-                    <th className="py-2 px-3">{t("Mwisho", "Last activity")}</th>
-                    <th className="py-2 px-3">{t("Hali", "Status")}</th>
-                    <th />
-                  </tr></thead>
+                  <thead>
+                    <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                      <th className="py-2 px-3">{t("Mteja", "Customer")}</th>
+                      <th className="py-2 px-3">{t("Aina", "Type")}</th>
+                      <th className="py-2 px-3 text-right">{t("Deni", "Outstanding")}</th>
+                      <th className="py-2 px-3">{t("Mwisho", "Last activity")}</th>
+                      <th className="py-2 px-3">{t("Hali", "Status")}</th>
+                      <th />
+                    </tr>
+                  </thead>
                   <tbody>
                     {filtered.map((c) => (
-                      <tr key={c.id} className="border-b border-border last:border-0 hover:bg-accent/40">
+                      <tr
+                        key={c.id}
+                        className="border-b border-border last:border-0 hover:bg-accent/40"
+                      >
                         <td className="py-2.5 px-3">
                           <div className="font-medium">{c.name}</div>
                           <div className="text-xs text-muted-foreground">{c.phone}</div>
                         </td>
-                        <td className="py-2.5 px-3"><Pill tone={c.type === "cash" ? "info" : c.type === "credit" ? "warning" : "success"}>{c.type === "cash" ? t("Cash", "Cash") : c.type === "credit" ? t("Mkopo", "Credit") : t("Mwezi", "Monthly")}</Pill></td>
-                        <td className="py-2.5 px-3 text-right font-num font-semibold">{tzs(c.outstandingTZS)}</td>
-                        <td className="py-2.5 px-3 text-muted-foreground text-xs">{c.lastActivity}</td>
-                        <td className="py-2.5 px-3"><Pill tone={c.status === "overdue" ? "danger" : "success"}>{c.status === "overdue" ? t("Imechelewa", "Overdue") : "OK"}</Pill></td>
-                        <td className="py-2.5 px-3 text-right"><CustomerDrawer c={c} onUpdate={(fn) => updateCustomer(c.id, fn)} /></td>
+                        <td className="py-2.5 px-3">
+                          <Pill
+                            tone={
+                              c.type === "cash"
+                                ? "info"
+                                : c.type === "credit"
+                                  ? "warning"
+                                  : "success"
+                            }
+                          >
+                            {c.type === "cash"
+                              ? t("Cash", "Cash")
+                              : c.type === "credit"
+                                ? t("Mkopo", "Credit")
+                                : t("Mwezi", "Monthly")}
+                          </Pill>
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-num font-semibold">
+                          {tzs(c.outstandingTZS)}
+                        </td>
+                        <td className="py-2.5 px-3 text-muted-foreground text-xs">
+                          {c.lastActivity}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <Pill tone={c.status === "overdue" ? "danger" : "success"}>
+                            {c.status === "overdue" ? t("Imechelewa", "Overdue") : "OK"}
+                          </Pill>
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <CustomerDrawer c={c} onUpdate={(fn) => updateCustomer(c.id, fn)} />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -128,7 +196,13 @@ export function CustomersScreen() {
   );
 }
 
-function CustomerDrawer({ c, onUpdate }: { c: Customer; onUpdate: (fn: (c: Customer) => Customer) => void }) {
+function CustomerDrawer({
+  c,
+  onUpdate,
+}: {
+  c: Customer;
+  onUpdate: (fn: (c: Customer) => Customer) => void;
+}) {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(MONTHS[0].id);
@@ -139,7 +213,12 @@ function CustomerDrawer({ c, onUpdate }: { c: Customer; onUpdate: (fn: (c: Custo
 
   // Real ageing computed from activity dates relative to TODAY.
   const buckets = useMemo(() => {
-    const result: Record<"current" | "30d" | "60d" | "90+", number> = { current: 0, "30d": 0, "60d": 0, "90+": 0 };
+    const result: Record<"current" | "30d" | "60d" | "90+", number> = {
+      current: 0,
+      "30d": 0,
+      "60d": 0,
+      "90+": 0,
+    };
     for (const a of c.monthlyActivity ?? []) {
       if (!a.paid) result[ageOfActivity(a.date, TODAY)] += a.amountTZS;
     }
@@ -154,24 +233,59 @@ function CustomerDrawer({ c, onUpdate }: { c: Customer; onUpdate: (fn: (c: Custo
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild><Button size="sm" variant="ghost" className="h-7 text-xs">{t("Tazama", "View")}</Button></SheetTrigger>
+      <SheetTrigger asChild>
+        <Button size="sm" variant="ghost" className="h-7 text-xs">
+          {t("Tazama", "View")}
+        </Button>
+      </SheetTrigger>
       <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>
             <div className="flex items-center gap-3">
-              <span className="grid h-10 w-10 place-items-center rounded-full text-white font-bold" style={{ background: "#1E7C3F" }}>{c.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}</span>
+              <span
+                className="grid h-10 w-10 place-items-center rounded-full text-white font-bold"
+                style={{ background: "#1E7C3F" }}
+              >
+                {c.name
+                  .split(" ")
+                  .map((p) => p[0])
+                  .slice(0, 2)
+                  .join("")}
+              </span>
               <div>
                 <div>{c.name}</div>
-                <div className="text-xs text-muted-foreground font-normal flex items-center gap-2">{c.phone} <Pill tone={c.type === "cash" ? "info" : c.type === "credit" ? "warning" : "success"}>{c.type}</Pill></div>
+                <div className="text-xs text-muted-foreground font-normal flex items-center gap-2">
+                  {c.phone}{" "}
+                  <Pill
+                    tone={c.type === "cash" ? "info" : c.type === "credit" ? "warning" : "success"}
+                  >
+                    {c.type}
+                  </Pill>
+                </div>
               </div>
             </div>
           </SheetTitle>
         </SheetHeader>
 
         <div className="mt-5 grid grid-cols-3 gap-2">
-          <div className="rounded-xl bg-secondary/60 p-3"><div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("Takings", "Takings")}</div><div className="font-num font-bold">{tzs(totalTakings)}</div></div>
-          <div className="rounded-xl bg-secondary/60 p-3"><div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("Amana", "Deposits")}</div><div className="font-num font-bold">{tzs(totalDeposits)}</div></div>
-          <div className="rounded-xl bg-secondary/60 p-3"><div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("Deni", "Outstanding")}</div><div className="font-num font-bold text-[#E11B22]">{tzs(c.outstandingTZS)}</div></div>
+          <div className="rounded-xl bg-secondary/60 p-3">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              {t("Takings", "Takings")}
+            </div>
+            <div className="font-num font-bold">{tzs(totalTakings)}</div>
+          </div>
+          <div className="rounded-xl bg-secondary/60 p-3">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              {t("Amana", "Deposits")}
+            </div>
+            <div className="font-num font-bold">{tzs(totalDeposits)}</div>
+          </div>
+          <div className="rounded-xl bg-secondary/60 p-3">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              {t("Deni", "Outstanding")}
+            </div>
+            <div className="font-num font-bold text-[#E11B22]">{tzs(c.outstandingTZS)}</div>
+          </div>
         </div>
 
         <Tabs defaultValue="activity" className="mt-5">
@@ -183,13 +297,43 @@ function CustomerDrawer({ c, onUpdate }: { c: Customer; onUpdate: (fn: (c: Custo
 
           <TabsContent value="activity" className="mt-3">
             {(c.monthlyActivity ?? []).length === 0 ? (
-              <EmptyState title={t("Hakuna shughuli", "No activity yet")} description={t("Manunuzi yatatokea hapa.", "Purchases will show up here.")} />
+              <EmptyState
+                title={t("Hakuna shughuli", "No activity yet")}
+                description={t("Manunuzi yatatokea hapa.", "Purchases will show up here.")}
+              />
             ) : (
               <table className="w-full text-sm">
-                <thead><tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border"><th className="py-2">{t("Tarehe", "Date")}</th><th>{t("Bidhaa", "Product")}</th><th className="text-right">{t("Idadi", "Qty")}</th><th className="text-right">{t("Kiasi", "Amount")}</th><th>{t("Hali", "Status")}</th></tr></thead>
-                <tbody>{(c.monthlyActivity ?? []).map((a) => { const p = PRODUCTS.find((x) => x.id === a.productId); return (
-                  <tr key={a.id} className="border-b border-border last:border-0"><td className="py-2 text-xs">{a.date}</td><td className="py-2">{p?.name}</td><td className="py-2 text-right font-num">{a.qty} {a.unit}</td><td className="py-2 text-right font-num font-semibold">{tzs(a.amountTZS)}</td><td className="py-2"><Pill tone={a.paid ? "success" : "warning"}>{a.paid ? t("Imelipwa", "Paid") : t("Mkopo", "Credit")}</Pill></td></tr>
-                );})}</tbody>
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                    <th className="py-2">{t("Tarehe", "Date")}</th>
+                    <th>{t("Bidhaa", "Product")}</th>
+                    <th className="text-right">{t("Idadi", "Qty")}</th>
+                    <th className="text-right">{t("Kiasi", "Amount")}</th>
+                    <th>{t("Hali", "Status")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(c.monthlyActivity ?? []).map((a) => {
+                    const p = PRODUCTS.find((x) => x.id === a.productId);
+                    return (
+                      <tr key={a.id} className="border-b border-border last:border-0">
+                        <td className="py-2 text-xs">{a.date}</td>
+                        <td className="py-2">{p?.name}</td>
+                        <td className="py-2 text-right font-num">
+                          {a.qty} {a.unit}
+                        </td>
+                        <td className="py-2 text-right font-num font-semibold">
+                          {tzs(a.amountTZS)}
+                        </td>
+                        <td className="py-2">
+                          <Pill tone={a.paid ? "success" : "warning"}>
+                            {a.paid ? t("Imelipwa", "Paid") : t("Mkopo", "Credit")}
+                          </Pill>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
               </table>
             )}
           </TabsContent>
@@ -197,34 +341,58 @@ function CustomerDrawer({ c, onUpdate }: { c: Customer; onUpdate: (fn: (c: Custo
           <TabsContent value="statement" className="mt-3">
             <div className="rounded-xl border border-border p-4">
               <div className="flex items-center justify-between mb-3">
-                <div className="text-xs uppercase tracking-wider text-muted-foreground">{t("Statimenti ya mwezi", "Monthly statement")}</div>
+                <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                  {t("Statimenti ya mwezi", "Monthly statement")}
+                </div>
                 <Select value={month} onValueChange={setMonth}>
-                  <SelectTrigger className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-7 w-32 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {MONTHS.map((m) => <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>)}
+                    {MONTHS.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="font-display text-lg font-bold mt-1">{c.name}</div>
 
               <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                <div className="flex justify-between border-b border-border py-2"><span>{t("Salio la awali", "Opening balance")}</span><span className="font-num">{tzs(opening)}</span></div>
-                <div className="flex justify-between border-b border-border py-2"><span>{t("Manunuzi", "Total takings")}</span><span className="font-num text-[#1E7C3F]">+{tzs(totalTakings)}</span></div>
-                <div className="flex justify-between border-b border-border py-2"><span>{t("Amana", "Deposits")}</span><span className="font-num text-[#E11B22]">-{tzs(totalDeposits)}</span></div>
-                <div className="flex justify-between border-b border-border py-2 font-bold"><span>{t("Salio la mwisho", "Closing balance")}</span><span className="font-num">{tzs(closing)}</span></div>
+                <div className="flex justify-between border-b border-border py-2">
+                  <span>{t("Salio la awali", "Opening balance")}</span>
+                  <span className="font-num">{tzs(opening)}</span>
+                </div>
+                <div className="flex justify-between border-b border-border py-2">
+                  <span>{t("Manunuzi", "Total takings")}</span>
+                  <span className="font-num text-[#1E7C3F]">+{tzs(totalTakings)}</span>
+                </div>
+                <div className="flex justify-between border-b border-border py-2">
+                  <span>{t("Amana", "Deposits")}</span>
+                  <span className="font-num text-[#E11B22]">-{tzs(totalDeposits)}</span>
+                </div>
+                <div className="flex justify-between border-b border-border py-2 font-bold">
+                  <span>{t("Salio la mwisho", "Closing balance")}</span>
+                  <span className="font-num">{tzs(closing)}</span>
+                </div>
               </div>
 
               <div className="mt-4">
-                <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">{t("Umri wa madeni", "Ageing")}</div>
+                <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
+                  {t("Umri wa madeni", "Ageing")}
+                </div>
                 <div className="grid grid-cols-4 gap-2 text-center">
-                  {([
+                  {[
                     { l: "Current", v: buckets.current, c: "#2F9E44" },
                     { l: "30 d", v: buckets["30d"], c: "#E5A100" },
                     { l: "60 d", v: buckets["60d"], c: "#E5A100" },
                     { l: "90+", v: buckets["90+"], c: "#E11B22" },
-                  ]).map((x) => (
+                  ].map((x) => (
                     <div key={x.l} className="rounded-lg p-2" style={{ background: `${x.c}15` }}>
-                      <div className="text-[10px] uppercase tracking-wider" style={{ color: x.c }}>{x.l}</div>
+                      <div className="text-[10px] uppercase tracking-wider" style={{ color: x.c }}>
+                        {x.l}
+                      </div>
                       <div className="font-num font-bold">{x.v}%</div>
                     </div>
                   ))}
@@ -232,13 +400,30 @@ function CustomerDrawer({ c, onUpdate }: { c: Customer; onUpdate: (fn: (c: Custo
               </div>
 
               <div className="mt-4 flex gap-2">
-                <Button asChild className="text-white" style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}>
-                  <Link to="/statement/customer/$id" params={{ id: c.id }} search={{ month: MONTHS.find((m) => m.id === month)?.label ?? "" }}>
-                    <FileText className="h-4 w-4 mr-1.5" />{t("Fungua kwa kuchapisha", "Open print view")}
+                <Button
+                  asChild
+                  className="text-white"
+                  style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+                >
+                  <Link
+                    to="/statement/customer/$id"
+                    params={{ id: c.id }}
+                    search={{ month: MONTHS.find((m) => m.id === month)?.label ?? "" }}
+                  >
+                    <FileText className="h-4 w-4 mr-1.5" />
+                    {t("Fungua kwa kuchapisha", "Open print view")}
                   </Link>
                 </Button>
-                <Button variant="outline" onClick={() => toast.success(t("Statimenti imetumwa kwa WhatsApp", "Statement sent via WhatsApp"))}>
-                  <Send className="h-4 w-4 mr-1.5" />{t("Tuma WhatsApp", "Send WhatsApp")}
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    toast.success(
+                      t("Statimenti imetumwa kwa WhatsApp", "Statement sent via WhatsApp"),
+                    )
+                  }
+                >
+                  <Send className="h-4 w-4 mr-1.5" />
+                  {t("Tuma WhatsApp", "Send WhatsApp")}
                 </Button>
               </div>
             </div>
@@ -246,19 +431,42 @@ function CustomerDrawer({ c, onUpdate }: { c: Customer; onUpdate: (fn: (c: Custo
 
           <TabsContent value="deposits" className="mt-3">
             <div className="flex justify-end mb-3">
-              <RecordDepositDialog onSave={(d) => {
-                onUpdate((cust) => ({ ...cust, deposits: [...(cust.deposits ?? []), d], outstandingTZS: Math.max(0, cust.outstandingTZS - d.amountTZS) }));
-                toast.success(t("Amana imerekodiwa", "Deposit recorded"));
-              }} />
+              <RecordDepositDialog
+                onSave={(d) => {
+                  onUpdate((cust) => ({
+                    ...cust,
+                    deposits: [...(cust.deposits ?? []), d],
+                    outstandingTZS: Math.max(0, cust.outstandingTZS - d.amountTZS),
+                  }));
+                  toast.success(t("Amana imerekodiwa", "Deposit recorded"));
+                }}
+              />
             </div>
             {(c.deposits ?? []).length === 0 ? (
-              <EmptyState title={t("Hakuna amana bado", "No deposits yet")} description={t("Bonyeza Rekodi amana kuanza.", "Click Record deposit to begin.")} />
+              <EmptyState
+                title={t("Hakuna amana bado", "No deposits yet")}
+                description={t("Bonyeza Rekodi amana kuanza.", "Click Record deposit to begin.")}
+              />
             ) : (
               <table className="w-full text-sm">
-                <thead><tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border"><th className="py-2">{t("Tarehe", "Date")}</th><th>{t("Rejea", "Reference")}</th><th className="text-right">{t("Kiasi", "Amount")}</th></tr></thead>
-                <tbody>{(c.deposits ?? []).map((d) => (
-                  <tr key={d.id} className="border-b border-border last:border-0"><td className="py-2.5 text-xs">{d.date}</td><td className="py-2.5 font-num text-xs">{d.ref}</td><td className="py-2.5 text-right font-num font-semibold">{tzs(d.amountTZS)}</td></tr>
-                ))}</tbody>
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                    <th className="py-2">{t("Tarehe", "Date")}</th>
+                    <th>{t("Rejea", "Reference")}</th>
+                    <th className="text-right">{t("Kiasi", "Amount")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(c.deposits ?? []).map((d) => (
+                    <tr key={d.id} className="border-b border-border last:border-0">
+                      <td className="py-2.5 text-xs">{d.date}</td>
+                      <td className="py-2.5 font-num text-xs">{d.ref}</td>
+                      <td className="py-2.5 text-right font-num font-semibold">
+                        {tzs(d.amountTZS)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             )}
           </TabsContent>
@@ -268,7 +476,11 @@ function CustomerDrawer({ c, onUpdate }: { c: Customer; onUpdate: (fn: (c: Custo
   );
 }
 
-function RecordDepositDialog({ onSave }: { onSave: (d: { id: string; date: string; amountTZS: number; ref: string }) => void }) {
+function RecordDepositDialog({
+  onSave,
+}: {
+  onSave: (d: { id: string; date: string; amountTZS: number; ref: string }) => void;
+}) {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(TODAY);
@@ -276,17 +488,50 @@ function RecordDepositDialog({ onSave }: { onSave: (d: { id: string; date: strin
   const [ref, setRef] = useState(`RCT-${1000 + Math.floor(Math.random() * 9000)}`);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm" className="text-white" style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}><Plus className="h-3.5 w-3.5 mr-1" />{t("Rekodi amana", "Record deposit")}</Button></DialogTrigger>
+      <DialogTrigger asChild>
+        <Button
+          size="sm"
+          className="text-white"
+          style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+        >
+          <Plus className="h-3.5 w-3.5 mr-1" />
+          {t("Rekodi amana", "Record deposit")}
+        </Button>
+      </DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>{t("Rekodi amana", "Record deposit")}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{t("Rekodi amana", "Record deposit")}</DialogTitle>
+        </DialogHeader>
         <div className="grid gap-3">
-          <div className="grid gap-1.5"><Label>{t("Tarehe", "Date")}</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
-          <div className="grid gap-1.5"><Label>{t("Kiasi (TZS)", "Amount (TZS)")}</Label><Input type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} /></div>
-          <div className="grid gap-1.5"><Label>{t("Rejea", "Reference")}</Label><Input value={ref} onChange={(e) => setRef(e.target.value)} /></div>
+          <div className="grid gap-1.5">
+            <Label>{t("Tarehe", "Date")}</Label>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>{t("Kiasi (TZS)", "Amount (TZS)")}</Label>
+            <Input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(Number(e.target.value))}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>{t("Rejea", "Reference")}</Label>
+            <Input value={ref} onChange={(e) => setRef(e.target.value)} />
+          </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>{t("Ghairi", "Cancel")}</Button>
-          <Button onClick={() => { onSave({ id: `d-${Date.now()}`, date, amountTZS: amount, ref }); setOpen(false); }}>{t("Hifadhi", "Save")}</Button>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            {t("Ghairi", "Cancel")}
+          </Button>
+          <Button
+            onClick={() => {
+              onSave({ id: `d-${Date.now()}`, date, amountTZS: amount, ref });
+              setOpen(false);
+            }}
+          >
+            {t("Hifadhi", "Save")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -307,17 +552,38 @@ function AddCustomerDialog({ onAdd }: { onAdd: (c: Customer) => void }) {
         </Button>
       </DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>{t("Sajili mteja mpya", "Register a new customer")}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{t("Sajili mteja mpya", "Register a new customer")}</DialogTitle>
+        </DialogHeader>
         <div className="grid gap-3">
-          <div className="grid gap-1.5"><Label>{t("Jina", "Name")}</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nyumbani Cafe" /></div>
+          <div className="grid gap-1.5">
+            <Label>{t("Jina", "Name")}</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Nyumbani Cafe"
+            />
+          </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5"><Label>{t("Simu", "Phone")}</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+255 78x xxx xxx" /></div>
-            <div className="grid gap-1.5"><Label>{t("Aina", "Type")}</Label>
+            <div className="grid gap-1.5">
+              <Label>{t("Simu", "Phone")}</Label>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+255 78x xxx xxx"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{t("Aina", "Type")}</Label>
               <Select value={type} onValueChange={(v) => setType(v as CustomerType)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">{t("Cash", "Cash")}</SelectItem>
-                  <SelectItem value="credit">{t("Mkopo (per-sale)", "Credit (per-sale)")}</SelectItem>
+                  <SelectItem value="credit">
+                    {t("Mkopo (per-sale)", "Credit (per-sale)")}
+                  </SelectItem>
                   <SelectItem value="monthly">{t("Mkopo wa mwezi", "Monthly")}</SelectItem>
                 </SelectContent>
               </Select>
@@ -325,14 +591,33 @@ function AddCustomerDialog({ onAdd }: { onAdd: (c: Customer) => void }) {
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>{t("Ghairi", "Cancel")}</Button>
-          <Button onClick={() => {
-            if (!name.trim()) return;
-            onAdd({ id: `c-new-${Date.now()}`, name, phone, type, outstandingTZS: 0, lastActivity: TODAY, status: "ok", monthlyActivity: [], deposits: [] });
-            toast.success(t("Mteja amesajiliwa", "Customer registered"));
-            setOpen(false);
-            setName(""); setPhone("");
-          }} className="text-white" style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}>{t("Sajili", "Register")}</Button>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            {t("Ghairi", "Cancel")}
+          </Button>
+          <Button
+            onClick={() => {
+              if (!name.trim()) return;
+              onAdd({
+                id: `c-new-${Date.now()}`,
+                name,
+                phone,
+                type,
+                outstandingTZS: 0,
+                lastActivity: TODAY,
+                status: "ok",
+                monthlyActivity: [],
+                deposits: [],
+              });
+              toast.success(t("Mteja amesajiliwa", "Customer registered"));
+              setOpen(false);
+              setName("");
+              setPhone("");
+            }}
+            className="text-white"
+            style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+          >
+            {t("Sajili", "Register")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

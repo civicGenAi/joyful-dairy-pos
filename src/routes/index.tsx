@@ -34,35 +34,52 @@ function LoginPage() {
       {/* Left brand panel */}
       <div
         className="relative hidden lg:flex flex-col justify-between p-12 text-white"
-        style={{ background: "linear-gradient(135deg, #14532D 0%, #1E7C3F 45%, #2F9E44 80%, #8CC63F 130%)" }}
+        style={{
+          background: "linear-gradient(135deg, #14532D 0%, #1E7C3F 45%, #2F9E44 80%, #8CC63F 130%)",
+        }}
       >
-        <div className="absolute inset-0 opacity-[0.06]" style={{
-          backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)",
-          backgroundSize: "22px 22px",
-        }} />
+        <div
+          className="absolute inset-0 opacity-[0.06]"
+          style={{
+            backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)",
+            backgroundSize: "22px 22px",
+          }}
+        />
         <div className="relative">
           <div className="inline-flex items-center gap-3">
             <div className="grid h-12 w-12 place-items-center rounded-full bg-white/15 backdrop-blur">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M5 8c0-1.5 2-3 7-3s7 1.5 7 3v8c0 1.5-2 3-7 3s-7-1.5-7-3V8z"/></svg>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                <path d="M5 8c0-1.5 2-3 7-3s7 1.5 7 3v8c0 1.5-2 3-7 3s-7-1.5-7-3V8z" />
+              </svg>
             </div>
             <div>
               <div className="font-display text-xl font-bold leading-none">African Joy</div>
-              <div className="text-[11px] uppercase tracking-[0.18em] opacity-80">Dairy · Arusha</div>
+              <div className="text-[11px] uppercase tracking-[0.18em] opacity-80">
+                Dairy · Arusha
+              </div>
             </div>
           </div>
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="relative max-w-md">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="relative max-w-md"
+        >
           <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider backdrop-blur">
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#E11B22" }} /> Tanzania
           </div>
           <h2 className="font-display text-4xl font-bold leading-tight mt-4">
-            {t("Maziwa bora, kuwawezesha wafugaji wanawake.", "Premium dairy, empowering women farmers.")}
+            {t(
+              "Maziwa bora, kuwawezesha wafugaji wanawake.",
+              "Premium dairy, empowering women farmers.",
+            )}
           </h2>
           <p className="mt-3 text-white/85 leading-relaxed">
             {t(
               "Mfumo kamili wa uzalishaji, mauzo, ghala na fedha, kwa lugha ya Kiswahili na Kiingereza.",
-              "An end-to-end system for production, sales, store and finance, built bilingual for our team."
+              "An end-to-end system for production, sales, store and finance, built bilingual for our team.",
             )}
           </p>
           <div className="mt-8 grid grid-cols-3 gap-3 text-center">
@@ -91,13 +108,19 @@ function LoginPage() {
         >
           <div className="flex items-center justify-between mb-6">
             <div>
-              <div className="font-display text-2xl font-bold">{t("Karibu tena", "Welcome back")}</div>
-              <div className="text-sm text-muted-foreground">{t("Ingia kwenye mfumo wa African Joy", "Sign in to the African Joy system")}</div>
+              <div className="font-display text-2xl font-bold">
+                {t("Karibu tena", "Welcome back")}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {t("Ingia kwenye mfumo wa African Joy", "Sign in to the African Joy system")}
+              </div>
             </div>
             <button
               onClick={() => setLang(lang === "sw" ? "en" : "sw")}
               className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold"
-            >{lang.toUpperCase()}</button>
+            >
+              {lang.toUpperCase()}
+            </button>
           </div>
 
           <div className="rounded-2xl bg-card border border-border shadow-card p-6">
@@ -108,7 +131,12 @@ function LoginPage() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="pwd">{t("Nenosiri", "Password")}</Label>
-                <Input id="pwd" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+                <Input
+                  id="pwd"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
               </div>
               <Button
                 onClick={() => enter()}
@@ -133,12 +161,23 @@ function LoginPage() {
                   onClick={() => enter(u.email)}
                   className="group flex items-center gap-2 rounded-xl border border-border bg-background px-2.5 py-2 text-left hover:border-[color:var(--color-brand-green-500)] transition-colors"
                 >
-                  <span className="grid h-7 w-7 place-items-center rounded-full text-[10px] font-bold text-white" style={{ background: u.avatarColor }}>
-                    {u.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
+                  <span
+                    className="grid h-7 w-7 place-items-center rounded-full text-[10px] font-bold text-white"
+                    style={{ background: u.avatarColor }}
+                  >
+                    {u.name
+                      .split(" ")
+                      .map((p) => p[0])
+                      .slice(0, 2)
+                      .join("")}
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-[11px] font-semibold truncate">{lang === "sw" ? ROLE_LABEL[u.roles[0]].sw : ROLE_LABEL[u.roles[0]].en}</span>
-                    <span className="block text-[10px] text-muted-foreground truncate">{u.email.split("@")[0]}</span>
+                    <span className="block text-[11px] font-semibold truncate">
+                      {lang === "sw" ? ROLE_LABEL[u.roles[0]].sw : ROLE_LABEL[u.roles[0]].en}
+                    </span>
+                    <span className="block text-[10px] text-muted-foreground truncate">
+                      {u.email.split("@")[0]}
+                    </span>
                   </span>
                 </button>
               ))}
@@ -146,9 +185,7 @@ function LoginPage() {
 
             <div className="mt-4 rounded-xl bg-secondary/60 px-3 py-2.5 text-[11px] text-muted-foreground flex items-start gap-2">
               <Briefcase className="h-3.5 w-3.5 mt-0.5" />
-              {t(
-                "Tumia nenosiri ", "Use password "
-              )}
+              {t("Tumia nenosiri ", "Use password ")}
               <code className="font-num font-semibold text-foreground">joy1234</code>
               {t(" kwa akaunti zote za demo.", " for all demo accounts.")}
             </div>
