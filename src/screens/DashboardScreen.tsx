@@ -47,14 +47,41 @@ import {
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ProductShowcase } from "@/components/brand/ProductShowcase";
+import { Skeleton } from "@/components/ui/skeleton";
+import { KPISkeleton, SectionSkeleton, ChartSkeleton } from "@/components/ui/Skeletons";
+import { useSimulatedLoad } from "@/hooks/use-simulated-load";
 
 const GREENS = ["#1E7C3F", "#2F9E44", "#6FBF59", "#8CC63F", "#1D9E75", "#14532D"];
 
 export function DashboardScreen() {
   const { t, lang, role, can } = useApp();
+  const loading = useSimulatedLoad(400);
   const top = FARMERS.slice()
     .sort((a, b) => b.litresThisCycle - a.litresThisCycle)
     .slice(0, 6);
+
+  if (loading) {
+    return (
+      <AppShell title={t("Dashibodi", "Dashboard")}>
+        <div className="flex items-center justify-between mb-4">
+          <Skeleton className="h-12 w-72" />
+          <Skeleton className="h-6 w-48" />
+        </div>
+        <KPISkeleton count={8} columns="grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8" />
+        <div className="grid lg:grid-cols-3 gap-3 sm:gap-4 mt-5">
+          <SectionSkeleton>
+            <ChartSkeleton />
+          </SectionSkeleton>
+          <SectionSkeleton>
+            <ChartSkeleton />
+          </SectionSkeleton>
+          <SectionSkeleton>
+            <ChartSkeleton />
+          </SectionSkeleton>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title={t("Dashibodi", "Dashboard")}>

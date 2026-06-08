@@ -30,6 +30,8 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
+import { useSimulatedLoad } from "@/hooks/use-simulated-load";
 
 interface Movement {
   id: string;
@@ -127,11 +129,25 @@ function statusOf(s: { onHand: number; reorder: number }) {
 
 export function StockScreen() {
   const { t, can } = useApp();
+  const loading = useSimulatedLoad(350);
   const writable = can("stock:write");
   const [items, setItems] = useState<StockItem[]>(STOCK);
   const [tab, setTab] = useState<"finished" | "consumable" | "raw" | "movements">("finished");
   const [movements, setMovements] = useState<Movement[]>(MOVEMENT_SEED);
   const [viewingId, setViewingId] = useState<string | null>(null);
+
+  if (loading) {
+    return (
+      <AppShell title={t("Ghala na Stock", "Stock & store")}>
+        <KPISkeleton />
+        <div className="mt-5">
+          <SectionSkeleton>
+            <TableSkeleton rows={8} cols={6} />
+          </SectionSkeleton>
+        </div>
+      </AppShell>
+    );
+  }
 
   const lowCount = items.filter((s) => s.onHand < s.reorder && s.onHand > 0).length;
   const outCount = items.filter((s) => s.onHand <= 0).length;

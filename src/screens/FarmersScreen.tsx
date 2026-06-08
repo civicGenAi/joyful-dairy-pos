@@ -39,16 +39,32 @@ import {
 import { Link } from "@tanstack/react-router";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ExportMenu } from "@/components/ui/ExportMenu";
+import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
+import { useSimulatedLoad } from "@/hooks/use-simulated-load";
 import { RowActions } from "@/components/ui/RowActions";
 import type { Farmer } from "@/mock/types";
 
 export function FarmersScreen() {
   const { t } = useApp();
+  const loading = useSimulatedLoad(350);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<string>("all");
   const [farmers, setFarmers] = useState<Farmer[]>(FARMERS);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  if (loading) {
+    return (
+      <AppShell title={t("Wafugaji", "Farmers")}>
+        <KPISkeleton />
+        <div className="mt-5">
+          <SectionSkeleton>
+            <TableSkeleton rows={8} cols={7} />
+          </SectionSkeleton>
+        </div>
+      </AppShell>
+    );
+  }
 
   const filtered = useMemo(
     () =>

@@ -29,6 +29,8 @@ import { Search, FileText, Plus, UserPlus, Send, Users } from "lucide-react";
 import type { Customer, CustomerType } from "@/mock/types";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
+import { useSimulatedLoad } from "@/hooks/use-simulated-load";
 import { Link } from "@tanstack/react-router";
 
 const MONTHS = [
@@ -51,7 +53,21 @@ function ageOfActivity(date: string, todayIso: string): "current" | "30d" | "60d
 
 export function CustomersScreen() {
   const { t } = useApp();
+  const loading = useSimulatedLoad(350);
   const [customers, setCustomers] = useState<Customer[]>(CUSTOMERS);
+
+  if (loading) {
+    return (
+      <AppShell title={t("Wateja na Madeni", "Customers & receivables")}>
+        <KPISkeleton />
+        <div className="mt-5">
+          <SectionSkeleton>
+            <TableSkeleton rows={8} cols={6} />
+          </SectionSkeleton>
+        </div>
+      </AppShell>
+    );
+  }
   const [tab, setTab] = useState("all");
   const [q, setQ] = useState("");
 

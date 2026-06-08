@@ -5,6 +5,7 @@ import { capabilitiesFor, hasCap, type Capability } from "@/lib/auth";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 
 type Lang = "sw" | "en";
+type Theme = "light" | "dark" | "system";
 
 interface AppCtx {
   user: User | null;
@@ -19,11 +20,15 @@ interface AppCtx {
   /** Whether the topbar should consider the screen visible for the current viewAs. */
   canView: (c: Capability) => boolean;
   lang: Lang;
+  theme: Theme;
+  /** The resolved theme after applying the `system` setting. */
+  resolvedTheme: "light" | "dark";
   login: (email: string) => void;
   logout: () => void;
   setRole: (r: Role) => void;
   resetRole: () => void;
   setLang: (l: Lang) => void;
+  setTheme: (theme: Theme) => void;
   t: (sw: string, en: string) => string;
 }
 
@@ -33,14 +38,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [viewAs, setViewAs] = useState<Role>("admin");
   const [lang, setLang] = useLocalStorage<Lang>("ajd:lang", "sw");
+  const [theme, setTheme] = useLocalStorage<Theme>("ajd:theme", "light");
+  const [systemDark, setSystemDark] = useState<boolean>(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
 
-  // Keep <html lang> in sync so screen readers and search bots pick the right
-  // language pronunciation/indexing automatically.
+  // Track the OS-level preference so `theme: "system"` stays in step live.
   useEffect(() => {
-    if (typeof document !== "undefined") {
-      document.documentElement.setAttribute("lang", lang === "sw" ? "sw" : "en");
-    }
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  const resolvedTheme: "light" | "dark" =
+    theme === "system" ? (systemDark ? "dark" : "light") : theme;
+
+  // Sync <html lang> and the .dark class.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.setAttribute("lang", lang === "sw" ? "sw" : "en");
   }, [lang]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.classList.toggle("dark", resolvedTheme === "dark");
+  }, [resolvedTheme]);
 
   const value = useMemo<AppCtx>(() => {
     const roles = user?.roles ?? [];
@@ -55,6 +80,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // sidebar / topbar reflect the role they're previewing.
       canView: (c) => (roles.includes("admin") ? capabilitiesFor([viewAs]).has(c) : caps.has(c)),
       lang,
+      theme,
+      resolvedTheme,
       login: (email: string) => {
         const u = USERS.find((x) => x.email.toLowerCase() === email.toLowerCase()) ?? USERS[0];
         setUser(u);
@@ -64,9 +91,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setRole: setViewAs,
       resetRole: () => user && setViewAs(user.roles[0]),
       setLang,
+      setTheme,
       t: (sw, en) => (lang === "sw" ? sw : en),
     };
-  }, [user, viewAs, lang, setLang]);
+  }, [user, viewAs, lang, theme, resolvedTheme, setLang, setTheme]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
