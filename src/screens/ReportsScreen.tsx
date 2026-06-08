@@ -10,6 +10,7 @@ import { AreaChart, Area, BarChart, Bar, LineChart, Line, ResponsiveContainer, X
 import { MILK_TREND_30 } from "@/mock/data";
 import { Download, FileSpreadsheet, FileText, Send, Mail, MessageCircle, Phone } from "lucide-react";
 import { toast } from "sonner";
+import { ExportMenu } from "@/components/ui/ExportMenu";
 
 const PRODUCT_BLOCKS = [
   { name: "Fresh milk (L)", opening: 60, sold: 380, credit: 120, spoilt: 12, closing: 94, total: 940 },
@@ -36,8 +37,7 @@ export function ReportsScreen() {
             <TabsTrigger value="schedule">{t("Ratiba", "Scheduled delivery")}</TabsTrigger>
           </TabsList>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline"><FileText className="h-3.5 w-3.5 mr-1.5" />{t("Pakua PDF", "Export PDF")}</Button>
-            <Button size="sm" variant="outline"><FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />{t("Pakua Excel", "Export Excel")}</Button>
+            <ExportMenu formats={["pdf", "excel"]} filename="report" />
           </div>
         </div>
 
