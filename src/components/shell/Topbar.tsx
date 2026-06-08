@@ -7,6 +7,7 @@ import {
   UserCog,
   ArrowLeftRight,
   X,
+  Menu,
 } from "lucide-react";
 import { useApp } from "@/app/context";
 import { ALERTS, ROLE_LABEL, USERS, CUSTOMERS, FARMERS, PRODUCTS } from "@/mock/data";
@@ -28,7 +29,7 @@ import { useMemo, useState } from "react";
 
 const ROLES: Role[] = ["admin", "finance", "production", "sales", "route", "store", "viewer"];
 
-export function Topbar({ title }: { title: string }) {
+export function Topbar({ title, onOpenMobileNav }: { title: string; onOpenMobileNav?: () => void }) {
   const { user, role, setRole, resetRole, lang, setLang, logout, t, roles } = useApp();
   const nav = useNavigate();
   const isAdmin = roles.includes("admin");
@@ -49,9 +50,18 @@ export function Topbar({ title }: { title: string }) {
   if (!user) return null;
 
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-background/85 backdrop-blur px-4 lg:px-6 h-16">
+    <header className="sticky top-0 z-20 flex items-center gap-2 sm:gap-3 border-b border-border bg-background/85 backdrop-blur px-3 sm:px-4 lg:px-6 h-16">
+      {onOpenMobileNav && (
+        <button
+          onClick={onOpenMobileNav}
+          className="lg:hidden rounded-lg p-2 -ml-1 hover:bg-accent"
+          aria-label={t("Fungua menyu", "Open menu")}
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      )}
       <div className="flex-1 min-w-0">
-        <h1 className="font-display text-lg font-semibold truncate">{title}</h1>
+        <h1 className="font-display text-base sm:text-lg font-semibold truncate">{title}</h1>
       </div>
 
       <Popover open={!!results} onOpenChange={(o) => !o && setQ("")}>
@@ -98,7 +108,7 @@ export function Topbar({ title }: { title: string }) {
       <button
         onClick={() => setLang(lang === "sw" ? "en" : "sw")}
         className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold hover:bg-accent"
-        title="Toggle language"
+        title={t("Badilisha lugha", "Toggle language")}
       >
         <Languages className="h-3.5 w-3.5" />
         {lang.toUpperCase()}

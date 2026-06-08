@@ -179,6 +179,11 @@
 /* Table row zebra */
 .table-zebra tbody tr:nth-child(odd) { background: color-mix(in oklab, var(--background) 60%, transparent); }
 
+/* Responsive tables: every <table> inside the app shell main scrolls horizontally on small screens.
+   SectionCard renders the table in a padded body; we set overflow on the body so the rounded card edges stay clean. */
+main table { min-width: max-content; }
+main .rounded-2xl > div:last-child:has(> table) { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: rgba(20,83,45,0.18); border-radius: 8px; }

@@ -316,7 +316,7 @@ export function POSScreen() {
               <div className="p-3 border-b border-border space-y-2">
                 <Select value={customer} onValueChange={setCustomer}>
                   <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Customer" />
+                    <SelectValue placeholder={t("Mteja", "Customer")} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="walkin">{t("Mteja wa kupita", "Walk-in")}</SelectItem>
