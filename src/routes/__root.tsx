@@ -13,6 +13,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppProvider } from "@/app/context";
 import { Toaster } from "@/components/ui/sonner";
 import { NotFoundScreen, GenericErrorScreen } from "@/screens/UtilityScreens";
+import { CommandPalette } from "@/components/shell/CommandPalette";
 
 function NotFoundComponent() {
   return <NotFoundScreen />;
@@ -78,6 +79,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <AppProvider>
         <Outlet />
+        <CommandPalette />
         <Toaster position="top-right" richColors />
       </AppProvider>
     </QueryClientProvider>

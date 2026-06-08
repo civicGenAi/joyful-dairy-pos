@@ -88,7 +88,7 @@ export function Topbar({
               )}
               className="pl-9 pr-8 bg-secondary/60 border-transparent focus-visible:border-border"
             />
-            {q && (
+            {q ? (
               <button
                 onClick={() => setQ("")}
                 aria-label={t("Futa utafutaji", "Clear search")}
@@ -96,6 +96,13 @@ export function Topbar({
               >
                 <X className="h-3 w-3" />
               </button>
+            ) : (
+              <kbd
+                className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center gap-0.5 rounded bg-background border border-border px-1.5 py-0.5 text-[10px] font-mono font-semibold text-muted-foreground pointer-events-none"
+                title={t("Bonyeza Ctrl+K kufungua amri", "Press Ctrl+K to open command menu")}
+              >
+                ⌘K
+              </kbd>
             )}
           </div>
         </PopoverTrigger>
