@@ -1,13 +1,13 @@
 import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
-import { FARMERS, COLLECTIONS_TODAY } from "@/mock/data";
+import { FARMERS } from "@/mock/data";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { tzs, L, num } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMemo, useState } from "react";
