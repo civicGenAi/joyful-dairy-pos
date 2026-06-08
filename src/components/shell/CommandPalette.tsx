@@ -225,9 +225,13 @@ export function CommandPalette() {
 
               <div className="px-3 py-2 border-t border-border flex items-center justify-between text-[10px] text-muted-foreground">
                 <span className="inline-flex items-center gap-2">
-                  <kbd className="rounded bg-secondary px-1.5 py-0.5 font-mono font-semibold">↑↓</kbd>
+                  <kbd className="rounded bg-secondary px-1.5 py-0.5 font-mono font-semibold">
+                    ↑↓
+                  </kbd>
                   {t("Pita", "Navigate")}
-                  <kbd className="rounded bg-secondary px-1.5 py-0.5 font-mono font-semibold">↵</kbd>
+                  <kbd className="rounded bg-secondary px-1.5 py-0.5 font-mono font-semibold">
+                    ↵
+                  </kbd>
                   {t("Chagua", "Select")}
                 </span>
                 <span className="inline-flex items-center gap-1">

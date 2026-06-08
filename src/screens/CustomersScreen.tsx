@@ -55,19 +55,6 @@ export function CustomersScreen() {
   const { t } = useApp();
   const loading = useSimulatedLoad(350);
   const [customers, setCustomers] = useState<Customer[]>(CUSTOMERS);
-
-  if (loading) {
-    return (
-      <AppShell title={t("Wateja na Madeni", "Customers & receivables")}>
-        <KPISkeleton />
-        <div className="mt-5">
-          <SectionSkeleton>
-            <TableSkeleton rows={8} cols={6} />
-          </SectionSkeleton>
-        </div>
-      </AppShell>
-    );
-  }
   const [tab, setTab] = useState("all");
   const [q, setQ] = useState("");
 
@@ -87,6 +74,19 @@ export function CustomersScreen() {
 
   const updateCustomer = (id: string, fn: (c: Customer) => Customer) =>
     setCustomers((xs) => xs.map((c) => (c.id === id ? fn(c) : c)));
+
+  if (loading) {
+    return (
+      <AppShell title={t("Wateja na Madeni", "Customers & receivables")}>
+        <KPISkeleton />
+        <div className="mt-5">
+          <SectionSkeleton>
+            <TableSkeleton rows={8} cols={6} />
+          </SectionSkeleton>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title={t("Wateja na Madeni", "Customers & receivables")}>

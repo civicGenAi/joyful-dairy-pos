@@ -877,7 +877,10 @@ export const NAV_GROUPS_BY_ROLE: Record<
     {
       group: "Finance",
       sw: "Fedha",
-      items: [{ to: "/finance", label: "Finance", sw: "Fedha", icon: "Wallet" }],
+      items: [
+        { to: "/finance", label: "Finance", sw: "Fedha", icon: "Wallet" },
+        { to: "/expenses", label: "Expenses", sw: "Matumizi", icon: "Receipt" },
+      ],
     },
     {
       group: "Insights",
@@ -906,6 +909,7 @@ export const NAV_GROUPS_BY_ROLE: Record<
         { to: "/customers", label: "Customers", sw: "Wateja", icon: "UserSquare2" },
         { to: "/farmers", label: "Farmer payables", sw: "Malipo wafugaji", icon: "Users" },
         { to: "/finance", label: "Deposits & receipts", sw: "Amana", icon: "Wallet" },
+        { to: "/expenses", label: "Expenses", sw: "Matumizi", icon: "Receipt" },
         {
           to: "/reconciliation",
           label: "Day-close confirm",
@@ -1199,5 +1203,115 @@ export const AUDIT_LOG: AuditEntry[] = [
     module: "reconciliation",
     summary: { sw: "Amechapisha ripoti ya kufunga siku", en: "Printed the day-close report" },
     ip: "10.0.4.18",
+  },
+];
+
+// Expense tracking, simple typed ledger for finance.
+export type ExpenseCategory =
+  | "fuel"
+  | "packaging"
+  | "repairs"
+  | "wages"
+  | "utilities"
+  | "transport"
+  | "office"
+  | "other";
+
+export interface Expense {
+  id: string;
+  date: string;
+  category: ExpenseCategory;
+  vendor: string;
+  description: string;
+  amountTZS: number;
+  method: "cash" | "mpesa" | "bank";
+  ref?: string;
+  recordedBy: string;
+}
+
+export const EXPENSES: Expense[] = [
+  {
+    id: "ex-1",
+    date: "2026-05-28",
+    category: "fuel",
+    vendor: "Total Sakina",
+    description: "Van #1 diesel, 25L",
+    amountTZS: 72500,
+    method: "mpesa",
+    ref: "M-PESA TX 3D5G7",
+    recordedBy: "Baraka Laizer",
+  },
+  {
+    id: "ex-2",
+    date: "2026-05-28",
+    category: "packaging",
+    vendor: "Kibo Plastics",
+    description: "Vikopo robo, 500 pcs",
+    amountTZS: 125000,
+    method: "bank",
+    ref: "INV-2034",
+    recordedBy: "Mama Esther",
+  },
+  {
+    id: "ex-3",
+    date: "2026-05-27",
+    category: "repairs",
+    vendor: "Kiwanja Workshop",
+    description: "Cooler thermostat replacement",
+    amountTZS: 180000,
+    method: "cash",
+    recordedBy: "Daudi Massawe",
+  },
+  {
+    id: "ex-4",
+    date: "2026-05-27",
+    category: "wages",
+    vendor: "Wafanyakazi (8)",
+    description: "Wiki Mei 21-27",
+    amountTZS: 920000,
+    method: "cash",
+    recordedBy: "Asha Mwakasege",
+  },
+  {
+    id: "ex-5",
+    date: "2026-05-26",
+    category: "utilities",
+    vendor: "TANESCO",
+    description: "Umeme Mei",
+    amountTZS: 165000,
+    method: "mpesa",
+    ref: "EVD-7821",
+    recordedBy: "Asha Mwakasege",
+  },
+  {
+    id: "ex-6",
+    date: "2026-05-26",
+    category: "transport",
+    vendor: "Tindi (collector)",
+    description: "Bei ya ukusanyaji wa wiki",
+    amountTZS: 84000,
+    method: "cash",
+    recordedBy: "Joyce Mollel",
+  },
+  {
+    id: "ex-7",
+    date: "2026-05-25",
+    category: "office",
+    vendor: "Hostings.tz",
+    description: "Mfumo wa hosting kwa mwezi",
+    amountTZS: 38000,
+    method: "bank",
+    ref: "INV-8821",
+    recordedBy: "Asha Mwakasege",
+  },
+  {
+    id: "ex-8",
+    date: "2026-05-24",
+    category: "fuel",
+    vendor: "Puma Ngaramtoni",
+    description: "Pikipiki ya ukusanyaji",
+    amountTZS: 24000,
+    method: "cash",
+    recordedBy: "Joyce Mollel",
   },
 ];

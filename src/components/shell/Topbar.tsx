@@ -12,6 +12,7 @@ import {
   Sun,
   Moon,
   Monitor,
+  HelpCircle,
 } from "lucide-react";
 import { useApp } from "@/app/context";
 import { ALERTS, ROLE_LABEL, USERS, CUSTOMERS, FARMERS, PRODUCTS } from "@/mock/data";
@@ -82,6 +83,12 @@ export function Topbar({
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && q.trim()) {
+                  setQ("");
+                  nav({ to: "/search", search: { q: q.trim() } });
+                }
+              }}
               placeholder={t(
                 "Tafuta wateja, bidhaa, wafugaji…",
                 "Search customers, products, farmers…",
@@ -322,6 +329,12 @@ export function Topbar({
             </DropdownMenuItem>
           )}
 
+          {/* Help & glossary, always available */}
+          <DropdownMenuItem onClick={() => nav({ to: "/help" })}>
+            <HelpCircle className="h-4 w-4 mr-2" />
+            {t("Msaada", "Help & glossary")}
+          </DropdownMenuItem>
+
           <DropdownMenuSeparator />
           <ConfirmDialog
             title={t("Toka kwenye African Joy POS?", "Log out of African Joy POS?")}
@@ -401,6 +414,14 @@ function SearchResults({
       <Group title={t("Wateja", "Customers")} items={results.customers} to="/customers" />
       <Group title={t("Wafugaji", "Farmers")} items={results.farmers} to="/farmers" />
       <Group title={t("Bidhaa", "Products")} items={results.products} to="/products" />
+      <div className="border-t border-border p-2">
+        <button
+          onClick={() => onPick("/search")}
+          className="w-full text-left rounded-md px-2 py-1.5 text-xs font-semibold text-[#1E7C3F] hover:bg-accent"
+        >
+          {t("Tazama matokeo yote, bonyeza Enter", "View all results, press Enter")} →
+        </button>
+      </div>
     </div>
   );
 }

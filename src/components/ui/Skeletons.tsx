@@ -7,7 +7,13 @@ import { cn } from "@/lib/utils";
  * brand surface (rounded-2xl cards, hairline borders).
  */
 
-export function KPISkeleton({ count = 4, columns = "grid-cols-2 lg:grid-cols-4" }: { count?: number; columns?: string }) {
+export function KPISkeleton({
+  count = 4,
+  columns = "grid-cols-2 lg:grid-cols-4",
+}: {
+  count?: number;
+  columns?: string;
+}) {
   return (
     <div className={cn("grid gap-3", columns)}>
       {Array.from({ length: count }).map((_, i) => (
@@ -29,7 +35,10 @@ export function TableSkeleton({ rows = 6, cols = 5 }: { rows?: number; cols?: nu
   return (
     <div className="overflow-hidden">
       {/* header */}
-      <div className="grid gap-3 px-3 py-2 border-b border-border" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+      <div
+        className="grid gap-3 px-3 py-2 border-b border-border"
+        style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+      >
         {Array.from({ length: cols }).map((_, i) => (
           <Skeleton key={i} className="h-3 w-16" />
         ))}
@@ -68,7 +77,9 @@ export function ChartSkeleton({ height = "h-64" }: { height?: string }) {
 
 export function CardSkeleton({ height = "h-32" }: { height?: string }) {
   return (
-    <div className={cn("rounded-2xl bg-card border border-border shadow-card p-4 space-y-3", height)}>
+    <div
+      className={cn("rounded-2xl bg-card border border-border shadow-card p-4 space-y-3", height)}
+    >
       <Skeleton className="h-4 w-2/3" />
       <Skeleton className="h-3 w-full" />
       <Skeleton className="h-3 w-5/6" />
@@ -77,7 +88,13 @@ export function CardSkeleton({ height = "h-32" }: { height?: string }) {
   );
 }
 
-export function ListItemSkeleton({ rows = 5, avatar = false }: { rows?: number; avatar?: boolean }) {
+export function ListItemSkeleton({
+  rows = 5,
+  avatar = false,
+}: {
+  rows?: number;
+  avatar?: boolean;
+}) {
   return (
     <ul className="divide-y divide-border">
       {Array.from({ length: rows }).map((_, i) => (

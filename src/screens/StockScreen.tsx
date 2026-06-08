@@ -136,19 +136,6 @@ export function StockScreen() {
   const [movements, setMovements] = useState<Movement[]>(MOVEMENT_SEED);
   const [viewingId, setViewingId] = useState<string | null>(null);
 
-  if (loading) {
-    return (
-      <AppShell title={t("Ghala na Stock", "Stock & store")}>
-        <KPISkeleton />
-        <div className="mt-5">
-          <SectionSkeleton>
-            <TableSkeleton rows={8} cols={6} />
-          </SectionSkeleton>
-        </div>
-      </AppShell>
-    );
-  }
-
   const lowCount = items.filter((s) => s.onHand < s.reorder && s.onHand > 0).length;
   const outCount = items.filter((s) => s.onHand <= 0).length;
 
@@ -212,6 +199,19 @@ export function StockScreen() {
           lastMovement: t("Imepika asubuhi", "Made this morning"),
         },
       ];
+
+  if (loading) {
+    return (
+      <AppShell title={t("Ghala na Stock", "Stock & store")}>
+        <KPISkeleton />
+        <div className="mt-5">
+          <SectionSkeleton>
+            <TableSkeleton rows={8} cols={6} />
+          </SectionSkeleton>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title={t("Ghala na Stock", "Stock & store")}>

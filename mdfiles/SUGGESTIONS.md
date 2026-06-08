@@ -127,11 +127,12 @@ Effort key, S = under 1 hour, M = 1-4 hours, L = a day or more.
 
 These are good ideas but each is opinionated or non-trivial. Pick which to tackle next:
 
-- **U-01** Cmd-K command palette
-- **U-02** Dark mode toggle
-- **P-01** Lazy-route code-splitting
-- **N-02** Farmer payout slip (small but adds a route + print layout)
-- **N-04** Expense entry
-- **N-10** Search results page
-- **N-08** Help / Glossary page
+- ~~**U-01** Cmd-K command palette~~ ✅ shipped
+- ~~**U-02** Dark mode toggle~~ ✅ shipped
+- ~~**P-01** Lazy-route code-splitting~~ ✅ shipped
+- ~~**N-02** Farmer payout slip~~ ✅ shipped
+- ~~**N-04** Expense entry~~ ✅ shipped
+- ~~**N-08** Help / Glossary page~~ ✅ shipped
+- ~~**N-10** Search results page~~ ✅ shipped
+- ~~**E-01** Skeleton loading patterns~~ ✅ shipped (reusable Skeletons + applied on key screens)
 - Any from §8 (operational) if they match how the business actually works

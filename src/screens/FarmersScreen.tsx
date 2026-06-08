@@ -53,19 +53,6 @@ export function FarmersScreen() {
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  if (loading) {
-    return (
-      <AppShell title={t("Wafugaji", "Farmers")}>
-        <KPISkeleton />
-        <div className="mt-5">
-          <SectionSkeleton>
-            <TableSkeleton rows={8} cols={7} />
-          </SectionSkeleton>
-        </div>
-      </AppShell>
-    );
-  }
-
   const filtered = useMemo(
     () =>
       farmers.filter((f) => {
@@ -80,6 +67,19 @@ export function FarmersScreen() {
   const totalDue = farmers.reduce((a, f) => a + f.currentBalanceTZS, 0);
   const totalFarmers = farmers.length;
   const dueCount = farmers.filter((f) => f.status === "due" || f.status === "delayed").length;
+
+  if (loading) {
+    return (
+      <AppShell title={t("Wafugaji", "Farmers")}>
+        <KPISkeleton />
+        <div className="mt-5">
+          <SectionSkeleton>
+            <TableSkeleton rows={8} cols={7} />
+          </SectionSkeleton>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title={t("Wafugaji", "Farmers")}>
@@ -464,12 +464,22 @@ function FarmerDetailDrawer({
           </ul>
         </div>
 
-        <div className="mt-5 flex gap-2">
+        <div className="mt-5 flex flex-wrap gap-2">
           <RecordFarmerPaymentDialog farmer={f} />
           <Button asChild variant="outline" className="rounded-xl">
             <Link to="/statement/farmer/$id" params={{ id: f.id }}>
               <FileText className="h-3.5 w-3.5 mr-1.5" />
               {t("Statimenti", "Statement")}
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="rounded-xl">
+            <Link
+              to="/payout/farmer/$id"
+              params={{ id: f.id }}
+              search={{ cycle: "01-15 Jun 2026" }}
+            >
+              <Wallet className="h-3.5 w-3.5 mr-1.5" />
+              {t("Karatasi ya malipo", "Payout slip")}
             </Link>
           </Button>
         </div>
