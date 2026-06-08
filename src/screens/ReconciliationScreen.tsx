@@ -7,6 +7,8 @@ import { num } from "@/lib/format";
 import { Check, X, Lock, Sigma } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ExportMenu } from "@/components/ui/ExportMenu";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 function isBalanced(r: typeof RECON_TODAY[number]) {
   const lhs = r.opening + r.collected + r.produced;
@@ -48,7 +50,7 @@ export function ReconciliationScreen() {
         </div>
       )}
 
-      <SectionCard title={t("Sawazisho la kila bidhaa", "Per-product reconciliation")}>
+      <SectionCard title={t("Sawazisho la kila bidhaa", "Per-product reconciliation")} action={<ExportMenu formats={["pdf"]} filename="day-reconciliation" />}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">

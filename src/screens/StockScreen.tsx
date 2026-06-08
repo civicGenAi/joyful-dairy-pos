@@ -12,6 +12,7 @@ import { num } from "@/lib/format";
 import { AlertTriangle, PackagePlus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ExportMenu } from "@/components/ui/ExportMenu";
 
 function statusOf(s: typeof STOCK[number]) {
   if (s.onHand <= 0) return "danger" as const;
