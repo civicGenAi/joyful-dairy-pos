@@ -30,48 +30,143 @@ import {
   Cell,
   Legend,
 } from "recharts";
+// BACKEND: data now flows through src/lib/data/{reports,recon,sales,farmers,production}.
 import {
-  MILK_TREND_30,
-  SALES_CHANNEL_SPLIT,
-  TOP_CUSTOMERS,
-  FARMERS,
-  TODAY,
-  TODAY_LABEL,
-} from "@/mock/data";
+  useMilkTrend,
+  useSalesByCategory,
+  useChannelSplit,
+  useTopCustomers,
+} from "@/lib/data/hooks/reports";
+import { useReconForDate } from "@/lib/data/hooks/recon";
+import { useSalesByDate } from "@/lib/data/hooks/sales";
+import { useFarmers } from "@/lib/data/hooks/farmers";
+import { useYieldTrend } from "@/lib/data/hooks/production";
+import { todayISO, daysAgoISO, dateLabel } from "@/lib/data/dates";
 import { Send, Mail, MessageCircle, Phone, FileText, Eye, X } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { Link } from "@tanstack/react-router";
 
-const PRODUCT_BLOCKS = [
-  {
-    name: "Fresh milk (L)",
-    opening: 60,
-    sold: 380,
-    credit: 120,
-    spoilt: 12,
-    closing: 94,
-    total: 940,
-  },
-  { name: "Mtindi (L)", opening: 40, sold: 110, credit: 80, spoilt: 4, closing: 60, total: 260 },
-  { name: "Yoghurt (pcs)", opening: 84, sold: 38, credit: 12, spoilt: 1, closing: 33, total: 120 },
-  { name: "Ghee (L)", opening: 18, sold: 1, credit: 0, spoilt: 0, closing: 23, total: 24 },
-  { name: "Butter (pcs)", opening: 12, sold: 12, credit: 0, spoilt: 0, closing: 0, total: 24 },
-  { name: "Mozzarella (kg)", opening: 2, sold: 8, credit: 2, spoilt: 0, closing: 12, total: 22 },
-  { name: "Halloumi (kg)", opening: 1, sold: 2, credit: 1, spoilt: 0, closing: 4.2, total: 7.35 },
-  { name: "Paneer (kg)", opening: 0, sold: 0, credit: 1, spoilt: 0, closing: 7, total: 8 },
-];
-
 const GREENS = ["#1E7C3F", "#2F9E44", "#6FBF59", "#8CC63F", "#1D9E75", "#14532D"];
+
+function addDays(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 export function ReportsScreen() {
   const { t } = useApp();
-  const [dailyDate, setDailyDate] = useState(TODAY);
-  const [weeklyStart, setWeeklyStart] = useState("2026-05-22");
-  const [monthlyMonth, setMonthlyMonth] = useState("2026-05");
-  const [yearlyYear, setYearlyYear] = useState("2026");
+  const today = todayISO();
+  const [dailyDate, setDailyDate] = useState(today);
+  const [weeklyStart, setWeeklyStart] = useState(daysAgoISO(6));
+  const [monthlyMonth, setMonthlyMonth] = useState(today.slice(0, 7));
+  const [yearlyYear, setYearlyYear] = useState(today.slice(0, 4));
   const [previewing, setPreviewing] = useState<{ recipient: string; channel: string } | null>(null);
+
+  // Daily
+  const { data: reconRows = [] } = useReconForDate(dailyDate);
+  const { data: dailySales = [] } = useSalesByDate(dailyDate);
+  const { data: yieldWeek = [] } = useYieldTrend(7);
+  const dailyRevenue = dailySales.reduce((a, s) => a + s.totalTZS, 0);
+  const litresSold = reconRows
+    .filter((r) => r.unit === "L")
+    .reduce((a, r) => a + r.soldCash + r.soldCredit, 0);
+  const dailySpoilt = reconRows.reduce((a, r) => a + r.spoilt, 0);
+  const lastYield = [...yieldWeek].reverse().find((y) => y.yieldPct && y.yieldPct > 0)?.yieldPct;
+
+  // Weekly
+  const weeklyEnd = addDays(weeklyStart, 6);
+  const { data: milkTrend = [] } = useMilkTrend(30);
+  const { data: weeklyCategory = [] } = useSalesByCategory(weeklyStart, weeklyEnd);
+  const { data: weeklyChannel = [] } = useChannelSplit(weeklyStart, weeklyEnd);
+  const { data: weeklyTop = [] } = useTopCustomers(weeklyStart, weeklyEnd, 6);
+  const { data: farmers = [] } = useFarmers();
+  const weekTrend = milkTrend
+    .filter((p) => p.date >= weeklyStart && p.date <= weeklyEnd)
+    .map((p) => ({
+      day: new Date(`${p.date}T00:00:00`).toLocaleDateString("en-GB", { weekday: "short" }),
+      collected: p.collected,
+      sold: p.sold,
+    }));
+  const weeklyRevenue = weeklyCategory.reduce((a, p) => a + p.amountTZS, 0);
+  const weeklyLitres = milkTrend
+    .filter((p) => p.date >= weeklyStart && p.date <= weeklyEnd)
+    .reduce((a, p) => a + p.collected, 0);
+  const weeklySpoilt = milkTrend
+    .filter((p) => p.date >= weeklyStart && p.date <= weeklyEnd)
+    .reduce((a, p) => a + p.spoilt, 0);
+  const spoilageRate = weeklyLitres > 0 ? ((weeklySpoilt / weeklyLitres) * 100).toFixed(1) : "0.0";
+  const weeklyChannelPie = useMemo(() => {
+    const counter = weeklyChannel
+      .filter((c) => c.channel === "counter" && c.payment !== "mpesa")
+      .reduce((a, c) => a + c.amountTZS, 0);
+    const route = weeklyChannel
+      .filter((c) => c.channel === "route" && c.payment !== "mpesa")
+      .reduce((a, c) => a + c.amountTZS, 0);
+    const mpesa = weeklyChannel
+      .filter((c) => c.payment === "mpesa")
+      .reduce((a, c) => a + c.amountTZS, 0);
+    const total = counter + route + mpesa || 1;
+    return [
+      { name: "Counter", value: Math.round((counter / total) * 100) },
+      { name: "Route", value: Math.round((route / total) * 100) },
+      { name: "M-Pesa", value: Math.round((mpesa / total) * 100) },
+    ];
+  }, [weeklyChannel]);
+
+  // Monthly
+  const monthStart = `${monthlyMonth}-01`;
+  const monthEnd = `${monthlyMonth}-31`;
+  const { data: monthlyCategory = [] } = useSalesByCategory(monthStart, monthEnd);
+  const { data: monthlyTop = [] } = useTopCustomers(monthStart, monthEnd, 1);
+  const monthlyRevenue = monthlyCategory.reduce((a, p) => a + p.amountTZS, 0);
+  const monthlyLitres = milkTrend
+    .filter((p) => p.date >= monthStart && p.date <= monthEnd)
+    .reduce((a, p) => a + p.collected, 0);
+  const monthlyDays = new Set(monthlyCategory.map((p) => p.date)).size || 1;
+  const weeklyBars = useMemo(() => {
+    const weeks: Record<string, number> = { W1: 0, W2: 0, W3: 0, W4: 0, W5: 0 };
+    for (const p of monthlyCategory) {
+      const day = Number(p.date.slice(8, 10));
+      const w = `W${Math.min(Math.ceil(day / 7), 5)}`;
+      weeks[w] += p.amountTZS;
+    }
+    return Object.entries(weeks)
+      .filter(([w, v]) => v > 0 || w !== "W5")
+      .map(([w, v]) => ({ w, v }));
+  }, [monthlyCategory]);
+  const bestDay = useMemo(() => {
+    const byDate: Record<string, number> = {};
+    for (const p of monthlyCategory) byDate[p.date] = (byDate[p.date] ?? 0) + p.amountTZS;
+    const sorted = Object.entries(byDate).sort((a, b) => b[1] - a[1]);
+    return sorted[0] ?? null;
+  }, [monthlyCategory]);
+  const topFarmer = farmers.slice().sort((a, b) => b.litresThisCycle - a.litresThisCycle)[0];
+  const avgYield = (() => {
+    const vals = yieldWeek.map((y) => y.yieldPct).filter((v): v is number => v !== null && v > 0);
+    return vals.length ? (vals.reduce((a, v) => a + v, 0) / vals.length).toFixed(1) : "0";
+  })();
+
+  // Yearly
+  const yearStart = `${yearlyYear}-01-01`;
+  const yearEnd = `${yearlyYear}-12-31`;
+  const { data: yearlyCategory = [] } = useSalesByCategory(yearStart, yearEnd);
+  const yearlyRevenue = yearlyCategory.reduce((a, p) => a + p.amountTZS, 0);
+  const yearlyByMonth = useMemo(() => {
+    const byMonth: Record<string, number> = {};
+    for (const p of yearlyCategory) {
+      const m = p.date.slice(0, 7);
+      byMonth[m] = (byMonth[m] ?? 0) + p.amountTZS;
+    }
+    return Object.keys(byMonth)
+      .sort()
+      .map((m) => ({
+        m: new Date(`${m}-01T00:00:00`).toLocaleDateString("en-GB", { month: "short" }),
+        v: byMonth[m],
+      }));
+  }, [yearlyCategory]);
 
   return (
     <AppShell title={t("Ripoti na Uchambuzi", "Reports & analytics")}>
@@ -105,53 +200,80 @@ export function ReportsScreen() {
             </Button>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-            <StatCard label={t("Mauzo leo", "Revenue today")} value={tzs(1428000)} accent="green" />
-            <StatCard label={t("Litre zilizouzwa", "Litres sold")} value={L(520)} accent="info" />
-            <StatCard label={t("Yaliyoharibika", "Spoilt")} value={L(17)} accent="red" />
-            <StatCard label={t("Yield", "Yield")} value="84%" accent="green" />
+            <StatCard
+              label={t("Mauzo leo", "Revenue today")}
+              value={tzs(dailyRevenue)}
+              accent="green"
+            />
+            <StatCard
+              label={t("Litre zilizouzwa", "Litres sold")}
+              value={L(litresSold)}
+              accent="info"
+            />
+            <StatCard label={t("Yaliyoharibika", "Spoilt")} value={L(dailySpoilt)} accent="red" />
+            <StatCard
+              label={t("Yield", "Yield")}
+              value={lastYield ? `${Math.round(lastYield)}%` : "·"}
+              accent="green"
+            />
           </div>
 
           <SectionCard
-            title={`${t("Ripoti ya kila siku", "Daily report")}, ${dailyDate === TODAY ? TODAY_LABEL : dailyDate}`}
+            title={`${t("Ripoti ya kila siku", "Daily report")}, ${dateLabel(dailyDate)}`}
           >
-            <div className="grid md:grid-cols-2 gap-3">
-              {PRODUCT_BLOCKS.map((p) => (
-                <div
-                  key={p.name}
-                  className="rounded-2xl border border-border bg-card overflow-hidden"
-                >
-                  <div className="px-3 py-2 border-b border-border bg-secondary/60 flex items-center justify-between">
-                    <span className="font-display font-semibold text-sm">{p.name}</span>
-                    <Pill tone="success">{t("Sawa", "Balanced")}</Pill>
+            {reconRows.length === 0 ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">
+                {t(
+                  "Hakuna harakati zilizorekodiwa siku hii.",
+                  "No movements recorded for this date.",
+                )}
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 gap-3">
+                {reconRows.map((p) => (
+                  <div
+                    key={p.productId}
+                    className="rounded-2xl border border-border bg-card overflow-hidden"
+                  >
+                    <div className="px-3 py-2 border-b border-border bg-secondary/60 flex items-center justify-between">
+                      <span className="font-display font-semibold text-sm">
+                        {p.product} ({p.unit})
+                      </span>
+                      <Pill tone="success">{t("Sawa", "Balanced")}</Pill>
+                    </div>
+                    <table className="w-full text-sm">
+                      <tbody>
+                        {[
+                          [t("Awali", "Opening"), p.opening],
+                          [t("Imeuzwa cash", "Sold cash"), p.soldCash],
+                          [t("Mkopo", "Credit"), p.soldCredit],
+                          [t("Imeharibika", "Spoilt"), p.spoilt, "danger"],
+                          [t("Imebakia", "Closing"), p.closing],
+                          [
+                            t("Jumla siku", "Day total"),
+                            p.opening + p.collected + p.produced,
+                            "bold",
+                          ],
+                        ].map(([k, v, tone], i) => (
+                          <tr key={i} className="border-b border-border last:border-0">
+                            <td
+                              className={`py-1.5 px-3 ${tone === "bold" ? "font-bold" : "text-muted-foreground"}`}
+                            >
+                              {k}
+                            </td>
+                            <td
+                              className={`py-1.5 px-3 text-right font-num ${tone === "bold" ? "font-bold text-[#1E7C3F]" : tone === "danger" ? "text-[#E11B22]" : ""}`}
+                            >
+                              {num(v as number)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                  <table className="w-full text-sm">
-                    <tbody>
-                      {[
-                        [t("Awali", "Opening"), p.opening],
-                        [t("Imeuzwa cash", "Sold cash"), p.sold],
-                        [t("Mkopo", "Credit"), p.credit],
-                        [t("Imeharibika", "Spoilt"), p.spoilt, "danger"],
-                        [t("Imebakia", "Closing"), p.closing],
-                        [t("Jumla siku", "Day total"), p.total, "bold"],
-                      ].map(([k, v, tone], i) => (
-                        <tr key={i} className="border-b border-border last:border-0">
-                          <td
-                            className={`py-1.5 px-3 ${tone === "bold" ? "font-bold" : "text-muted-foreground"}`}
-                          >
-                            {k}
-                          </td>
-                          <td
-                            className={`py-1.5 px-3 text-right font-num ${tone === "bold" ? "font-bold text-[#1E7C3F]" : tone === "danger" ? "text-[#E11B22]" : ""}`}
-                          >
-                            {num(v as number)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </SectionCard>
         </TabsContent>
 
@@ -170,14 +292,22 @@ export function ReportsScreen() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             <StatCard
               label={t("Mauzo wiki", "Weekly revenue")}
-              value={tzs(9620000)}
+              value={tzs(weeklyRevenue)}
               accent="green"
             />
-            <StatCard label={t("Litre wiki", "Litres collected")} value={L(6240)} accent="info" />
-            <StatCard label={t("Spoilage rate", "Spoilage")} value="1.4%" accent="amber" />
+            <StatCard
+              label={t("Litre wiki", "Litres collected")}
+              value={L(weeklyLitres)}
+              accent="info"
+            />
+            <StatCard
+              label={t("Spoilage rate", "Spoilage")}
+              value={`${spoilageRate}%`}
+              accent="amber"
+            />
             <StatCard
               label={t("Wateja active", "Active customers")}
-              value={num(28)}
+              value={num(weeklyTop.length)}
               accent="green"
             />
           </div>
@@ -185,7 +315,7 @@ export function ReportsScreen() {
             <SectionCard title={t("Mwelekeo wa wiki", "Weekly trend")} className="lg:col-span-2">
               <div className="h-72">
                 <ResponsiveContainer>
-                  <AreaChart data={MILK_TREND_30.slice(-7)} margin={{ left: -10 }}>
+                  <AreaChart data={weekTrend} margin={{ left: -10 }}>
                     <defs>
                       <linearGradient id="wk" x1="0" x2="0" y1="0" y2="1">
                         <stop offset="0%" stopColor="#2F9E44" stopOpacity={0.4} />
@@ -213,13 +343,13 @@ export function ReportsScreen() {
                 <ResponsiveContainer>
                   <PieChart>
                     <Pie
-                      data={SALES_CHANNEL_SPLIT}
+                      data={weeklyChannelPie}
                       dataKey="value"
                       innerRadius={50}
                       outerRadius={80}
                       paddingAngle={3}
                     >
-                      {SALES_CHANNEL_SPLIT.map((_, i) => (
+                      {weeklyChannelPie.map((_, i) => (
                         <Cell key={i} fill={GREENS[i]} />
                       ))}
                     </Pie>
@@ -234,12 +364,12 @@ export function ReportsScreen() {
             <SectionCard title={t("Wateja wa juu, wiki", "Top customers, week")}>
               <table className="w-full text-sm">
                 <tbody>
-                  {TOP_CUSTOMERS.slice(0, 6).map((c, i) => (
+                  {weeklyTop.map((c, i) => (
                     <tr key={c.name} className="border-b border-border last:border-0">
                       <td className="py-2 px-3 font-num text-xs text-muted-foreground">{i + 1}</td>
                       <td className="py-2 px-3 font-medium">{c.name}</td>
                       <td className="py-2 px-3 text-right font-num font-semibold">
-                        {tzs(c.value / 4)}
+                        {tzs(c.amountTZS)}
                       </td>
                     </tr>
                   ))}
@@ -249,7 +379,8 @@ export function ReportsScreen() {
             <SectionCard title={t("Wafugaji wa juu, wiki", "Top farmers, week")}>
               <table className="w-full text-sm">
                 <tbody>
-                  {FARMERS.slice()
+                  {farmers
+                    .slice()
                     .sort((a, b) => b.litresThisCycle - a.litresThisCycle)
                     .slice(0, 6)
                     .map((f, i) => (
@@ -277,49 +408,52 @@ export function ReportsScreen() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {["2026-05", "2026-04", "2026-03", "2026-02", "2026-01"].map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {m}
-                  </SelectItem>
-                ))}
+                {Array.from({ length: 6 }).map((_, i) => {
+                  const d = new Date();
+                  d.setMonth(d.getMonth() - i);
+                  const m = d.toISOString().slice(0, 7);
+                  return (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-            <StatCard label={t("Mapato Mei", "May revenue")} value={tzs(41200000)} accent="green" />
-            <StatCard label={t("Litre Mei", "May litres")} value={L(26800)} accent="info" />
+            <StatCard
+              label={t("Mapato mwezi", "Month revenue")}
+              value={tzs(monthlyRevenue)}
+              accent="green"
+            />
+            <StatCard
+              label={t("Litre mwezi", "Month litres")}
+              value={L(monthlyLitres)}
+              accent="info"
+            />
             <StatCard
               label={t("Wafugaji active", "Farmers active")}
-              value={num(15)}
+              value={num(farmers.length)}
               accent="green"
             />
             <StatCard
               label={t("Mauzo wastani siku", "Avg daily sales")}
-              value={tzs(1370000)}
+              value={tzs(Math.round(monthlyRevenue / monthlyDays))}
               accent="info"
             />
           </div>
           <div className="grid lg:grid-cols-3 gap-4">
-            <SectionCard
-              title={t("Mauzo kwa wiki, Mei", "Sales by week, May")}
-              className="lg:col-span-2"
-            >
+            <SectionCard title={t("Mauzo kwa wiki", "Sales by week")} className="lg:col-span-2">
               <div className="h-72">
                 <ResponsiveContainer>
-                  <BarChart
-                    data={[
-                      { w: "W1", v: 8800000 },
-                      { w: "W2", v: 10200000 },
-                      { w: "W3", v: 9400000 },
-                      { w: "W4", v: 12800000 },
-                    ]}
-                  >
+                  <BarChart data={weeklyBars}>
                     <CartesianGrid stroke="#E6EBE1" vertical={false} />
                     <XAxis dataKey="w" stroke="#6B776E" fontSize={11} />
                     <YAxis
                       stroke="#6B776E"
                       fontSize={11}
-                      tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`}
+                      tickFormatter={(v) => `${(v / 1e6).toFixed(1)}M`}
                     />
                     <Tooltip formatter={(v: number) => tzs(v)} />
                     <Bar dataKey="v" fill="#2F9E44" radius={[8, 8, 0, 0]} />
@@ -333,23 +467,25 @@ export function ReportsScreen() {
                   <span className="text-muted-foreground">
                     {t("Mauzo bora ya siku", "Best sales day")}
                   </span>
-                  <span className="font-num font-semibold">22 Mei, {tzs(1880000)}</span>
+                  <span className="font-num font-semibold">
+                    {bestDay ? `${dateLabel(bestDay[0])}, ${tzs(bestDay[1])}` : "·"}
+                  </span>
                 </li>
                 <li className="flex justify-between">
                   <span className="text-muted-foreground">{t("Mteja wa juu", "Top customer")}</span>
-                  <span className="font-semibold">Mamis Bistro</span>
+                  <span className="font-semibold">{monthlyTop[0]?.name ?? "·"}</span>
                 </li>
                 <li className="flex justify-between">
                   <span className="text-muted-foreground">{t("Mfugaji wa juu", "Top farmer")}</span>
-                  <span className="font-semibold">Idda Kirenga</span>
+                  <span className="font-semibold">{topFarmer?.name ?? "·"}</span>
                 </li>
                 <li className="flex justify-between">
                   <span className="text-muted-foreground">{t("Yield wastani", "Avg yield")}</span>
-                  <span className="font-num">83.6%</span>
+                  <span className="font-num">{avgYield}%</span>
                 </li>
                 <li className="flex justify-between">
                   <span className="text-muted-foreground">{t("Spoilage rate", "Spoilage")}</span>
-                  <span className="font-num">1.6%</span>
+                  <span className="font-num">{spoilageRate}%</span>
                 </li>
               </ul>
             </SectionCard>
@@ -364,39 +500,49 @@ export function ReportsScreen() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {["2026", "2025", "2024"].map((y) => (
-                  <SelectItem key={y} value={y}>
-                    {y}
-                  </SelectItem>
-                ))}
+                {Array.from({ length: 3 }).map((_, i) => {
+                  const y = String(new Date().getFullYear() - i);
+                  return (
+                    <SelectItem key={y} value={y}>
+                      {y}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             <StatCard
-              label={t("Mapato 2026", "Revenue YTD")}
-              value={tzs(184500000)}
+              label={t(`Mapato ${yearlyYear}`, "Revenue YTD")}
+              value={tzs(yearlyRevenue)}
               accent="green"
             />
-            <StatCard label={t("Litre 2026", "Litres YTD")} value={L(126000)} accent="info" />
-            <StatCard label={t("Ukuaji", "Growth vs 2025")} value="+22%" accent="green" />
-            <StatCard label={t("Yield wastani", "Avg yield")} value="83.4%" accent="amber" />
+            <StatCard
+              label={t(`Litre ${yearlyYear}`, "Litres YTD")}
+              value={L(monthlyLitres)}
+              accent="info"
+            />
+            <StatCard
+              label={t("Miezi yenye mauzo", "Months with sales")}
+              value={num(yearlyByMonth.length)}
+              accent="green"
+            />
+            <StatCard
+              label={t("Yield wastani", "Avg yield")}
+              value={`${avgYield}%`}
+              accent="amber"
+            />
           </div>
           <SectionCard title={t("Mapato kwa mwezi", "Revenue by month")}>
             <div className="h-72">
               <ResponsiveContainer>
-                <LineChart
-                  data={["Jan", "Feb", "Mar", "Apr", "May"].map((m, i) => ({
-                    m,
-                    v: 28000000 + i * 3300000 + i * i * 500000,
-                  }))}
-                >
+                <LineChart data={yearlyByMonth}>
                   <CartesianGrid stroke="#E6EBE1" vertical={false} />
                   <XAxis dataKey="m" stroke="#6B776E" fontSize={11} />
                   <YAxis
                     stroke="#6B776E"
                     fontSize={11}
-                    tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`}
+                    tickFormatter={(v) => `${(v / 1e6).toFixed(1)}M`}
                   />
                   <Tooltip formatter={(v: number) => tzs(v)} />
                   <Line
@@ -512,15 +658,21 @@ export function ReportsScreen() {
                         ? "AFR JOY DAILY"
                         : t("Muhtasari wa siku, African Joy", "Daily summary, African Joy")}
                     </div>
-                    <div>{TODAY_LABEL}</div>
+                    <div>{dateLabel(today)}</div>
                     <div>
-                      {t("Mauzo", "Sales")}: {tzs(1428000)}
+                      {t("Mauzo", "Sales")}: {tzs(dailyRevenue)}
                     </div>
-                    <div>{t("Litre", "Litres")}: 520 L</div>
-                    <div>{t("Yaliyoharibika", "Spoilt")}: 17 L</div>
-                    <div>{t("Wateja wa juu", "Top customer")}: Mamis Bistro</div>
                     <div>
-                      {t("Hali ya siku", "Day")}: {t("Imefungwa", "Locked")}
+                      {t("Litre", "Litres")}: {num(litresSold)} L
+                    </div>
+                    <div>
+                      {t("Yaliyoharibika", "Spoilt")}: {num(dailySpoilt)} L
+                    </div>
+                    <div>
+                      {t("Wateja wa juu", "Top customer")}: {weeklyTop[0]?.name ?? "·"}
+                    </div>
+                    <div>
+                      {t("Hali ya siku", "Day")}: {t("Imefunguliwa", "Open")}
                     </div>
                     {previewing.channel === "SMS" ? null : (
                       <div className="pt-2 mt-2 border-t border-border text-[10px] text-muted-foreground">
