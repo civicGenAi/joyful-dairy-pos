@@ -32,6 +32,7 @@ export interface PriceHistoryEntry {
   tier: PriceTier;
   value: number;
   effectiveFrom: string;
+  byName?: string;
 }
 
 export const productKeys = {
@@ -64,15 +65,17 @@ export const productsRepo = {
     const rows = unwrap(
       await supabase
         .from("price_list")
-        .select("id, product_id, tier, value, effective_from")
+        .select("id, product_id, tier, value, effective_from, profiles(name)")
         .order("effective_from", { ascending: false })
-        .limit(100),
-    ) as {
+        .order("created_at", { ascending: false })
+        .limit(120),
+    ) as unknown as {
       id: string;
       product_id: string;
       tier: PriceTier;
       value: number;
       effective_from: string;
+      profiles: { name: string } | null;
     }[];
     return rows.map((r) => ({
       id: r.id,
@@ -80,6 +83,7 @@ export const productsRepo = {
       tier: r.tier,
       value: Number(r.value),
       effectiveFrom: r.effective_from,
+      byName: r.profiles?.name,
     }));
   },
 
