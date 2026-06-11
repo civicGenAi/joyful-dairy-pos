@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { Command } from "cmdk";
 import { useNavigate } from "@tanstack/react-router";
 import { useApp } from "@/app/context";
-import { CUSTOMERS, FARMERS, PRODUCTS, NAV_GROUPS_BY_ROLE } from "@/mock/data";
+// BACKEND: live data via src/lib/data hooks; NAV_GROUPS_BY_ROLE is static UI config.
+import { NAV_GROUPS_BY_ROLE } from "@/mock/data";
+import { useCustomers } from "@/lib/data/hooks/customers";
+import { useFarmers } from "@/lib/data/hooks/farmers";
+import { useProducts } from "@/lib/data/hooks/products";
 import * as Icons from "lucide-react";
 import {
   Search,
@@ -27,6 +31,10 @@ export function CommandPalette() {
   const nav = useNavigate();
   const { t, role, lang, setLang, setTheme, theme, logout, user } = useApp();
   const groups = NAV_GROUPS_BY_ROLE[role] ?? [];
+  // Palette search tolerates missing read capability: errors render as empty.
+  const customers = useCustomers().data ?? [];
+  const farmers = useFarmers().data ?? [];
+  const products = useProducts().data ?? [];
 
   // Global Cmd/Ctrl+K listener. Skip when typing in an editable element so
   // we don't hijack regular form K-presses.
@@ -161,7 +169,8 @@ export function CommandPalette() {
                 {/* Customers */}
                 {q && (
                   <Command.Group heading={t("Wateja", "Customers")} className="cmdk-group">
-                    {CUSTOMERS.filter((c) => c.name.toLowerCase().includes(q.toLowerCase()))
+                    {customers
+                      .filter((c) => c.name.toLowerCase().includes(q.toLowerCase()))
                       .slice(0, 6)
                       .map((c) => (
                         <CmdItem
@@ -178,7 +187,8 @@ export function CommandPalette() {
                 {/* Farmers */}
                 {q && (
                   <Command.Group heading={t("Wafugaji", "Farmers")} className="cmdk-group">
-                    {FARMERS.filter((f) => f.name.toLowerCase().includes(q.toLowerCase()))
+                    {farmers
+                      .filter((f) => f.name.toLowerCase().includes(q.toLowerCase()))
                       .slice(0, 6)
                       .map((f) => (
                         <CmdItem
@@ -195,11 +205,12 @@ export function CommandPalette() {
                 {/* Products */}
                 {q && (
                   <Command.Group heading={t("Bidhaa", "Products")} className="cmdk-group">
-                    {PRODUCTS.filter(
-                      (p) =>
-                        p.name.toLowerCase().includes(q.toLowerCase()) ||
-                        p.swName.toLowerCase().includes(q.toLowerCase()),
-                    )
+                    {products
+                      .filter(
+                        (p) =>
+                          p.name.toLowerCase().includes(q.toLowerCase()) ||
+                          p.swName.toLowerCase().includes(q.toLowerCase()),
+                      )
                       .slice(0, 6)
                       .map((p) => (
                         <CmdItem

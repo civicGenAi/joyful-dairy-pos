@@ -15,6 +15,15 @@ export function useCreateLocation() {
   });
 }
 
+export function useSetLocationActive() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name, active }: { id: string; name: string; active: boolean }) =>
+      locationsRepo.setActive(id, name, active),
+    onSuccess: () => qc.invalidateQueries({ queryKey: locationKeys.all }),
+  });
+}
+
 export function useDeleteLocation() {
   const qc = useQueryClient();
   return useMutation({

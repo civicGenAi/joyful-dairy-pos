@@ -1,6 +1,10 @@
 import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
-import { CUSTOMERS, FARMERS, PRODUCTS, NAV_GROUPS_BY_ROLE } from "@/mock/data";
+// BACKEND: data now flows through src/lib/data hooks; NAV_GROUPS_BY_ROLE is static UI config.
+import { NAV_GROUPS_BY_ROLE } from "@/mock/data";
+import { useCustomers } from "@/lib/data/hooks/customers";
+import { useFarmers } from "@/lib/data/hooks/farmers";
+import { useProducts } from "@/lib/data/hooks/products";
 import { SectionCard, Pill } from "@/components/ui/data-bits";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -14,6 +18,10 @@ export function SearchScreen() {
   const nav = useNavigate();
   const search = useSearch({ from: "/search" }) as { q?: string };
   const [q, setQ] = useState(search.q ?? "");
+  // Search UIs tolerate missing read capability: errors render as empty lists.
+  const customers = useCustomers().data ?? [];
+  const farmers = useFarmers().data ?? [];
+  const products = useProducts().data ?? [];
 
   // Keep URL in sync as user types (debounced via simple short timer)
   useEffect(() => {
@@ -29,11 +37,11 @@ export function SearchScreen() {
   const results = useMemo(() => {
     if (!needle) return null;
     return {
-      customers: CUSTOMERS.filter((c) => c.name.toLowerCase().includes(needle)),
-      farmers: FARMERS.filter(
+      customers: customers.filter((c) => c.name.toLowerCase().includes(needle)),
+      farmers: farmers.filter(
         (f) => f.name.toLowerCase().includes(needle) || f.village.toLowerCase().includes(needle),
       ),
-      products: PRODUCTS.filter(
+      products: products.filter(
         (p) =>
           p.name.toLowerCase().includes(needle) ||
           p.swName.toLowerCase().includes(needle) ||
@@ -47,7 +55,7 @@ export function SearchScreen() {
           .map((it) => ({ ...it, group: g.group, groupSw: g.sw })),
       ),
     };
-  }, [needle, groups]);
+  }, [needle, groups, customers, farmers, products]);
 
   const totalCount = results
     ? results.customers.length +
