@@ -508,12 +508,10 @@ function AdjustDialog({ items }: { items: StockItem[] }) {
   const [itemId, setItemId] = useState(items[0]?.id);
   const [delta, setDelta] = useState(-1);
   const [reason, setReason] = useState("");
+  // Explicit type: no guessing from the reason text.
+  const [kind, setKind] = useState<"adjusted" | "spoilt">("adjusted");
   const move = useStockMove();
   const spoil = useRecordSpoilage();
-
-  const isSpoilage =
-    delta < 0 &&
-    (reason.toLowerCase().includes("haribika") || reason.toLowerCase().includes("spoil"));
   const pending = move.isPending || spoil.isPending;
 
   const save = () => {
@@ -526,7 +524,7 @@ function AdjustDialog({ items }: { items: StockItem[] }) {
       },
       onError: () => toast.error(t("Imeshindikana kurekodi", "Could not record adjustment")),
     };
-    if (isSpoilage) {
+    if (kind === "spoilt") {
       spoil.mutate(
         { stockItemId: itemId, qty: Math.abs(delta), reason: reason || undefined },
         done,
@@ -568,11 +566,27 @@ function AdjustDialog({ items }: { items: StockItem[] }) {
             </Select>
           </div>
           <div className="grid gap-1.5">
+            <Label>{t("Aina", "Type")}</Label>
+            <Select value={kind} onValueChange={(v) => setKind(v as typeof kind)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="adjusted">
+                  {t("Marekebisho ya hesabu", "Count adjustment")}
+                </SelectItem>
+                <SelectItem value="spoilt">{t("Uharibifu", "Spoilage")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
             <Label>
-              {t(
-                "Mabadiliko (chanya kuongeza, hasi kupunguza)",
-                "Delta (positive to add, negative to remove)",
-              )}
+              {kind === "spoilt"
+                ? t("Idadi iliyoharibika", "Quantity spoilt")
+                : t(
+                    "Mabadiliko (chanya kuongeza, hasi kupunguza)",
+                    "Delta (positive to add, negative to remove)",
+                  )}
             </Label>
             <Input type="number" value={delta} onChange={(e) => setDelta(Number(e.target.value))} />
           </div>

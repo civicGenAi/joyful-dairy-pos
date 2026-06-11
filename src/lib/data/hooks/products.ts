@@ -39,3 +39,19 @@ export function useSetPrice() {
     onSuccess: () => qc.invalidateQueries({ queryKey: productKeys.all }),
   });
 }
+
+export function useUpdateProduct() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: productsRepo.update,
+    onSuccess: () => qc.invalidateQueries({ queryKey: productKeys.all }),
+  });
+}
+
+export function useDeleteProduct() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) => productsRepo.remove(id, name),
+    onSuccess: () => qc.invalidateQueries({ queryKey: productKeys.all }),
+  });
+}

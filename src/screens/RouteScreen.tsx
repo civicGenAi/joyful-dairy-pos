@@ -63,7 +63,8 @@ export function RouteScreen() {
   const today = todayISO();
   const { data: products = [] } = useProducts();
   const { data: priceMatrix = {} } = usePriceMatrix();
-  const { data: customers = [] } = useCustomers();
+  const { data: allCustomers = [] } = useCustomers();
+  const customers = allCustomers.filter((c) => !c.suspended);
   const { data: stock = [] } = useStock();
   const { data: sales = [] } = useSalesByDate(today, "route");
   const completeSaleMut = useCompleteSale();

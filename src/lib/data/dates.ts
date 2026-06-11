@@ -21,3 +21,9 @@ export function dateLabel(iso: string, lang: "sw" | "en" = "en"): string {
     year: "numeric",
   });
 }
+
+/** Session suggested by the real clock (EAT): morning until 11:59, then evening. */
+export function currentSession(): "morning" | "evening" {
+  const hourEAT = (new Date().getUTCHours() + 3) % 24;
+  return hourEAT < 12 ? "morning" : "evening";
+}

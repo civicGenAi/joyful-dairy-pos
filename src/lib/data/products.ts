@@ -129,6 +129,45 @@ export const productsRepo = {
     return toProduct(row);
   },
 
+  async update(input: {
+    id: string;
+    name: string;
+    swName: string;
+    category: ProductCategory;
+    unit: Unit;
+    conversionNote?: string;
+  }): Promise<void> {
+    unwrap(
+      await supabase
+        .from("products")
+        .update({
+          name: input.name,
+          sw_name: input.swName,
+          category: input.category,
+          unit: input.unit,
+          conversion_note: input.conversionNote ?? null,
+        })
+        .eq("id", input.id)
+        .select("id"),
+    );
+    await recordAudit(
+      "edit",
+      "products",
+      `Amehariri bidhaa (${input.name})`,
+      `Edited product (${input.name})`,
+    );
+  },
+
+  async remove(id: string, name: string): Promise<void> {
+    unwrap(await supabase.from("products").delete().eq("id", id).select("id"));
+    await recordAudit(
+      "delete",
+      "products",
+      `Amefuta bidhaa (${name})`,
+      `Deleted product (${name})`,
+    );
+  },
+
   async setActive(id: string, name: string, active: boolean): Promise<void> {
     unwrap(await supabase.from("products").update({ active }).eq("id", id).select("id"));
     await recordAudit(

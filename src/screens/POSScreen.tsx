@@ -70,7 +70,8 @@ export function POSScreen() {
   const today = todayISO();
   const { data: allProducts = [], isPending } = useProducts();
   const { data: priceMatrix = {} } = usePriceMatrix();
-  const { data: customers = [] } = useCustomers();
+  const { data: allCustomers = [] } = useCustomers();
+  const customers = allCustomers.filter((c) => !c.suspended);
   const { data: stock = [] } = useStock();
   const { data: shift = [] } = useSalesByDate(today, "counter");
   const completeSaleMut = useCompleteSale();

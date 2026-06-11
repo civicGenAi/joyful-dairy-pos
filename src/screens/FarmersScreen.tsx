@@ -9,11 +9,14 @@ import {
   useUpdateFarmer,
   useDeleteFarmer,
   usePayFarmer,
+  useFarmerAdjustments,
+  useRequestAdjustment,
+  useReviewAdjustment,
 } from "@/lib/data/hooks/farmers";
 import { useRecordCollection } from "@/lib/data/hooks/collections";
 import { useQuery } from "@tanstack/react-query";
 import { collectionKeys, collectionsRepo } from "@/lib/data/collections";
-import { todayISO, dateLabel } from "@/lib/data/dates";
+import { todayISO, dateLabel, currentSession } from "@/lib/data/dates";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { tzs, L, num } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -321,6 +324,8 @@ export function FarmersScreen() {
           </div>
         </SectionCard>
       </div>
+
+      <AdjustmentsSection />
     </AppShell>
   );
 }
@@ -330,7 +335,9 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
   const [open, setOpen] = useState(false);
   const [farmerId, setFarmerId] = useState<string>("");
   const [date, setDate] = useState(todayISO());
-  const [session, setSession] = useState<"morning" | "evening">("morning");
+  // Session defaults to the real clock so morning/evening cannot be mixed up.
+  const [session, setSession] = useState<"morning" | "evening">(currentSession());
+  const sessionMismatch = date === todayISO() && session !== currentSession();
   const [litres, setLitres] = useState(32);
   const [point, setPoint] = useState<"field-a" | "main">("field-a");
   const [note, setNote] = useState("");
@@ -349,9 +356,14 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
         },
         onError: (e) =>
           toast.error(
-            e.message.includes("day-locked")
-              ? t("Siku hii imefungwa", "This day is locked")
-              : t("Imeshindikana kurekodi", "Could not record collection"),
+            e.message.includes("session-mismatch")
+              ? t(
+                  "Kipindi hakilingani na muda halisi wa sasa",
+                  "Session does not match the real current time",
+                )
+              : e.message.includes("day-locked")
+                ? t("Siku hii imefungwa", "This day is locked")
+                : t("Imeshindikana kurekodi", "Could not record collection"),
           ),
       },
     );
@@ -431,6 +443,14 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
               </Select>
             </div>
           </div>
+          {sessionMismatch && (
+            <div className="rounded-lg bg-[#E5A100]/10 text-[#8a5a00] px-3 py-2 text-[11px]">
+              {t(
+                `Sasa hivi ni kipindi cha ${currentSession() === "morning" ? "asubuhi" : "jioni"}; mfumo utakataa kipindi kisicholingana.`,
+                `Right now it is the ${currentSession()} session; the system will reject a mismatched session.`,
+              )}
+            </div>
+          )}
           <div className="grid gap-1.5">
             <Label>{t("Maelezo (hiari)", "Notes (optional)")}</Label>
             <Input
@@ -464,6 +484,7 @@ function FarmerDetailDrawer({
 }) {
   const { t, lang, can } = useApp();
   const canPay = can("payout:write");
+  const canAdjust = can("farmers:write") || can("payout:write");
   const monthStart = `${todayISO().slice(0, 8)}01`;
   const { data: monthCollections = [] } = useQuery({
     queryKey: collectionKeys.byFarmer(f.id, monthStart),
@@ -596,6 +617,7 @@ function FarmerDetailDrawer({
 
         <div className="mt-5 flex flex-wrap gap-2">
           {canPay && <RecordFarmerPaymentDialog farmer={f} />}
+          {canAdjust && <RequestAdjustmentDialog farmer={f} />}
           <Button asChild variant="outline" className="rounded-xl">
             <Link to="/statement/farmer/$id" params={{ id: f.id }}>
               <FileText className="h-3.5 w-3.5 mr-1.5" />
@@ -865,5 +887,196 @@ function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function RequestAdjustmentDialog({ farmer }: { farmer: Farmer }) {
+  const { t } = useApp();
+  const [open, setOpen] = useState(false);
+  const [delta, setDelta] = useState(0);
+  const [reason, setReason] = useState("");
+  const request = useRequestAdjustment();
+
+  const save = () => {
+    if (!delta || !reason.trim()) {
+      toast.error(t("Weka kiasi na sababu", "Enter an amount and a reason"));
+      return;
+    }
+    request.mutate(
+      { farmerId: farmer.id, deltaTZS: delta, reason },
+      {
+        onSuccess: () => {
+          toast.success(
+            t(
+              "Ombi limewasilishwa, linasubiri idhini ya admin",
+              "Request submitted, awaiting admin approval",
+            ),
+          );
+          setOpen(false);
+          setDelta(0);
+          setReason("");
+        },
+        onError: () => toast.error(t("Imeshindikana kuwasilisha", "Could not submit the request")),
+      },
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="rounded-xl">
+          {t("Omba marekebisho ya salio", "Request balance adjustment")}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {t("Marekebisho ya salio la", "Balance adjustment for")} {farmer.name}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-3">
+          <div className="rounded-xl bg-secondary/60 p-3 flex justify-between text-sm">
+            <span className="text-muted-foreground">{t("Salio la sasa", "Current balance")}</span>
+            <span className="font-num font-bold">{tzs(farmer.currentBalanceTZS)}</span>
+          </div>
+          <div className="grid gap-1.5">
+            <Label>
+              {t(
+                "Kiasi (TZS, chanya kuongeza, hasi kupunguza)",
+                "Amount (TZS, positive to add, negative to subtract)",
+              )}
+            </Label>
+            <Input type="number" value={delta} onChange={(e) => setDelta(Number(e.target.value))} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>{t("Sababu (lazima)", "Reason (required)")}</Label>
+            <Input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder={t(
+                "Mfano: kurekebisha kosa la kuingiza litre",
+                "e.g. correcting a litres entry mistake",
+              )}
+            />
+          </div>
+          <div className="rounded-xl border border-dashed border-border p-3 text-[11px] text-muted-foreground">
+            {t(
+              "Salio halitabadilika mpaka admin aidhinishe ombi hili.",
+              "The balance does not change until an admin approves this request.",
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            {t("Ghairi", "Cancel")}
+          </Button>
+          <Button onClick={save} disabled={request.isPending}>
+            {request.isPending ? t("Inawasilisha…", "Submitting…") : t("Wasilisha", "Submit")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AdjustmentsSection() {
+  const { t, can } = useApp();
+  const { data: adjustments = [] } = useFarmerAdjustments();
+  const review = useReviewAdjustment();
+  const isAdmin = can("users:write");
+  if (adjustments.length === 0) return null;
+
+  return (
+    <div className="mt-5">
+      <SectionCard
+        title={t("Marekebisho ya salio (idhini ya admin)", "Balance adjustments (admin approval)")}
+      >
+        <ul className="divide-y divide-border">
+          {adjustments.map((a) => (
+            <li key={a.id} className="flex flex-wrap items-center gap-3 py-3">
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm">
+                  {a.farmerName ?? a.farmerId} ·{" "}
+                  <span
+                    className={`font-num font-semibold ${a.deltaTZS < 0 ? "text-[#E11B22]" : "text-[#1E7C3F]"}`}
+                  >
+                    {a.deltaTZS > 0 ? "+" : ""}
+                    {tzs(a.deltaTZS)}
+                  </span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {a.reason} · {t("Ameomba", "Requested by")} {a.requestedByName ?? "·"} ·{" "}
+                  {new Date(a.requestedAt).toLocaleString()}
+                  {a.reviewedByName &&
+                    ` · ${t("Imekaguliwa na", "Reviewed by")} ${a.reviewedByName}`}
+                </div>
+              </div>
+              <Pill
+                tone={
+                  a.status === "pending"
+                    ? "warning"
+                    : a.status === "approved"
+                      ? "success"
+                      : "danger"
+                }
+              >
+                {a.status === "pending"
+                  ? t("Inasubiri", "Pending")
+                  : a.status === "approved"
+                    ? t("Imeidhinishwa", "Approved")
+                    : t("Imekataliwa", "Rejected")}
+              </Pill>
+              {isAdmin && a.status === "pending" && (
+                <div className="flex gap-1.5">
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs text-white"
+                    style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+                    disabled={review.isPending}
+                    onClick={() =>
+                      review.mutate(
+                        { id: a.id, approve: true },
+                        {
+                          onSuccess: () =>
+                            toast.success(
+                              t("Imeidhinishwa, salio limebadilika", "Approved, balance updated"),
+                            ),
+                          onError: () => toast.error(t("Imeshindikana", "Could not approve")),
+                        },
+                      )
+                    }
+                  >
+                    {t("Idhinisha", "Approve")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs text-[#E11B22] border-[#E11B22]"
+                    disabled={review.isPending}
+                    onClick={() =>
+                      review.mutate(
+                        { id: a.id, approve: false },
+                        {
+                          onSuccess: () => toast.success(t("Imekataliwa", "Rejected")),
+                          onError: () => toast.error(t("Imeshindikana", "Could not reject")),
+                        },
+                      )
+                    }
+                  >
+                    {t("Kataa", "Reject")}
+                  </Button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+        <div className="mt-3 text-xs text-muted-foreground">
+          {t(
+            "Salio na malipo ya mwisho huendeshwa na makusanyo na malipo; marekebisho ya mkono yanahitaji idhini ya admin.",
+            "Balance and last payment are driven by collections and payouts; manual corrections require admin approval.",
+          )}
+        </div>
+      </SectionCard>
+    </div>
   );
 }

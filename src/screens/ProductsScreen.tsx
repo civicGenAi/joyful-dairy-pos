@@ -6,9 +6,14 @@ import {
   usePriceMatrix,
   usePriceHistory,
   useCreateProduct,
+  useUpdateProduct,
+  useDeleteProduct,
   useSetProductActive,
   useSetPrice,
 } from "@/lib/data/hooks/products";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import type { Product } from "@/mock/types";
 import type { PriceTier, ProductCategory, Unit } from "@/mock/types";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -60,6 +65,7 @@ export function ProductsScreen() {
   const setPriceMut = useSetPrice();
   const [showInactive, setShowInactive] = useState(true);
   const [q, setQ] = useState("");
+  const [viewingId, setViewingId] = useState<string | null>(null);
   // Local edits overlay the server matrix until "Save" pushes them as new
   // price-list entries (price history stays first-class).
   const [edited, setEdited] = useState<Record<string, Partial<Record<PriceTier, number>>>>({});
@@ -71,7 +77,9 @@ export function ProductsScreen() {
           (showInactive || p.active) &&
           (!q ||
             p.name.toLowerCase().includes(q.toLowerCase()) ||
-            p.swName.toLowerCase().includes(q.toLowerCase())),
+            p.swName.toLowerCase().includes(q.toLowerCase()) ||
+            p.category.toLowerCase().includes(q.toLowerCase()) ||
+            p.id.toLowerCase().includes(q.toLowerCase())),
       ),
     [products, showInactive, q],
   );
@@ -212,7 +220,8 @@ export function ProductsScreen() {
                   {visibleProducts.map((p) => (
                     <tr
                       key={p.id}
-                      className={`border-b border-border last:border-0 ${!p.active ? "opacity-60" : ""}`}
+                      onClick={() => setViewingId(p.id)}
+                      className={`border-b border-border last:border-0 hover:bg-accent/40 cursor-pointer ${!p.active ? "opacity-60" : ""}`}
                     >
                       <td className="py-2.5 px-3 font-medium">{p.name}</td>
                       <td className="py-2.5 text-muted-foreground">{p.swName}</td>
@@ -223,7 +232,7 @@ export function ProductsScreen() {
                       <td className="py-2.5 text-xs text-muted-foreground">
                         {p.conversionNote ?? "·"}
                       </td>
-                      <td className="py-2.5">
+                      <td className="py-2.5" onClick={(e) => e.stopPropagation()}>
                         <Switch
                           checked={p.active}
                           disabled={!canWrite}
@@ -309,6 +318,13 @@ export function ProductsScreen() {
           <PriceHistoryTab />
         </TabsContent>
       </Tabs>
+
+      {viewingId && (
+        <ProductSheet
+          product={products.find((p) => p.id === viewingId)!}
+          onClose={() => setViewingId(null)}
+        />
+      )}
     </AppShell>
   );
 }
@@ -505,5 +521,274 @@ function AddProductDialog() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ProductSheet({ product: p, onClose }: { product: Product; onClose: () => void }) {
+  const { t, can } = useApp();
+  const canWrite = can("products:write");
+  const canPrice = can("prices:write");
+  const { data: prices = {} } = usePriceMatrix();
+  const update = useUpdateProduct();
+  const remove = useDeleteProduct();
+  const setActive = useSetProductActive();
+  const setPriceMut = useSetPrice();
+
+  const [name, setName] = useState(p.name);
+  const [swName, setSwName] = useState(p.swName);
+  const [category, setCategory] = useState<ProductCategory>(p.category);
+  const [unit, setUnit] = useState<Unit>(p.unit);
+  const [note, setNote] = useState(p.conversionNote ?? "");
+  const [tierEdits, setTierEdits] = useState<Partial<Record<PriceTier, number>>>({});
+  const priceOf = (tier: PriceTier) => tierEdits[tier] ?? prices[p.id]?.[tier] ?? 0;
+
+  const saveDetails = () => {
+    update.mutate(
+      { id: p.id, name, swName, category, unit, conversionNote: note || undefined },
+      {
+        onSuccess: () => toast.success(t("Bidhaa imehifadhiwa", "Product saved")),
+        onError: () => toast.error(t("Imeshindikana kuhifadhi", "Could not save product")),
+      },
+    );
+  };
+
+  const savePrices = async () => {
+    const changes = TIERS.filter(
+      (tier) => tierEdits[tier] !== undefined && tierEdits[tier] !== (prices[p.id]?.[tier] ?? 0),
+    );
+    if (changes.length === 0) {
+      toast(t("Hakuna mabadiliko ya bei", "No price changes to save"));
+      return;
+    }
+    try {
+      for (const tier of changes) {
+        await setPriceMut.mutateAsync({
+          productId: p.id,
+          productName: p.name,
+          tier,
+          oldValue: prices[p.id]?.[tier] ?? 0,
+          value: tierEdits[tier]!,
+        });
+      }
+      setTierEdits({});
+      toast.success(t("Bei zimehifadhiwa", "Prices saved"));
+    } catch {
+      toast.error(t("Imeshindikana kuhifadhi bei", "Could not save prices"));
+    }
+  };
+
+  return (
+    <Sheet open onOpenChange={(o) => !o && onClose()}>
+      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-3">
+            <span
+              className="grid h-10 w-10 place-items-center rounded-2xl text-white"
+              style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+            >
+              <Tag className="h-5 w-5" />
+            </span>
+            <div>
+              <div>{p.name}</div>
+              <div className="text-xs text-muted-foreground font-normal">
+                {p.swName} · {p.category} · {p.unit}
+              </div>
+            </div>
+          </SheetTitle>
+        </SheetHeader>
+
+        {/* Status + quick actions */}
+        <div className="mt-5 flex items-center gap-2">
+          <Pill tone={p.active ? "success" : "slate"}>
+            {p.active ? t("Inauzwa", "On sale") : t("Imesimamishwa", "Suspended")}
+          </Pill>
+          {canWrite && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs"
+                disabled={setActive.isPending}
+                onClick={() =>
+                  setActive.mutate(
+                    { id: p.id, name: p.name, active: !p.active },
+                    {
+                      onSuccess: () =>
+                        toast.success(
+                          p.active
+                            ? t("Bidhaa imesimamishwa", "Product suspended")
+                            : t("Bidhaa imerudishwa", "Product back on sale"),
+                        ),
+                      onError: () => toast.error(t("Imeshindikana", "Could not update")),
+                    },
+                  )
+                }
+              >
+                {p.active ? t("Simamisha", "Suspend") : t("Rudisha", "Reinstate")}
+              </Button>
+              <ConfirmDialog
+                destructive
+                title={t("Futa bidhaa?", "Delete product?")}
+                description={t(
+                  "Bidhaa yenye historia ya mauzo haiwezi kufutwa; itakataliwa na mfumo.",
+                  "A product with sales history cannot be deleted; the system will refuse.",
+                )}
+                confirmLabel={t("Futa", "Delete")}
+                onConfirm={() =>
+                  remove.mutate(
+                    { id: p.id, name: p.name },
+                    {
+                      onSuccess: () => {
+                        toast.success(t("Bidhaa imefutwa", "Product deleted"));
+                        onClose();
+                      },
+                      onError: () =>
+                        toast.error(
+                          t(
+                            "Haiwezekani: bidhaa ina historia ya mauzo. Itumie 'Simamisha'.",
+                            "Not possible: the product has sales history. Use 'Suspend' instead.",
+                          ),
+                        ),
+                    },
+                  )
+                }
+                trigger={
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs text-[#E11B22] border-[#E11B22]"
+                  >
+                    {t("Futa", "Delete")}
+                  </Button>
+                }
+              />
+            </>
+          )}
+        </div>
+
+        {/* Catalogue details */}
+        <div className="mt-5">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+            {t("Taarifa za katalogi", "Catalogue details")}
+          </div>
+          <div className="grid gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label>{t("Jina (English)", "Name (English)")}</Label>
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  readOnly={!canWrite}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>{t("Jina la Kiswahili", "Swahili name")}</Label>
+                <Input
+                  value={swName}
+                  onChange={(e) => setSwName(e.target.value)}
+                  readOnly={!canWrite}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label>{t("Kategoria", "Category")}</Label>
+                <Select
+                  value={category}
+                  onValueChange={(v) => setCategory(v as ProductCategory)}
+                  disabled={!canWrite}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label>{t("Kipimo", "Unit")}</Label>
+                <Select value={unit} onValueChange={(v) => setUnit(v as Unit)} disabled={!canWrite}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="L">L</SelectItem>
+                    <SelectItem value="kg">kg</SelectItem>
+                    <SelectItem value="pcs">pcs</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{t("Maelezo ya ubadilishaji", "Conversion note")}</Label>
+              <Input value={note} onChange={(e) => setNote(e.target.value)} readOnly={!canWrite} />
+            </div>
+            {canWrite && (
+              <Button
+                onClick={saveDetails}
+                disabled={update.isPending}
+                className="w-fit text-white"
+                style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+              >
+                <Save className="h-3.5 w-3.5 mr-1.5" />
+                {update.isPending
+                  ? t("Inahifadhi…", "Saving…")
+                  : t("Hifadhi taarifa", "Save details")}
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Price matrix for this item */}
+        <div className="mt-6">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+            {t("Bei (TZS)", "Price matrix (TZS)")}
+          </div>
+          <div className="grid gap-2">
+            {TIERS.map((tier) => (
+              <div key={tier} className="flex items-center gap-3">
+                <div className="flex-1 text-sm">
+                  {tier === "own"
+                    ? t("Chombo cha mteja", "Own container")
+                    : tier === "bottle"
+                      ? t("Pamoja na chupa", "With bottle")
+                      : t("Jumla / dozeni", "Bulk / dozen")}
+                </div>
+                <Input
+                  type="number"
+                  value={priceOf(tier)}
+                  onChange={(e) => setTierEdits((x) => ({ ...x, [tier]: Number(e.target.value) }))}
+                  readOnly={!canPrice}
+                  className="h-9 w-32 text-right font-num"
+                />
+              </div>
+            ))}
+            {canPrice && (
+              <Button
+                onClick={savePrices}
+                disabled={setPriceMut.isPending}
+                variant="outline"
+                className="w-fit"
+              >
+                {setPriceMut.isPending
+                  ? t("Inahifadhi…", "Saving…")
+                  : t("Hifadhi bei", "Save prices")}
+              </Button>
+            )}
+            <div className="text-[11px] text-muted-foreground">
+              {t(
+                "Kila badiliko huhifadhiwa kwenye historia ya bei.",
+                "Every change is kept in the price history.",
+              )}
+            </div>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
