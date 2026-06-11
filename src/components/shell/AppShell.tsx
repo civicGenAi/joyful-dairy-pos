@@ -7,7 +7,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useLocalStorage, usePrefersReducedMotion } from "@/hooks/use-local-storage";
 
 export function AppShell({ title, children }: { title: string; children: ReactNode }) {
-  const { user, t } = useApp();
+  const { user, authReady, t } = useApp();
   // Persist the collapsed state so opening a new tab keeps the user's choice.
   const [collapsed, setCollapsed] = useLocalStorage<boolean>("ajd:sidebar-collapsed", false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -22,6 +22,18 @@ export function AppShell({ title, children }: { title: string; children: ReactNo
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  // Wait for the persisted session check so a refresh doesn't bounce to login.
+  if (!authReady) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background">
+        <span
+          className="h-8 w-8 rounded-full border-4 border-[#1E7C3F] border-t-transparent animate-spin"
+          role="status"
+          aria-label={t("Inapakia", "Loading")}
+        />
+      </div>
+    );
+  }
   if (!user) return <Navigate to="/" />;
 
   return (

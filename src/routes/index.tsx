@@ -1,7 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { useApp } from "@/app/context";
-import { USERS, ROLE_LABEL, COMPANY } from "@/mock/data";
+// BACKEND: login now authenticates against Supabase; only the static demo
+// account chips and labels still come from the mock module.
+import { ROLE_LABEL, COMPANY } from "@/mock/data";
+import type { Role } from "@/mock/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,19 +13,29 @@ import { ProductShowcase } from "@/components/brand/ProductShowcase";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Eye,
-  EyeOff,
-  ShieldCheck,
-  Mail,
-  Lock as LockIcon,
-  Languages,
-} from "lucide-react";
+import { Eye, EyeOff, ShieldCheck, Mail, Lock as LockIcon, Languages } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [{ title: "Sign in, African Joy Dairy" }] }),
   component: LoginPage,
 });
+
+// Demo accounts shown as quick-login chips. These exist as real Supabase
+// auth users (seeded by scripts/seed.ts) with the shared password joy1234.
+const DEMO_ACCOUNTS: { name: string; email: string; role: Role; color: string }[] = [
+  { name: "Joyce Mollel", email: "admin@africanjoy.co.tz", role: "admin", color: "#1E7C3F" },
+  { name: "Asha Mwakasege", email: "finance@africanjoy.co.tz", role: "finance", color: "#2F9E44" },
+  {
+    name: "Daudi Massawe",
+    email: "production@africanjoy.co.tz",
+    role: "production",
+    color: "#6FBF59",
+  },
+  { name: "Neema Kileo", email: "sales@africanjoy.co.tz", role: "sales", color: "#8CC63F" },
+  { name: "Baraka Laizer", email: "route@africanjoy.co.tz", role: "route", color: "#E11B22" },
+  { name: "Mama Esther", email: "store@africanjoy.co.tz", role: "store", color: "#E5A100" },
+  { name: "Glory Mushi", email: "viewer@africanjoy.co.tz", role: "viewer", color: "#1D9E75" },
+];
 
 function LoginPage() {
   const { login, lang, setLang, t } = useApp();
@@ -32,14 +45,18 @@ function LoginPage() {
   const [showPwd, setShowPwd] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const enter = async (e?: string) => {
+  const enter = async (e?: string, pwd?: string) => {
     const addr = e ?? email;
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 350));
-    login(addr);
-    const u = USERS.find((x) => x.email === addr);
-    toast.success(t(`Karibu, ${u?.name.split(" ")[0]}`, `Welcome, ${u?.name.split(" ")[0]}`));
-    nav({ to: u?.roles[0] === "route" ? "/van" : "/dashboard" });
+    try {
+      const u = await login(addr, pwd ?? password);
+      toast.success(t(`Karibu, ${u.name.split(" ")[0]}`, `Welcome, ${u.name.split(" ")[0]}`));
+      nav({ to: u.roles[0] === "route" ? "/van" : "/dashboard" });
+    } catch {
+      toast.error(t("Barua pepe au nenosiri si sahihi", "Email or password is incorrect"));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -170,9 +187,7 @@ function LoginPage() {
                     {t("Inaingia…", "Signing in…")}
                   </span>
                 ) : (
-                  <span>
-                    {t("Ingia", "Sign in")}
-                  </span>
+                  <span>{t("Ingia", "Sign in")}</span>
                 )}
               </Button>
             </form>
@@ -184,16 +199,16 @@ function LoginPage() {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-              {USERS.slice(0, 7).map((u) => (
+              {DEMO_ACCOUNTS.map((u) => (
                 <button
-                  key={u.id}
+                  key={u.email}
                   type="button"
-                  onClick={() => enter(u.email)}
+                  onClick={() => enter(u.email, "joy1234")}
                   className="group flex items-center gap-2 rounded-xl border border-border bg-background px-2 py-2 text-left hover:border-[#2F9E44] transition-colors"
                 >
                   <span
                     className="grid h-7 w-7 place-items-center rounded-full text-[10px] font-bold text-white shrink-0"
-                    style={{ background: u.avatarColor }}
+                    style={{ background: u.color }}
                   >
                     {u.name
                       .split(" ")
@@ -203,7 +218,7 @@ function LoginPage() {
                   </span>
                   <span className="min-w-0">
                     <span className="block text-[11px] font-semibold truncate">
-                      {lang === "sw" ? ROLE_LABEL[u.roles[0]].sw : ROLE_LABEL[u.roles[0]].en}
+                      {lang === "sw" ? ROLE_LABEL[u.role].sw : ROLE_LABEL[u.role].en}
                     </span>
                     <span className="block text-[10px] text-muted-foreground truncate">
                       {u.email.split("@")[0]}
@@ -222,8 +237,6 @@ function LoginPage() {
               </span>
             </div>
           </div>
-
-
         </motion.div>
       </div>
     </div>
@@ -257,7 +270,9 @@ function BrandPanel() {
         <JoyLogo size={48} showWordmark={false} inlineOnly={false} />
         <div>
           <div className="font-display text-xl font-bold leading-none">African Joy</div>
-          <div className="text-[11px] uppercase tracking-[0.18em] opacity-80">Dairy &middot; Arusha</div>
+          <div className="text-[11px] uppercase tracking-[0.18em] opacity-80">
+            Dairy &middot; Arusha
+          </div>
         </div>
       </div>
 

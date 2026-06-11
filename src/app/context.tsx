@@ -1,14 +1,18 @@
 import { createContext, useContext, useState, useMemo, useEffect, type ReactNode } from "react";
-import { USERS } from "@/mock/data";
 import type { Role, User } from "@/mock/types";
 import { capabilitiesFor, hasCap, type Capability } from "@/lib/auth";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+// BACKEND: auth now flows through Supabase (src/lib/data/auth.ts), not @/mock/data.
+import { authRepo } from "@/lib/data/auth";
+import { supabase } from "@/lib/api/client";
 
 type Lang = "sw" | "en";
 type Theme = "light" | "dark" | "system";
 
 interface AppCtx {
   user: User | null;
+  /** False until the persisted session has been checked on page load. */
+  authReady: boolean;
   /** All roles assigned to the user (multi-role union). */
   roles: Role[];
   /** Admin-only "view as" override. Non-admins always see role === roles[0]. */
@@ -23,7 +27,7 @@ interface AppCtx {
   theme: Theme;
   /** The resolved theme after applying the `system` setting. */
   resolvedTheme: "light" | "dark";
-  login: (email: string) => void;
+  login: (email: string, password: string) => Promise<User>;
   logout: () => void;
   setRole: (r: Role) => void;
   resetRole: () => void;
@@ -36,6 +40,7 @@ const Ctx = createContext<AppCtx | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [viewAs, setViewAs] = useState<Role>("admin");
   const [lang, setLang] = useLocalStorage<Lang>("ajd:lang", "sw");
   const [theme, setTheme] = useLocalStorage<Theme>("ajd:theme", "light");
@@ -43,6 +48,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (typeof window === "undefined" || !window.matchMedia) return false;
     return window.matchMedia("(prefers-color-scheme: dark)").matches;
   });
+
+  // Restore the Supabase session once on load, then track sign-outs
+  // (e.g. token expiry or sign-out from another tab).
+  useEffect(() => {
+    let cancelled = false;
+    authRepo
+      .restore()
+      .then((u) => {
+        if (cancelled) return;
+        if (u) {
+          setUser(u);
+          setViewAs(u.roles[0]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAuthReady(true);
+      });
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") setUser(null);
+    });
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
 
   // Track the OS-level preference so `theme: "system"` stays in step live.
   useEffect(() => {
@@ -72,6 +102,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const caps = capabilitiesFor(roles);
     return {
       user,
+      authReady,
       roles,
       role: viewAs,
       caps,
@@ -82,19 +113,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       lang,
       theme,
       resolvedTheme,
-      login: (email: string) => {
-        const u = USERS.find((x) => x.email.toLowerCase() === email.toLowerCase()) ?? USERS[0];
+      login: async (email: string, password: string) => {
+        const u = await authRepo.signIn(email, password);
         setUser(u);
         setViewAs(u.roles[0]);
+        return u;
       },
-      logout: () => setUser(null),
+      logout: () => {
+        void authRepo.signOut();
+        setUser(null);
+      },
       setRole: setViewAs,
       resetRole: () => user && setViewAs(user.roles[0]),
       setLang,
       setTheme,
       t: (sw, en) => (lang === "sw" ? sw : en),
     };
-  }, [user, viewAs, lang, theme, resolvedTheme, setLang, setTheme]);
+  }, [user, authReady, viewAs, lang, theme, resolvedTheme, setLang, setTheme]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

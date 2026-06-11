@@ -52,7 +52,7 @@ interface RouteSale {
 }
 
 export function RouteScreen() {
-  const { user, t, logout } = useApp();
+  const { user, authReady, t, logout } = useApp();
   const nav = useNavigate();
   const [tab, setTab] = useState("plan");
   const [online, setOnline] = useState(true);
@@ -128,6 +128,7 @@ export function RouteScreen() {
     nav({ to: "/receipt/deposit/$id", params: { id } });
   };
 
+  if (!authReady) return null;
   if (!user) return <Navigate to="/" />;
 
   return (
