@@ -16,7 +16,13 @@ import { NotFoundScreen, GenericErrorScreen } from "@/screens/UtilityScreens";
 import { CommandPalette } from "@/components/shell/CommandPalette";
 
 function NotFoundComponent() {
-  return <NotFoundScreen />;
+  // Boundary components render outside RootComponent, so they need their own
+  // AppProvider for useApp() (translator, theme) to work.
+  return (
+    <AppProvider>
+      <NotFoundScreen />
+    </AppProvider>
+  );
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
@@ -25,13 +31,15 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
   return (
-    <GenericErrorScreen
-      error={error}
-      reset={() => {
-        router.invalidate();
-        reset();
-      }}
-    />
+    <AppProvider>
+      <GenericErrorScreen
+        error={error}
+        reset={() => {
+          router.invalidate();
+          reset();
+        }}
+      />
+    </AppProvider>
   );
 }
 

@@ -13,6 +13,7 @@ export interface ProfileRow {
   roles: Role[];
   active: boolean;
   avatar_color: string;
+  avatar_url?: string | null;
 }
 
 export function profileToUser(p: ProfileRow): User {
@@ -24,6 +25,7 @@ export function profileToUser(p: ProfileRow): User {
     roles: p.roles,
     active: p.active,
     avatarColor: p.avatar_color,
+    avatarUrl: p.avatar_url ?? undefined,
   };
 }
 

@@ -10,6 +10,7 @@ import {
   Moon,
   Monitor,
   HelpCircle,
+  UserCircle2,
 } from "lucide-react";
 import { useApp } from "@/app/context";
 // BACKEND: live data via src/lib/data hooks; ROLE_LABEL is static UI config.
@@ -18,6 +19,7 @@ import { useCustomers } from "@/lib/data/hooks/customers";
 import { useFarmers } from "@/lib/data/hooks/farmers";
 import { useProducts } from "@/lib/data/hooks/products";
 import { useAlerts } from "@/lib/data/hooks/reports";
+import { useAlertReads, useMarkAlertsRead } from "@/lib/data/hooks/profile";
 import type { Customer, Farmer, Product } from "@/mock/types";
 import type { Role } from "@/mock/types";
 import { Input } from "@/components/ui/input";
@@ -50,6 +52,9 @@ export function Topbar({
   const farmers = useFarmers().data ?? [];
   const products = useProducts().data ?? [];
   const alerts = useAlerts().data ?? [];
+  const reads = useAlertReads().data ?? [];
+  const markRead = useMarkAlertsRead();
+  const unread = alerts.filter((a) => !reads.includes(a.id));
 
   const results = useMemo(() => {
     if (!q.trim()) return null;
@@ -153,20 +158,32 @@ export function Topbar({
             aria-label={t("Arifa", "Notifications")}
           >
             <Bell className="h-4 w-4" />
-            <span
-              className="absolute -top-1 -right-1 grid place-items-center h-4 min-w-4 px-1 rounded-full text-[10px] font-bold text-white"
-              style={{ background: "#E11B22" }}
-            >
-              {alerts.length}
-            </span>
+            {unread.length > 0 && (
+              <span
+                className="absolute -top-1 -right-1 grid place-items-center h-4 min-w-4 px-1 rounded-full text-[10px] font-bold text-white"
+                style={{ background: "#E11B22" }}
+              >
+                {unread.length}
+              </span>
+            )}
           </button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-[360px] p-0">
-          <div className="px-4 py-3 border-b border-border">
-            <div className="text-sm font-semibold">{t("Arifa", "Notifications")}</div>
-            <div className="text-xs text-muted-foreground">
-              {alerts.length} {t("zinazohitaji uangalizi", "items need attention")}
+          <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+            <div className="flex-1">
+              <div className="text-sm font-semibold">{t("Arifa", "Notifications")}</div>
+              <div className="text-xs text-muted-foreground">
+                {unread.length} {t("mpya", "unread")} · {alerts.length} {t("jumla", "total")}
+              </div>
             </div>
+            {unread.length > 0 && (
+              <button
+                onClick={() => markRead.mutate(unread.map((a) => a.id))}
+                className="text-[11px] font-semibold text-[#1E7C3F] hover:underline"
+              >
+                {t("Soma zote", "Mark all as read")}
+              </button>
+            )}
           </div>
           <ul className="max-h-[360px] overflow-y-auto divide-y divide-border">
             {alerts.map((a) => {
@@ -178,11 +195,15 @@ export function Topbar({
                     : a.kind === "farmer-payable"
                       ? "/farmers"
                       : "/reconciliation";
+              const isRead = reads.includes(a.id);
               return (
                 <li key={a.id}>
                   <button
-                    onClick={() => nav({ to: link })}
-                    className="w-full text-left px-4 py-3 hover:bg-accent/60"
+                    onClick={() => {
+                      if (!isRead) markRead.mutate([a.id]);
+                      nav({ to: link });
+                    }}
+                    className={`w-full text-left px-4 py-3 hover:bg-accent/60 ${isRead ? "opacity-55" : ""}`}
                   >
                     <div className="flex items-start gap-2">
                       <span
@@ -207,16 +228,24 @@ export function Topbar({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="inline-flex items-center gap-2">
-            <span
-              className="grid h-9 w-9 place-items-center rounded-full text-white text-sm font-bold"
-              style={{ background: user.avatarColor }}
-            >
-              {user.name
-                .split(" ")
-                .map((p) => p[0])
-                .slice(0, 2)
-                .join("")}
-            </span>
+            {user.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.name}
+                className="h-9 w-9 rounded-full object-cover border border-border"
+              />
+            ) : (
+              <span
+                className="grid h-9 w-9 place-items-center rounded-full text-white text-sm font-bold"
+                style={{ background: user.avatarColor }}
+              >
+                {user.name
+                  .split(" ")
+                  .map((p) => p[0])
+                  .slice(0, 2)
+                  .join("")}
+              </span>
+            )}
             <span className="hidden lg:inline text-sm font-medium">{user.name.split(" ")[0]}</span>
           </button>
         </DropdownMenuTrigger>
@@ -276,6 +305,12 @@ export function Topbar({
               })}
             </div>
           </div>
+
+          {/* My profile, available to every signed-in user */}
+          <DropdownMenuItem onClick={() => nav({ to: "/profile" })}>
+            <UserCircle2 className="h-4 w-4 mr-2" />
+            {t("Profaili yangu", "My profile")}
+          </DropdownMenuItem>
 
           {/* Settings gear, only when the user can reach it */}
           {can("settings:write") && (

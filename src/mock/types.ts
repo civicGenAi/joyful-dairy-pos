@@ -8,6 +8,7 @@ export interface User {
   roles: Role[];
   active: boolean;
   avatarColor: string;
+  avatarUrl?: string;
 }
 
 export type ProductCategory =

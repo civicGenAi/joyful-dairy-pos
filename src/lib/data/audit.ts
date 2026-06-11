@@ -31,7 +31,10 @@ interface AuditRow {
   summary_sw: string;
   summary_en: string;
   ip: string | null;
+  device: string | null;
 }
+
+export type AuditEntryWithDevice = AuditEntry & { device?: string };
 
 export const auditKeys = {
   all: ["audit"] as const,
@@ -39,7 +42,7 @@ export const auditKeys = {
 };
 
 export const auditRepo = {
-  async list(limit = 100): Promise<AuditEntry[]> {
+  async list(limit = 100): Promise<AuditEntryWithDevice[]> {
     const rows = unwrap(
       await supabase.from("audit_log").select("*").order("at", { ascending: false }).limit(limit),
     ) as AuditRow[];
@@ -52,6 +55,7 @@ export const auditRepo = {
       module: r.module,
       summary: { sw: r.summary_sw, en: r.summary_en },
       ip: r.ip ?? undefined,
+      device: r.device ?? undefined,
     }));
   },
 };
