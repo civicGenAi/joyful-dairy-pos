@@ -20,6 +20,9 @@ import { useFarmers } from "@/lib/data/hooks/farmers";
 import { useProducts } from "@/lib/data/hooks/products";
 import { useAlerts } from "@/lib/data/hooks/reports";
 import { useAlertReads, useMarkAlertsRead } from "@/lib/data/hooks/profile";
+import { useStock } from "@/lib/data/hooks/stock";
+import { useLocations } from "@/lib/data/hooks/locations";
+import { navGroupsFor } from "@/lib/nav";
 import type { Customer, Farmer, Product } from "@/mock/types";
 import type { Role } from "@/mock/types";
 import { Input } from "@/components/ui/input";
@@ -51,6 +54,8 @@ export function Topbar({
   const customers = useCustomers().data ?? [];
   const farmers = useFarmers().data ?? [];
   const products = useProducts().data ?? [];
+  const stock = useStock().data ?? [];
+  const locations = useLocations().data ?? [];
   const alerts = useAlerts().data ?? [];
   const reads = useAlertReads().data ?? [];
   const markRead = useMarkAlertsRead();
@@ -59,16 +64,47 @@ export function Topbar({
   const results = useMemo(() => {
     if (!q.trim()) return null;
     const needle = q.toLowerCase();
+    const modules = navGroupsFor(can)
+      .flatMap((g) => g.items)
+      .filter(
+        (it) => it.label.toLowerCase().includes(needle) || it.sw.toLowerCase().includes(needle),
+      )
+      .slice(0, 4)
+      .map((it) => ({ id: it.to, name: lang === "sw" ? it.sw : it.label, to: it.to }));
     return {
-      customers: customers.filter((c) => c.name.toLowerCase().includes(needle)).slice(0, 4),
-      farmers: farmers.filter((f) => f.name.toLowerCase().includes(needle)).slice(0, 4),
-      products: products
+      modules,
+      customers: customers
         .filter(
-          (p) => p.name.toLowerCase().includes(needle) || p.swName.toLowerCase().includes(needle),
+          (c) =>
+            c.name.toLowerCase().includes(needle) ||
+            c.phone.includes(q.trim()) ||
+            (c.email ?? "").toLowerCase().includes(needle),
         )
         .slice(0, 4),
+      farmers: farmers
+        .filter(
+          (f) => f.name.toLowerCase().includes(needle) || f.village.toLowerCase().includes(needle),
+        )
+        .slice(0, 4),
+      products: products
+        .filter(
+          (p) =>
+            p.name.toLowerCase().includes(needle) ||
+            p.swName.toLowerCase().includes(needle) ||
+            p.category.toLowerCase().includes(needle),
+        )
+        .slice(0, 4),
+      stock: stock
+        .filter(
+          (s) =>
+            s.name.toLowerCase().includes(needle) ||
+            (s.swName ?? "").toLowerCase().includes(needle),
+        )
+        .slice(0, 4),
+      locations: locations.filter((l) => l.name.toLowerCase().includes(needle)).slice(0, 3),
+      receiptId: /^(rct|dep|pay)-/i.test(q.trim()) ? q.trim().toUpperCase() : null,
     };
-  }, [q, customers, farmers, products]);
+  }, [q, can, lang, customers, farmers, products, stock, locations]);
 
   if (!user) return null;
 
@@ -358,12 +394,27 @@ function SearchResults({
   onPick,
   onClose,
 }: {
-  results: { customers: Customer[]; farmers: Farmer[]; products: Product[] };
+  results: {
+    modules: { id: string; name: string; to: string }[];
+    customers: Customer[];
+    farmers: Farmer[];
+    products: Product[];
+    stock: { id: string; name: string }[];
+    locations: { id: string; name: string }[];
+    receiptId: string | null;
+  };
   onPick: (to: string) => void;
   onClose: () => void;
 }) {
   const { t } = useApp();
-  const total = results.customers.length + results.farmers.length + results.products.length;
+  const total =
+    results.modules.length +
+    results.customers.length +
+    results.farmers.length +
+    results.products.length +
+    results.stock.length +
+    results.locations.length +
+    (results.receiptId ? 1 : 0);
   if (total === 0) {
     return (
       <div className="p-6 text-center text-sm text-muted-foreground">
@@ -402,9 +453,46 @@ function SearchResults({
 
   return (
     <div className="max-h-[420px] overflow-y-auto">
+      {results.modules.length > 0 && (
+        <div className="p-2">
+          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+            {t("Moduli", "Modules")}
+          </div>
+          <ul>
+            {results.modules.map((m) => (
+              <li key={m.id}>
+                <button
+                  onClick={() => onPick(m.to)}
+                  className="w-full text-left rounded-md px-2 py-1.5 text-sm font-medium hover:bg-accent"
+                >
+                  {m.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {results.receiptId && (
+        <div className="p-2 border-b border-border">
+          <button
+            onClick={() =>
+              onPick(
+                results.receiptId!.startsWith("DEP-")
+                  ? `/receipt/deposit/${results.receiptId}`
+                  : `/receipt/${results.receiptId}`,
+              )
+            }
+            className="w-full text-left rounded-md px-2 py-1.5 text-sm font-semibold text-[#1E7C3F] hover:bg-accent"
+          >
+            {t("Fungua risiti", "Open receipt")} {results.receiptId} →
+          </button>
+        </div>
+      )}
       <Group title={t("Wateja", "Customers")} items={results.customers} to="/customers" />
       <Group title={t("Wafugaji", "Farmers")} items={results.farmers} to="/farmers" />
       <Group title={t("Bidhaa", "Products")} items={results.products} to="/products" />
+      <Group title={t("Stock", "Stock items")} items={results.stock} to="/stock" />
+      <Group title={t("Maeneo", "Locations")} items={results.locations} to="/settings" />
       <div className="border-t border-border p-2">
         <button
           onClick={() => onPick("/search")}

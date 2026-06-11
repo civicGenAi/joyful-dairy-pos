@@ -6,7 +6,11 @@ import {
   useCustomerActivities,
   useCustomerDeposits,
   useCreateCustomer,
+  useUpdateCustomer,
+  useDeleteCustomer,
   useRecordCustomerDeposit,
+  useSetCustomerSuspended,
+  useSendReminder,
 } from "@/lib/data/hooks/customers";
 import { useProducts } from "@/lib/data/hooks/products";
 import { todayISO } from "@/lib/data/dates";
@@ -34,7 +38,21 @@ import {
 } from "@/components/ui/dialog";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Search, FileText, Plus, UserPlus, Send, Users } from "lucide-react";
+import {
+  Search,
+  FileText,
+  Plus,
+  UserPlus,
+  Send,
+  Users,
+  Pencil,
+  Trash2,
+  Mail,
+  UserX,
+  UserCheck,
+} from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { Customer, CustomerType } from "@/mock/types";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -61,6 +79,7 @@ function ageOfActivity(date: string, todayIso: string): "current" | "30d" | "60d
 
 export function CustomersScreen() {
   const { t, can } = useApp();
+  const canWrite = can("customers:write");
   const { data: customers = [], isPending, isError, refetch } = useCustomers();
   const [tab, setTab] = useState("all");
   const [q, setQ] = useState("");
@@ -213,12 +232,19 @@ export function CustomersScreen() {
                           {c.lastActivity}
                         </td>
                         <td className="py-2.5 px-3">
-                          <Pill tone={c.status === "overdue" ? "danger" : "success"}>
-                            {c.status === "overdue" ? t("Imechelewa", "Overdue") : "OK"}
-                          </Pill>
+                          {c.suspended ? (
+                            <Pill tone="slate">{t("Amesimamishwa", "Suspended")}</Pill>
+                          ) : (
+                            <Pill tone={c.status === "overdue" ? "danger" : "success"}>
+                              {c.status === "overdue" ? t("Imechelewa", "Overdue") : "OK"}
+                            </Pill>
+                          )}
                         </td>
                         <td className="py-2.5 px-3 text-right">
-                          <CustomerDrawer c={c} />
+                          <div className="inline-flex items-center gap-1">
+                            <CustomerDrawer c={c} />
+                            {canWrite && <CustomerActions c={c} />}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -592,13 +618,14 @@ function AddCustomerDialog() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [type, setType] = useState<CustomerType>("cash");
   const create = useCreateCustomer();
 
   const save = () => {
     if (!name.trim()) return;
     create.mutate(
-      { name, phone, type },
+      { name, phone, email, type },
       {
         onSuccess: () => {
           toast.success(t("Mteja amesajiliwa", "Customer registered"));
@@ -629,6 +656,15 @@ function AddCustomerDialog() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Nyumbani Cafe"
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>{t("Barua pepe (kwa vikumbusho)", "Email (for reminders)")}</Label>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="cafe@example.com"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -672,5 +708,194 @@ function AddCustomerDialog() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function CustomerActions({ c }: { c: Customer }) {
+  const { t } = useApp();
+  const [editOpen, setEditOpen] = useState(false);
+  const [name, setName] = useState(c.name);
+  const [phone, setPhone] = useState(c.phone);
+  const [email, setEmail] = useState(c.email ?? "");
+  const [type, setType] = useState<CustomerType>(c.type);
+  const [reminders, setReminders] = useState(c.remindersEnabled ?? true);
+  const update = useUpdateCustomer();
+  const remove = useDeleteCustomer();
+  const suspend = useSetCustomerSuspended();
+  const sendReminder = useSendReminder();
+  const canRemind = c.type !== "cash" && !!(c.email ?? "") && c.outstandingTZS > 0;
+
+  const saveEdit = () => {
+    update.mutate(
+      { id: c.id, name, phone, email, type, remindersEnabled: reminders },
+      {
+        onSuccess: () => {
+          toast.success(t("Mteja amehifadhiwa", "Customer saved"));
+          setEditOpen(false);
+        },
+        onError: () => toast.error(t("Imeshindikana kuhifadhi", "Could not save customer")),
+      },
+    );
+  };
+
+  return (
+    <>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-7 w-7"
+        title={t("Hariri", "Edit")}
+        onClick={() => setEditOpen(true)}
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </Button>
+      {canRemind && (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7"
+          title={t("Tuma kikumbusho cha deni (barua pepe)", "Send balance reminder (email)")}
+          disabled={sendReminder.isPending}
+          onClick={() =>
+            sendReminder.mutate(c.id, {
+              onSuccess: (res) =>
+                res.sent[0]?.status === "sent"
+                  ? toast.success(t("Kikumbusho kimetumwa", "Reminder sent"))
+                  : toast.error(t("Kikumbusho hakikufika", "Reminder failed to send")),
+              onError: () =>
+                toast.error(
+                  t(
+                    "Huduma ya barua pepe haijasanidiwa bado",
+                    "Email service is not configured yet",
+                  ),
+                ),
+            })
+          }
+        >
+          <Mail className="h-3.5 w-3.5" />
+        </Button>
+      )}
+      <Button
+        size="icon"
+        variant="ghost"
+        className={`h-7 w-7 ${c.suspended ? "text-[#1E7C3F]" : "text-muted-foreground"}`}
+        title={
+          c.suspended
+            ? t("Mrudishe mteja", "Reinstate customer")
+            : t("Simamisha mteja", "Suspend customer")
+        }
+        disabled={suspend.isPending}
+        onClick={() =>
+          suspend.mutate(
+            { id: c.id, name: c.name, suspended: !c.suspended },
+            {
+              onSuccess: () =>
+                toast.success(
+                  c.suspended
+                    ? t("Mteja amerudishwa", "Customer reinstated")
+                    : t("Mteja amesimamishwa", "Customer suspended"),
+                ),
+              onError: () => toast.error(t("Imeshindikana", "Could not update")),
+            },
+          )
+        }
+      >
+        {c.suspended ? <UserCheck className="h-3.5 w-3.5" /> : <UserX className="h-3.5 w-3.5" />}
+      </Button>
+      <ConfirmDialog
+        destructive
+        title={t("Futa mteja?", "Delete customer?")}
+        description={t(
+          `${c.name} na historia yake ya mauzo itaondolewa kwenye orodha.`,
+          `${c.name} will be removed; their sales history links will be detached.`,
+        )}
+        confirmLabel={t("Futa", "Delete")}
+        onConfirm={() =>
+          remove.mutate(
+            { id: c.id, name: c.name },
+            {
+              onSuccess: () => toast.success(t("Mteja amefutwa", "Customer deleted")),
+              onError: () => toast.error(t("Imeshindikana kufuta", "Could not delete")),
+            },
+          )
+        }
+        trigger={
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-muted-foreground hover:text-[#E11B22]"
+            title={t("Futa", "Delete")}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        }
+      />
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {t("Hariri mteja", "Edit customer")}: {c.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="grid gap-1.5">
+              <Label>{t("Jina", "Name")}</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label>{t("Simu", "Phone")}</Label>
+                <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>{t("Aina", "Type")}</Label>
+                <Select value={type} onValueChange={(v) => setType(v as CustomerType)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">{t("Cash", "Cash")}</SelectItem>
+                    <SelectItem value="credit">{t("Mkopo", "Credit")}</SelectItem>
+                    <SelectItem value="monthly">{t("Mkopo wa mwezi", "Monthly credit")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{t("Barua pepe (kwa vikumbusho)", "Email (for reminders)")}</Label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="cafe@example.com"
+              />
+            </div>
+            {type !== "cash" && (
+              <label className="flex items-center justify-between rounded-xl border border-border p-3 text-sm">
+                <span>
+                  {t("Vikumbusho vya deni otomatiki", "Automatic balance reminders")}
+                  <span className="block text-xs text-muted-foreground">
+                    {t(
+                      "Barua pepe; WhatsApp na SMS zinakuja",
+                      "Email; WhatsApp and SMS coming soon",
+                    )}
+                  </span>
+                </span>
+                <Switch checked={reminders} onCheckedChange={setReminders} />
+              </label>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              {t("Ghairi", "Cancel")}
+            </Button>
+            <Button onClick={saveEdit} disabled={update.isPending}>
+              {update.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

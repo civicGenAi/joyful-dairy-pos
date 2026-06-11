@@ -5,6 +5,8 @@ import { navGroupsFor } from "@/lib/nav";
 import { useCustomers } from "@/lib/data/hooks/customers";
 import { useFarmers } from "@/lib/data/hooks/farmers";
 import { useProducts } from "@/lib/data/hooks/products";
+import { useStock } from "@/lib/data/hooks/stock";
+import { useLocations } from "@/lib/data/hooks/locations";
 import { SectionCard, Pill } from "@/components/ui/data-bits";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -22,6 +24,8 @@ export function SearchScreen() {
   const customers = useCustomers().data ?? [];
   const farmers = useFarmers().data ?? [];
   const products = useProducts().data ?? [];
+  const stock = useStock().data ?? [];
+  const locations = useLocations().data ?? [];
 
   // Keep URL in sync as user types (debounced via simple short timer)
   useEffect(() => {
@@ -37,7 +41,18 @@ export function SearchScreen() {
   const results = useMemo(() => {
     if (!needle) return null;
     return {
-      customers: customers.filter((c) => c.name.toLowerCase().includes(needle)),
+      stock: stock.filter(
+        (s) =>
+          s.name.toLowerCase().includes(needle) || (s.swName ?? "").toLowerCase().includes(needle),
+      ),
+      locations: locations.filter((l) => l.name.toLowerCase().includes(needle)),
+      receiptId: /^(rct|dep|pay)-/i.test(needle) ? needle.toUpperCase() : null,
+      customers: customers.filter(
+        (c) =>
+          c.name.toLowerCase().includes(needle) ||
+          (c.email ?? "").toLowerCase().includes(needle) ||
+          c.phone.includes(q.trim()),
+      ),
       farmers: farmers.filter(
         (f) => f.name.toLowerCase().includes(needle) || f.village.toLowerCase().includes(needle),
       ),
@@ -55,13 +70,16 @@ export function SearchScreen() {
           .map((it) => ({ ...it, group: g.group, groupSw: g.sw })),
       ),
     };
-  }, [needle, groups, customers, farmers, products]);
+  }, [needle, q, groups, customers, farmers, products, stock, locations]);
 
   const totalCount = results
     ? results.customers.length +
       results.farmers.length +
       results.products.length +
-      results.modules.length
+      results.modules.length +
+      results.stock.length +
+      results.locations.length +
+      (results.receiptId ? 1 : 0)
     : 0;
 
   return (
@@ -210,6 +228,82 @@ export function SearchScreen() {
                       >
                         {f.status}
                       </Pill>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </SectionCard>
+          )}
+
+          {results!.receiptId && (
+            <SectionCard className="lg:col-span-2" title={t("Risiti", "Receipt")}>
+              {results!.receiptId.startsWith("DEP-") ? (
+                <Link
+                  to="/receipt/deposit/$id"
+                  params={{ id: results!.receiptId }}
+                  className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2.5 text-sm font-semibold text-[#1E7C3F] hover:border-[#2F9E44]"
+                >
+                  {t("Fungua risiti", "Open receipt")} {results!.receiptId} →
+                </Link>
+              ) : (
+                <Link
+                  to="/receipt/$id"
+                  params={{ id: results!.receiptId }}
+                  className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2.5 text-sm font-semibold text-[#1E7C3F] hover:border-[#2F9E44]"
+                >
+                  {t("Fungua risiti", "Open receipt")} {results!.receiptId} →
+                </Link>
+              )}
+            </SectionCard>
+          )}
+
+          {results!.stock.length > 0 && (
+            <SectionCard
+              title={t("Stock", "Stock items")}
+              action={<Pill tone="info">{results!.stock.length}</Pill>}
+            >
+              <ul className="divide-y divide-border">
+                {results!.stock.slice(0, 12).map((s) => (
+                  <li key={s.id}>
+                    <Link
+                      to="/stock"
+                      className="flex items-center gap-3 py-2.5 hover:bg-accent/40 -mx-3 px-3 rounded-lg"
+                    >
+                      <span className="grid h-8 w-8 place-items-center rounded-full bg-secondary">
+                        <Package className="h-4 w-4 text-[#1E7C3F]" />
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{s.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {s.onHand} {s.unit} · {s.category}
+                        </div>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </SectionCard>
+          )}
+
+          {results!.locations.length > 0 && (
+            <SectionCard
+              title={t("Maeneo", "Locations")}
+              action={<Pill tone="info">{results!.locations.length}</Pill>}
+            >
+              <ul className="divide-y divide-border">
+                {results!.locations.map((l) => (
+                  <li key={l.id}>
+                    <Link
+                      to="/settings"
+                      className="flex items-center gap-3 py-2.5 hover:bg-accent/40 -mx-3 px-3 rounded-lg"
+                    >
+                      <span className="grid h-8 w-8 place-items-center rounded-full bg-secondary">
+                        <MapPin className="h-4 w-4 text-[#1E7C3F]" />
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{l.name}</div>
+                        <div className="text-xs text-muted-foreground">{l.kind}</div>
+                      </div>
                     </Link>
                   </li>
                 ))}

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { farmerKeys, farmersRepo } from "@/lib/data/farmers";
+import { farmerAdjustmentsRepo, farmerKeys, farmersRepo } from "@/lib/data/farmers";
 import { collectionKeys } from "@/lib/data/collections";
 
 // BACKEND: react-query wrappers for the farmers repository.
@@ -69,4 +69,28 @@ export function useRecordCollectionInvalidation() {
     qc.invalidateQueries({ queryKey: farmerKeys.all });
     qc.invalidateQueries({ queryKey: collectionKeys.all });
   };
+}
+
+export function useFarmerAdjustments() {
+  return useQuery({
+    queryKey: farmerKeys.adjustments(),
+    queryFn: () => farmerAdjustmentsRepo.list(),
+  });
+}
+
+export function useRequestAdjustment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: farmerAdjustmentsRepo.request,
+    onSuccess: () => qc.invalidateQueries({ queryKey: farmerKeys.adjustments() }),
+  });
+}
+
+export function useReviewAdjustment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, approve }: { id: string; approve: boolean }) =>
+      farmerAdjustmentsRepo.review(id, approve),
+    onSuccess: () => qc.invalidateQueries({ queryKey: farmerKeys.all }),
+  });
 }

@@ -46,7 +46,21 @@ export const farmerKeys = {
   byId: (id: string) => ["farmers", "byId", id] as const,
   payouts: (id: string) => ["farmers", "payouts", id] as const,
   cycle: () => ["farmers", "cycle"] as const,
+  adjustments: () => ["farmers", "adjustments"] as const,
 };
+
+export interface FarmerAdjustment {
+  id: string;
+  farmerId: string;
+  farmerName?: string;
+  deltaTZS: number;
+  reason: string;
+  status: "pending" | "approved" | "rejected";
+  requestedByName?: string;
+  requestedAt: string;
+  reviewedByName?: string;
+  reviewedAt: string | null;
+}
 
 export interface CycleSummary {
   startDate: string;
@@ -196,5 +210,62 @@ export const farmersRepo = {
       method: r.method,
       ref: r.ref,
     }));
+  },
+};
+
+// Manual balance adjustments: requested by staff, applied on admin approval.
+export const farmerAdjustmentsRepo = {
+  async list(limit = 30): Promise<FarmerAdjustment[]> {
+    const rows = unwrap(
+      await supabase
+        .from("farmer_adjustments")
+        .select(
+          "id, farmer_id, delta_tzs, reason, status, requested_at, reviewed_at, " +
+            "farmers(name), requested_by_profile:profiles!farmer_adjustments_requested_by_fkey(name), " +
+            "reviewed_by_profile:profiles!farmer_adjustments_reviewed_by_fkey(name)",
+        )
+        .order("requested_at", { ascending: false })
+        .limit(limit),
+    ) as unknown as {
+      id: string;
+      farmer_id: string;
+      delta_tzs: number;
+      reason: string;
+      status: "pending" | "approved" | "rejected";
+      requested_at: string;
+      reviewed_at: string | null;
+      farmers: { name: string } | null;
+      requested_by_profile: { name: string } | null;
+      reviewed_by_profile: { name: string } | null;
+    }[];
+    return rows.map((r) => ({
+      id: r.id,
+      farmerId: r.farmer_id,
+      farmerName: r.farmers?.name,
+      deltaTZS: Number(r.delta_tzs),
+      reason: r.reason,
+      status: r.status,
+      requestedByName: r.requested_by_profile?.name,
+      requestedAt: r.requested_at,
+      reviewedByName: r.reviewed_by_profile?.name,
+      reviewedAt: r.reviewed_at,
+    }));
+  },
+
+  async request(input: { farmerId: string; deltaTZS: number; reason: string }): Promise<void> {
+    const { error } = await supabase.rpc("request_farmer_adjustment", {
+      p_farmer_id: input.farmerId,
+      p_delta: input.deltaTZS,
+      p_reason: input.reason,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  async review(adjustmentId: string, approve: boolean): Promise<void> {
+    const { error } = await supabase.rpc("review_farmer_adjustment", {
+      p_adjustment_id: adjustmentId,
+      p_approve: approve,
+    });
+    if (error) throw new Error(error.message);
   },
 };

@@ -57,10 +57,13 @@ export interface Customer {
   id: string;
   name: string;
   phone: string;
+  email?: string;
   type: CustomerType;
   outstandingTZS: number;
   lastActivity: string;
   status: "active" | "overdue" | "ok";
+  remindersEnabled?: boolean;
+  suspended?: boolean;
   monthlyActivity?: CustomerActivity[];
   deposits?: { id: string; date: string; amountTZS: number; ref: string }[];
 }
