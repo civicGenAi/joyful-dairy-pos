@@ -21,6 +21,9 @@ import {
   useSetLocationActive,
   useDeleteLocation,
 } from "@/lib/data/hooks/locations";
+import { useAlerts } from "@/lib/data/hooks/reports";
+import { useAlertReads, useMarkAlertsRead } from "@/lib/data/hooks/profile";
+import { deviceLabel } from "@/lib/data/profile";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,6 +103,7 @@ export function SettingsScreen() {
           {can("audit:read") && (
             <TabsTrigger value="audit">{t("Kumbukumbu", "Audit trail")}</TabsTrigger>
           )}
+          <TabsTrigger value="notifications">{t("Arifa", "Notifications")}</TabsTrigger>
           <TabsTrigger value="company">{t("Kampuni", "Company")}</TabsTrigger>
           <TabsTrigger value="alerts">{t("Vituo vya arifa", "Alert thresholds")}</TabsTrigger>
           <TabsTrigger value="schedule">{t("Ratiba ya ripoti", "Report schedule")}</TabsTrigger>
@@ -347,6 +351,10 @@ export function SettingsScreen() {
             <AuditTrail />
           </TabsContent>
         )}
+
+        <TabsContent value="notifications" className="mt-4">
+          <NotificationsTab />
+        </TabsContent>
 
         <TabsContent value="company" className="mt-4">
           <CompanyTab />
@@ -838,6 +846,7 @@ function AuditTrail() {
                 <th>{t("Kitendo", "Action")}</th>
                 <th>{t("Moduli", "Module")}</th>
                 <th>{t("Maelezo", "Details")}</th>
+                <th>{t("Kifaa", "Device")}</th>
                 <th>IP</th>
               </tr>
             </thead>
@@ -867,7 +876,10 @@ function AuditTrail() {
                     </td>
                     <td className="py-2.5 text-xs text-muted-foreground">{e.module}</td>
                     <td className="py-2.5">{lang === "sw" ? e.summary.sw : e.summary.en}</td>
-                    <td className="py-2.5 font-num text-xs text-muted-foreground">{e.ip}</td>
+                    <td className="py-2.5 text-xs text-muted-foreground" title={e.device}>
+                      {e.device ? deviceLabel(e.device) : "·"}
+                    </td>
+                    <td className="py-2.5 font-num text-xs text-muted-foreground">{e.ip ?? "·"}</td>
                   </tr>
                 );
               })}
@@ -1246,6 +1258,131 @@ function UserActions({ user }: { user: User }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
+  );
+}
+
+const ALERT_GROUPS: { kind: string; sw: string; en: string }[] = [
+  { kind: "low-stock", sw: "Stock ndogo", en: "Low stock" },
+  { kind: "overdue-credit", sw: "Madeni yaliyochelewa", en: "Overdue credit" },
+  { kind: "farmer-payable", sw: "Malipo ya wafugaji", en: "Farmer payouts" },
+  { kind: "day-unbalanced", sw: "Kufunga siku", en: "Day close" },
+];
+
+function NotificationsTab() {
+  const { t } = useApp();
+  const { data: alerts = [] } = useAlerts();
+  const { data: reads = [] } = useAlertReads();
+  const markRead = useMarkAlertsRead();
+  const unread = alerts.filter((a) => !reads.includes(a.id));
+
+  return (
+    <>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <StatCard
+          label={t("Arifa jumla", "Total notifications")}
+          value={alerts.length}
+          accent="green"
+        />
+        <StatCard label={t("Mpya", "Unread")} value={unread.length} accent="red" />
+        <StatCard
+          label={t("Zilizosomwa", "Read")}
+          value={alerts.length - unread.length}
+          accent="info"
+        />
+        <StatCard label={t("Makundi", "Categories")} value={ALERT_GROUPS.length} accent="amber" />
+      </div>
+
+      <SectionCard
+        title={
+          <span className="inline-flex items-center gap-1.5">
+            <Bell className="h-4 w-4" /> {t("Arifa za mfumo", "System notifications")}
+          </span>
+        }
+        action={
+          unread.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs"
+              disabled={markRead.isPending}
+              onClick={() =>
+                markRead.mutate(
+                  unread.map((a) => a.id),
+                  {
+                    onSuccess: () => toast.success(t("Zote zimesomwa", "All marked as read")),
+                  },
+                )
+              }
+            >
+              <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+              {t("Soma zote", "Mark all as read")}
+            </Button>
+          )
+        }
+      >
+        {alerts.length === 0 ? (
+          <EmptyState
+            icon={Bell}
+            title={t("Hakuna arifa kwa sasa", "No notifications right now")}
+            description={t(
+              "Arifa huundwa moja kwa moja kutoka kwenye stock, madeni, malipo na kufunga siku.",
+              "Notifications come straight from stock levels, credit, payouts and day-close.",
+            )}
+          />
+        ) : (
+          <div className="space-y-5">
+            {ALERT_GROUPS.map((g) => {
+              const items = alerts.filter((a) => a.kind === g.kind);
+              if (items.length === 0) return null;
+              return (
+                <div key={g.kind}>
+                  <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    {t(g.sw, g.en)} · {items.length}
+                  </div>
+                  <ul className="divide-y divide-border rounded-xl border border-border overflow-hidden">
+                    {items.map((a) => {
+                      const isRead = reads.includes(a.id);
+                      return (
+                        <li
+                          key={a.id}
+                          className={`flex items-start gap-3 px-3 py-2.5 bg-card ${isRead ? "opacity-55" : ""}`}
+                        >
+                          <span
+                            className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${a.severity === "danger" ? "bg-[#E11B22]" : a.severity === "warning" ? "bg-[#E5A100]" : "bg-[#1D9E75]"}`}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium">{a.title}</div>
+                            <div className="text-xs text-muted-foreground">{a.detail}</div>
+                          </div>
+                          {isRead ? (
+                            <Pill tone="slate">{t("Imesomwa", "Read")}</Pill>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs shrink-0"
+                              onClick={() => markRead.mutate([a.id])}
+                            >
+                              {t("Soma", "Mark read")}
+                            </Button>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div className="mt-3 text-xs text-muted-foreground">
+          {t(
+            "Hali ya kusoma ni ya kila mtumiaji; arifa hupotea zenyewe tatizo likitatuliwa.",
+            "Read-state is per user; a notification clears itself once the underlying issue is resolved.",
+          )}
+        </div>
+      </SectionCard>
     </>
   );
 }

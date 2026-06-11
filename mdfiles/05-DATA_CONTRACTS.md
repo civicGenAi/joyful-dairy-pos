@@ -147,6 +147,16 @@ is driven by `useQuery().isPending`.
   account), `admin_set_roles` and `admin_delete_user`. Guards prevent
   suspending/deleting yourself or removing the last active admin.
 - **Login page is clean**: no demo chips or password hints.
+- **Audit trail captures real context**: `record_audit()` reads the request's
+  `x-forwarded-for` (IP) and `user-agent` (device) headers automatically.
+- **Notifications are real with read-state**: the bell and Settings →
+  Notifications group the computed alerts; per-user reads persist in
+  `alert_reads` (mark as read / mark all as read).
+- **Every user has `/profile`**: avatar upload (public `avatars` bucket),
+  edit own name/phone (`update_own_profile`), change own password
+  (re-auth with old password, strength meter, strong generator, must differ
+  from old), 2FA placeholder, and WhatsApp-style device sessions via
+  `my_sessions()` / `revoke_session()` plus sign-out-others.
 
 ## 8. Known gaps / follow-ups
 

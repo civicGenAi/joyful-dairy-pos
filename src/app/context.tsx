@@ -29,6 +29,8 @@ interface AppCtx {
   resolvedTheme: "light" | "dark";
   login: (email: string, password: string) => Promise<User>;
   logout: () => void;
+  /** Re-fetches the signed-in profile (after avatar or name changes). */
+  refreshUser: () => Promise<void>;
   setRole: (r: Role) => void;
   resetRole: () => void;
   setLang: (l: Lang) => void;
@@ -122,6 +124,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       logout: () => {
         void authRepo.signOut();
         setUser(null);
+      },
+      refreshUser: async () => {
+        const u = await authRepo.restore();
+        if (u) setUser(u);
       },
       setRole: setViewAs,
       resetRole: () => user && setViewAs(user.roles[0]),

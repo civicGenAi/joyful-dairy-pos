@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/api/client";
+import { supabase, unwrap } from "@/lib/api/client";
 import type { Alert } from "@/mock/types";
 
 // BACKEND: chart + report rollups (RPCs over the movement ledger) and the
@@ -126,5 +126,23 @@ export const alertsRepo = {
       severity: r.severity,
       timeAgo: timeAgo(r.at),
     }));
+  },
+};
+
+// Per-user read-state for the computed alerts (notification bell + Settings).
+export const alertReadsRepo = {
+  async list(): Promise<string[]> {
+    const rows = unwrap(await supabase.from("alert_reads").select("alert_id")) as {
+      alert_id: string;
+    }[];
+    return rows.map((r) => r.alert_id);
+  },
+
+  async markRead(profileId: string, alertIds: string[]): Promise<void> {
+    if (alertIds.length === 0) return;
+    const { error } = await supabase
+      .from("alert_reads")
+      .upsert(alertIds.map((alert_id) => ({ profile_id: profileId, alert_id })));
+    if (error) throw new Error(error.message);
   },
 };

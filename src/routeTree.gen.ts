@@ -16,6 +16,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ReconciliationRouteImport } from './routes/reconciliation'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ProductsRouteImport } from './routes/products'
 import { Route as ProductionRouteImport } from './routes/production'
 import { Route as PosRouteImport } from './routes/pos'
@@ -71,6 +72,11 @@ const ReportsRoute = ReportsRouteImport.update({
 const ReconciliationRoute = ReconciliationRouteImport.update({
   id: '/reconciliation',
   path: '/reconciliation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProductsRoute = ProductsRouteImport.update({
@@ -195,6 +201,7 @@ export interface FileRoutesByFullPath {
   '/pos': typeof PosRoute
   '/production': typeof ProductionRoute
   '/products': typeof ProductsRoute
+  '/profile': typeof ProfileRoute
   '/reconciliation': typeof ReconciliationRoute
   '/reports': typeof ReportsRoute
   '/search': typeof SearchRoute
@@ -225,6 +232,7 @@ export interface FileRoutesByTo {
   '/pos': typeof PosRoute
   '/production': typeof ProductionRoute
   '/products': typeof ProductsRoute
+  '/profile': typeof ProfileRoute
   '/reconciliation': typeof ReconciliationRoute
   '/reports': typeof ReportsRoute
   '/search': typeof SearchRoute
@@ -256,6 +264,7 @@ export interface FileRoutesById {
   '/pos': typeof PosRoute
   '/production': typeof ProductionRoute
   '/products': typeof ProductsRoute
+  '/profile': typeof ProfileRoute
   '/reconciliation': typeof ReconciliationRoute
   '/reports': typeof ReportsRoute
   '/search': typeof SearchRoute
@@ -288,6 +297,7 @@ export interface FileRouteTypes {
     | '/pos'
     | '/production'
     | '/products'
+    | '/profile'
     | '/reconciliation'
     | '/reports'
     | '/search'
@@ -318,6 +328,7 @@ export interface FileRouteTypes {
     | '/pos'
     | '/production'
     | '/products'
+    | '/profile'
     | '/reconciliation'
     | '/reports'
     | '/search'
@@ -348,6 +359,7 @@ export interface FileRouteTypes {
     | '/pos'
     | '/production'
     | '/products'
+    | '/profile'
     | '/reconciliation'
     | '/reports'
     | '/search'
@@ -379,6 +391,7 @@ export interface RootRouteChildren {
   PosRoute: typeof PosRoute
   ProductionRoute: typeof ProductionRoute
   ProductsRoute: typeof ProductsRoute
+  ProfileRoute: typeof ProfileRoute
   ReconciliationRoute: typeof ReconciliationRoute
   ReportsRoute: typeof ReportsRoute
   SearchRoute: typeof SearchRoute
@@ -443,6 +456,13 @@ declare module '@tanstack/react-router' {
       path: '/reconciliation'
       fullPath: '/reconciliation'
       preLoaderRoute: typeof ReconciliationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/products': {
@@ -611,6 +631,7 @@ const rootRouteChildren: RootRouteChildren = {
   PosRoute: PosRoute,
   ProductionRoute: ProductionRoute,
   ProductsRoute: ProductsRoute,
+  ProfileRoute: ProfileRoute,
   ReconciliationRoute: ReconciliationRoute,
   ReportsRoute: ReportsRoute,
   SearchRoute: SearchRoute,
