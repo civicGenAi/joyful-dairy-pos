@@ -1,20 +1,23 @@
 import { JoyLogo } from "@/components/brand/JoyLogo";
 import { Button } from "@/components/ui/button";
+// BACKEND: print pages render live records via src/lib/data hooks.
+import { useSale, useDeposit } from "@/lib/data/hooks/sales";
+import { useProducts } from "@/lib/data/hooks/products";
 import {
-  COMPANY,
-  CUSTOMERS,
-  FARMERS,
-  PRICE_MATRIX,
-  PRODUCTS,
-  RECON_TODAY,
-  TODAY_LABEL,
-} from "@/mock/data";
-import type { Customer, Farmer } from "@/mock/types";
-import { L, kg, num, tzs } from "@/lib/format";
+  useCustomer,
+  useCustomerActivities,
+  useCustomerDeposits,
+} from "@/lib/data/hooks/customers";
+import { useFarmer, useCycleSummary } from "@/lib/data/hooks/farmers";
+import { useDayLock, useReconForDate } from "@/lib/data/hooks/recon";
+import { useCompany } from "@/lib/data/hooks/settings";
+import { collectionKeys, collectionsRepo } from "@/lib/data/collections";
+import { dateLabel, todayISO } from "@/lib/data/dates";
+import { useQuery } from "@tanstack/react-query";
+import { L, num, tzs } from "@/lib/format";
 import { ArrowLeft, Printer } from "lucide-react";
 import { Link, useParams, useSearch } from "@tanstack/react-router";
 import { useApp } from "@/app/context";
-import { Pill } from "@/components/ui/data-bits";
 
 function PrintShell({
   backTo,
@@ -28,6 +31,7 @@ function PrintShell({
   children: React.ReactNode;
 }) {
   const { t } = useApp();
+  const { data: company } = useCompany();
   return (
     <div className="min-h-screen bg-background">
       <header className="no-print sticky top-0 z-10 border-b border-border bg-card">
@@ -54,12 +58,14 @@ function PrintShell({
           <div className="flex items-center justify-between border-b border-border pb-5 mb-6">
             <JoyLogo size={48} />
             <div className="text-right text-xs text-muted-foreground">
-              <div className="font-semibold text-foreground">{COMPANY.name}</div>
-              <div>{COMPANY.city}</div>
-              <div>{COMPANY.phone}</div>
-              <div>{COMPANY.email}</div>
+              <div className="font-semibold text-foreground">
+                {company?.name ?? "African Joy Dairy"}
+              </div>
+              <div>{company?.city ?? ""}</div>
+              <div>{company?.phone ?? ""}</div>
+              <div>{company?.email ?? ""}</div>
               <div className="mt-1">
-                {COMPANY.tin} · {COMPANY.vrn}
+                {company?.tin ?? ""} · {company?.vrn ?? ""}
               </div>
             </div>
           </div>
@@ -69,7 +75,7 @@ function PrintShell({
           </div>
           {children}
           <div className="mt-10 pt-5 border-t border-border text-center text-xs text-muted-foreground">
-            {COMPANY.footer}
+            {company?.footer ?? ""}
           </div>
         </div>
       </main>
@@ -83,23 +89,42 @@ function PrintShell({
   );
 }
 
+function PrintLoading({ backTo, title }: { backTo: string; title: string }) {
+  const { t } = useApp();
+  return (
+    <PrintShell backTo={backTo} title={title}>
+      <div className="py-12 text-center text-sm text-muted-foreground">
+        {t("Inapakia…", "Loading…")}
+      </div>
+    </PrintShell>
+  );
+}
+
 // ---- Receipt ----------------------------------------------------------------
 
 export function ReceiptPrintScreen() {
   const { t } = useApp();
   const { id } = useParams({ from: "/receipt/$id" });
-  // Demo: synthesise an internally-consistent receipt from the id.
-  const lines = [
-    { productId: "p-fresh", qty: 5, tier: "own" as const },
-    { productId: "p-mtindi", qty: 3, tier: "own" as const },
-    { productId: "p-yog-van", qty: 4, tier: "own" as const },
-  ];
-  const total = lines.reduce((a, l) => a + PRICE_MATRIX[l.productId][l.tier] * l.qty, 0);
+  const { data: sale, isPending } = useSale(id);
+  const { data: products = [] } = useProducts();
+
+  if (isPending) return <PrintLoading backTo="/pos" title={t("Risiti ya mauzo", "Sale receipt")} />;
+  if (!sale) {
+    return (
+      <PrintShell backTo="/pos" title={t("Risiti haipatikani", "Receipt not found")}>
+        <div className="text-sm text-muted-foreground">
+          {t("Hakuna risiti yenye namba", "No receipt with id")} {id}.
+        </div>
+      </PrintShell>
+    );
+  }
+
+  const lines = sale.lines ?? [];
   return (
     <PrintShell
       backTo="/pos"
       title={t("Risiti ya mauzo", "Sale receipt")}
-      subtitle={`${id} · ${new Date().toLocaleString()}`}
+      subtitle={`${sale.id} · ${new Date(sale.at).toLocaleString()}`}
     >
       <table className="w-full text-sm font-num">
         <thead>
@@ -111,20 +136,21 @@ export function ReceiptPrintScreen() {
           </tr>
         </thead>
         <tbody>
-          {lines.map((l, i) => {
-            const p = PRODUCTS.find((x) => x.id === l.productId)!;
-            const price = PRICE_MATRIX[l.productId][l.tier];
+          {lines.map((l) => {
+            const p = products.find((x) => x.id === l.productId);
             return (
-              <tr key={i} className="border-b border-border last:border-0">
+              <tr key={l.id} className="border-b border-border last:border-0">
                 <td className="py-2.5">
-                  {p.name}
-                  <span className="text-xs text-muted-foreground"> / {p.swName}</span>
+                  {p?.name ?? l.productId}
+                  {p?.swName && (
+                    <span className="text-xs text-muted-foreground"> / {p.swName}</span>
+                  )}
                 </td>
                 <td className="py-2.5 text-right">
-                  {l.qty} {p.unit}
+                  {num(l.qty)} {l.unit}
                 </td>
-                <td className="py-2.5 text-right">{num(price)}</td>
-                <td className="py-2.5 text-right font-semibold">{num(price * l.qty)}</td>
+                <td className="py-2.5 text-right">{num(l.unitPrice)}</td>
+                <td className="py-2.5 text-right font-semibold">{num(l.amountTZS)}</td>
               </tr>
             );
           })}
@@ -134,7 +160,7 @@ export function ReceiptPrintScreen() {
             <td colSpan={3} className="py-3 text-right font-semibold">
               {t("Jumla", "Total")}
             </td>
-            <td className="py-3 text-right font-bold text-lg">{tzs(total)}</td>
+            <td className="py-3 text-right font-bold text-lg">{tzs(sale.totalTZS)}</td>
           </tr>
         </tfoot>
       </table>
@@ -143,13 +169,20 @@ export function ReceiptPrintScreen() {
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
             {t("Aina ya malipo", "Payment")}
           </div>
-          <div className="font-semibold">Cash</div>
+          <div className="font-semibold capitalize">{sale.payment}</div>
         </div>
         <div className="rounded-xl bg-secondary/60 p-3">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
             {t("Mteja", "Customer")}
           </div>
-          <div className="font-semibold">{t("Mteja wa kupita", "Walk-in")}</div>
+          <div className="font-semibold">
+            {sale.customerName ?? t("Mteja wa kupita", "Walk-in")}
+          </div>
+          {sale.soldByName && (
+            <div className="text-xs text-muted-foreground">
+              {t("Muuzaji", "Served by")}: {sale.soldByName}
+            </div>
+          )}
         </div>
       </div>
     </PrintShell>
@@ -161,20 +194,38 @@ export function ReceiptPrintScreen() {
 export function CustomerStatementPrintScreen() {
   const { t } = useApp();
   const { id } = useParams({ from: "/statement/customer/$id" });
-  const c: Customer | undefined = CUSTOMERS.find((x) => x.id === id);
+  const search = useSearch({ from: "/statement/customer/$id" }) as { month?: string };
   const month =
-    (useSearch({ from: "/statement/customer/$id" }) as { month?: string }).month ?? "May 2026";
+    search.month ?? new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  const { data: c, isPending } = useCustomer(id);
+  const { data: activities = [] } = useCustomerActivities(id);
+  const { data: deposits = [] } = useCustomerDeposits(id);
+  const { data: products = [] } = useProducts();
+
+  if (isPending)
+    return (
+      <PrintLoading backTo="/customers" title={t("Statimenti ya mwezi", "Monthly statement")} />
+    );
   if (!c)
     return (
-      <PrintShell backTo="/customers" title="Customer not found">
-        <div>No customer with id {id}.</div>
+      <PrintShell backTo="/customers" title={t("Mteja hapatikani", "Customer not found")}>
+        <div className="text-sm text-muted-foreground">
+          {t("Hakuna mteja mwenye namba", "No customer with id")} {id}.
+        </div>
       </PrintShell>
     );
 
-  const takings = (c.monthlyActivity ?? []).reduce((a, x) => a + x.amountTZS, 0);
-  const deposits = (c.deposits ?? []).reduce((a, x) => a + x.amountTZS, 0);
+  const monthLabel = (iso: string) =>
+    new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  const monthActivities = activities.filter((a) => monthLabel(a.date) === month);
+  const monthDeposits = deposits.filter((d) => monthLabel(d.date) === month);
+  const shown = monthActivities.length ? monthActivities : activities;
+  const shownDeposits = monthActivities.length ? monthDeposits : deposits;
+
+  const takings = shown.reduce((a, x) => a + x.amountTZS, 0);
+  const depositTotal = shownDeposits.reduce((a, x) => a + x.amountTZS, 0);
   const opening = 0;
-  const closing = opening + takings - deposits;
+  const closing = opening + takings - depositTotal;
 
   return (
     <PrintShell
@@ -211,14 +262,14 @@ export function CustomerStatementPrintScreen() {
           </tr>
         </thead>
         <tbody>
-          {(c.monthlyActivity ?? []).map((a) => {
-            const p = PRODUCTS.find((x) => x.id === a.productId);
+          {shown.map((a) => {
+            const p = products.find((x) => x.id === a.productId);
             return (
               <tr key={a.id} className="border-b border-border last:border-0">
                 <td className="py-1.5 text-xs">{a.date}</td>
-                <td className="py-1.5">{p?.name}</td>
+                <td className="py-1.5">{p?.name ?? a.productId}</td>
                 <td className="py-1.5 text-right">
-                  {a.qty} {a.unit}
+                  {num(a.qty)} {a.unit}
                 </td>
                 <td className="py-1.5 text-right">{num(a.amountTZS)}</td>
               </tr>
@@ -238,7 +289,7 @@ export function CustomerStatementPrintScreen() {
         </div>
         <div className="flex justify-between border-b border-border py-2">
           <span>{t("Amana", "Deposits")}</span>
-          <span className="font-num text-[#E11B22]">-{tzs(deposits)}</span>
+          <span className="font-num text-[#E11B22]">-{tzs(depositTotal)}</span>
         </div>
         <div className="flex justify-between border-b border-border py-2 font-bold">
           <span>{t("Salio la mwisho", "Closing balance")}</span>
@@ -254,29 +305,38 @@ export function CustomerStatementPrintScreen() {
 export function FarmerStatementPrintScreen() {
   const { t } = useApp();
   const { id } = useParams({ from: "/statement/farmer/$id" });
-  const f: Farmer | undefined = FARMERS.find((x) => x.id === id);
+  const { data: f, isPending } = useFarmer(id);
+  const { data: cycle } = useCycleSummary();
+  const cycleStart = cycle?.startDate ?? todayISO();
+  const { data: collections = [] } = useQuery({
+    queryKey: collectionKeys.byFarmer(id, cycleStart),
+    queryFn: () => collectionsRepo.listByFarmer(id, cycleStart),
+  });
+
+  if (isPending)
+    return (
+      <PrintLoading backTo="/farmers" title={t("Statimenti ya mfugaji", "Farmer statement")} />
+    );
   if (!f)
     return (
-      <PrintShell backTo="/farmers" title="Farmer not found">
-        <div>No farmer with id {id}.</div>
+      <PrintShell backTo="/farmers" title={t("Mfugaji hapatikani", "Farmer not found")}>
+        <div className="text-sm text-muted-foreground">
+          {t("Hakuna mfugaji mwenye namba", "No farmer with id")} {id}.
+        </div>
       </PrintShell>
     );
-  const daily = Array.from({ length: 15 }).map((_, i) => {
-    const litres = Math.round(8 + (((i + parseInt(f.id.slice(1)) || 0) * 7) % 35));
-    return {
-      date: `2026-05-${String(14 + i).padStart(2, "0")}`,
-      session: i % 2 === 0 ? "morning" : "evening",
-      litres,
-    };
-  });
-  const total = daily.reduce((a, d) => a + d.litres, 0);
+
+  const total = collections.reduce((a, d) => a + d.litres, 0);
   const earnings = total * f.ratePerL;
+  const cycleLabel = cycle
+    ? `${dateLabel(cycle.startDate)} - ${dateLabel(cycle.endDate)}`
+    : t("Mzunguko wa sasa", "Current cycle");
 
   return (
     <PrintShell
       backTo="/farmers"
       title={t("Statimenti ya mfugaji", "Farmer statement")}
-      subtitle={`${f.name} · ${f.village} · ${t("Mzunguko", "Cycle")} 01-15 Jun 2026`}
+      subtitle={`${f.name} · ${f.village} · ${t("Mzunguko", "Cycle")} ${cycleLabel}`}
     >
       <div className="grid grid-cols-3 gap-3 mb-6 text-sm">
         <div className="rounded-xl bg-secondary/60 p-3">
@@ -309,11 +369,11 @@ export function FarmerStatementPrintScreen() {
           </tr>
         </thead>
         <tbody>
-          {daily.map((d) => (
-            <tr key={d.date + d.session} className="border-b border-border last:border-0">
+          {collections.map((d) => (
+            <tr key={d.id} className="border-b border-border last:border-0">
               <td className="py-1.5 text-xs">{d.date}</td>
               <td className="py-1.5 capitalize">{d.session}</td>
-              <td className="py-1.5 text-right">{d.litres}</td>
+              <td className="py-1.5 text-right">{num(d.litres)}</td>
               <td className="py-1.5 text-right">{num(d.litres * f.ratePerL)}</td>
             </tr>
           ))}
@@ -323,7 +383,7 @@ export function FarmerStatementPrintScreen() {
             <td colSpan={2} className="py-3 font-semibold">
               {t("Jumla", "Total")}
             </td>
-            <td className="py-3 text-right font-bold">{total} L</td>
+            <td className="py-3 text-right font-bold">{num(total)} L</td>
             <td className="py-3 text-right font-bold text-[#1E7C3F]">{tzs(earnings)}</td>
           </tr>
         </tfoot>
@@ -353,46 +413,66 @@ export function FarmerStatementPrintScreen() {
 export function DayCloseReportScreen() {
   const { t } = useApp();
   const { date } = useParams({ from: "/report/day-close/$date" });
+  const { data: lock, isPending: lockPending } = useDayLock(date);
+  const { data: liveRows = [], isPending: livePending } = useReconForDate(date);
+  const rows = lock ? lock.rows : liveRows;
+
+  if (lockPending && livePending)
+    return (
+      <PrintLoading
+        backTo="/reconciliation"
+        title={t("Ripoti ya kufunga siku", "Day-close report")}
+      />
+    );
+
   return (
     <PrintShell
       backTo="/reconciliation"
       title={t("Ripoti ya kufunga siku", "Day-close report")}
-      subtitle={`${date} · ${TODAY_LABEL}`}
+      subtitle={`${date} · ${dateLabel(date)}`}
     >
-      <table className="w-full text-sm font-num">
-        <thead>
-          <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-            <th className="py-2 px-2">{t("Bidhaa", "Product")}</th>
-            <th className="text-right px-2">{t("Awali", "Open")}</th>
-            <th className="text-right px-2">{t("Kusanywa", "Coll.")}</th>
-            <th className="text-right px-2">{t("Tengeneza", "Prod.")}</th>
-            <th className="text-right px-2">Cash</th>
-            <th className="text-right px-2">Credit</th>
-            <th className="text-right px-2">{t("Tenga", "Sep.")}</th>
-            <th className="text-right px-2">{t("Haribika", "Spoilt")}</th>
-            <th className="text-right px-2">{t("Rudi", "Ret.")}</th>
-            <th className="text-right px-2">{t("Bakia", "Close")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {RECON_TODAY.map((r, i) => (
-            <tr key={i} className="border-b border-border last:border-0">
-              <td className="py-2 px-2 font-sans font-medium">{r.product}</td>
-              <td className="py-2 px-2 text-right">{num(r.opening, r.opening % 1 ? 2 : 0)}</td>
-              <td className="py-2 px-2 text-right">{num(r.collected)}</td>
-              <td className="py-2 px-2 text-right">{num(r.produced, r.produced % 1 ? 2 : 0)}</td>
-              <td className="py-2 px-2 text-right">{num(r.soldCash)}</td>
-              <td className="py-2 px-2 text-right">{num(r.soldCredit)}</td>
-              <td className="py-2 px-2 text-right">{num(r.separated)}</td>
-              <td className="py-2 px-2 text-right text-[#E11B22]">{num(r.spoilt)}</td>
-              <td className="py-2 px-2 text-right">{num(r.returned)}</td>
-              <td className="py-2 px-2 text-right font-bold">
-                {num(r.closing, r.closing % 1 ? 2 : 0)}
-              </td>
+      {rows.length === 0 ? (
+        <div className="py-10 text-center text-sm text-muted-foreground">
+          {t("Hakuna harakati zilizorekodiwa siku hii.", "No movements recorded for this date.")}
+        </div>
+      ) : (
+        <table className="w-full text-sm font-num">
+          <thead>
+            <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+              <th className="py-2 px-2">{t("Bidhaa", "Product")}</th>
+              <th className="text-right px-2">{t("Awali", "Open")}</th>
+              <th className="text-right px-2">{t("Kusanywa", "Coll.")}</th>
+              <th className="text-right px-2">{t("Tengeneza", "Prod.")}</th>
+              <th className="text-right px-2">Cash</th>
+              <th className="text-right px-2">Credit</th>
+              <th className="text-right px-2">{t("Tenga", "Sep.")}</th>
+              <th className="text-right px-2">{t("Haribika", "Spoilt")}</th>
+              <th className="text-right px-2">{t("Rudi", "Ret.")}</th>
+              <th className="text-right px-2">{t("Bakia", "Close")}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.productId} className="border-b border-border last:border-0">
+                <td className="py-2 px-2 font-sans font-medium">
+                  {r.product} ({r.unit})
+                </td>
+                <td className="py-2 px-2 text-right">{num(r.opening, r.opening % 1 ? 2 : 0)}</td>
+                <td className="py-2 px-2 text-right">{num(r.collected)}</td>
+                <td className="py-2 px-2 text-right">{num(r.produced, r.produced % 1 ? 2 : 0)}</td>
+                <td className="py-2 px-2 text-right">{num(r.soldCash)}</td>
+                <td className="py-2 px-2 text-right">{num(r.soldCredit)}</td>
+                <td className="py-2 px-2 text-right">{num(r.separated)}</td>
+                <td className="py-2 px-2 text-right text-[#E11B22]">{num(r.spoilt)}</td>
+                <td className="py-2 px-2 text-right">{num(r.returned)}</td>
+                <td className="py-2 px-2 text-right font-bold">
+                  {num(r.closing, r.closing % 1 ? 2 : 0)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
 
       <div className="mt-6 rounded-xl bg-[#1E7C3F]/10 p-4 text-sm">
         <div className="font-display font-semibold mb-1">
@@ -409,18 +489,22 @@ export function DayCloseReportScreen() {
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
             {t("Imefungwa na", "Locked by")}
           </div>
-          <div className="font-semibold">Daudi Massawe</div>
+          <div className="font-semibold">
+            {lock?.lockedByName ?? t("Bado haijafungwa", "Not locked yet")}
+          </div>
           <div className="text-xs text-muted-foreground">
-            Production Manager · {new Date().toLocaleTimeString()}
+            {lock ? new Date(lock.lockedAt).toLocaleString() : ""}
           </div>
         </div>
         <div className="rounded-xl border border-border p-3">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
             {t("Imethibitishwa na", "Confirmed by")}
           </div>
-          <div className="font-semibold">Asha Mwakasege</div>
+          <div className="font-semibold">
+            {lock?.confirmedByName ?? (lock ? t("Inasubiri Finance", "Awaiting finance") : "·")}
+          </div>
           <div className="text-xs text-muted-foreground">
-            Finance · {new Date().toLocaleTimeString()}
+            {lock?.confirmedAt ? new Date(lock.confirmedAt).toLocaleString() : ""}
           </div>
         </div>
       </div>
@@ -433,27 +517,56 @@ export function DayCloseReportScreen() {
 export function DepositSlipPrintScreen() {
   const { t } = useApp();
   const { id } = useParams({ from: "/receipt/deposit/$id" });
-  const amount = 540000;
+  const { data: deposit, isPending } = useDeposit(id);
+
+  if (isPending)
+    return <PrintLoading backTo="/finance" title={t("Risiti ya amana", "Deposit slip")} />;
+  if (!deposit)
+    return (
+      <PrintShell backTo="/finance" title={t("Amana haipatikani", "Deposit not found")}>
+        <div className="text-sm text-muted-foreground">
+          {t("Hakuna amana yenye namba", "No deposit with id")} {id}.
+        </div>
+      </PrintShell>
+    );
+
+  const sourceLabel =
+    deposit.source === "route"
+      ? t("Cash ya njia", "Route cash-up")
+      : deposit.source === "pos"
+        ? t("Cash benki", "Cash banking")
+        : deposit.source === "customer"
+          ? t("Amana ya mteja", "Customer deposit")
+          : t("Nyingine", "Other");
+
   return (
-    <PrintShell backTo="/finance" title={t("Risiti ya amana", "Deposit slip")} subtitle={`${id}`}>
+    <PrintShell
+      backTo="/finance"
+      title={t("Risiti ya amana", "Deposit slip")}
+      subtitle={`${deposit.id} · ${deposit.date}`}
+    >
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div className="rounded-xl bg-secondary/60 p-3">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
             {t("Chanzo", "Source")}
           </div>
-          <div className="font-semibold">Route van #1, Baraka Laizer</div>
+          <div className="font-semibold">{deposit.customerName ?? deposit.note ?? sourceLabel}</div>
+          {deposit.ref && <div className="text-xs text-muted-foreground">{deposit.ref}</div>}
         </div>
         <div className="rounded-xl bg-secondary/60 p-3">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
             {t("Aina", "Type")}
           </div>
-          <div className="font-semibold">Route cash-up</div>
+          <div className="font-semibold">{sourceLabel}</div>
+          <div className="text-xs text-muted-foreground capitalize">{deposit.method}</div>
         </div>
         <div className="rounded-xl bg-secondary/60 p-3 col-span-2 text-center py-6">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
             {t("Kiasi", "Amount")}
           </div>
-          <div className="font-num text-4xl font-bold mt-1 text-[#1E7C3F]">{tzs(amount)}</div>
+          <div className="font-num text-4xl font-bold mt-1 text-[#1E7C3F]">
+            {tzs(deposit.amountTZS)}
+          </div>
         </div>
       </div>
       <div className="mt-6 grid grid-cols-2 gap-6 text-sm">
@@ -462,16 +575,14 @@ export function DepositSlipPrintScreen() {
             {t("Saini, mleta", "Signature, depositor")}
           </div>
           <div className="border-t border-border pt-1 text-xs text-muted-foreground">
-            Baraka Laizer
+            {deposit.customerName ?? ""}
           </div>
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-8">
             {t("Saini, mpokeaji", "Signature, receiver")}
           </div>
-          <div className="border-t border-border pt-1 text-xs text-muted-foreground">
-            Asha Mwakasege, Finance
-          </div>
+          <div className="border-t border-border pt-1 text-xs text-muted-foreground">Finance</div>
         </div>
       </div>
     </PrintShell>
@@ -484,21 +595,30 @@ export function FarmerPayoutSlipScreen() {
   const { t } = useApp();
   const { id } = useParams({ from: "/payout/farmer/$id" });
   const search = useSearch({ from: "/payout/farmer/$id" }) as { cycle?: string };
-  const cycle = search.cycle ?? "01-15 Jun 2026";
-  const f: Farmer | undefined = FARMERS.find((x) => x.id === id);
+  const { data: f, isPending } = useFarmer(id);
+  const { data: cycleData } = useCycleSummary();
+  const cycle =
+    search.cycle ??
+    (cycleData
+      ? `${dateLabel(cycleData.startDate)} - ${dateLabel(cycleData.endDate)}`
+      : t("Mzunguko wa sasa", "Current cycle"));
 
+  if (isPending)
+    return <PrintLoading backTo="/farmers" title={t("Karatasi ya malipo", "Payout slip")} />;
   if (!f) {
     return (
-      <PrintShell backTo="/farmers" title="Farmer not found">
-        <div>No farmer with id {id}.</div>
+      <PrintShell backTo="/farmers" title={t("Mfugaji hapatikani", "Farmer not found")}>
+        <div className="text-sm text-muted-foreground">
+          {t("Hakuna mfugaji mwenye namba", "No farmer with id")} {id}.
+        </div>
       </PrintShell>
     );
   }
 
-  // For demo, the payout amount is the farmer's current balance.
-  const litres = Math.round(f.litresThisCycle / 2); // litres earned in this cycle
+  const litres = f.litresThisCycle;
   const gross = litres * f.ratePerL;
-  const deductions = Math.round(gross * 0.02); // 2% Sacco contribution, demo
+  // 2% Sacco contribution, the cooperative's standing deduction.
+  const deductions = Math.round(gross * 0.02);
   const net = gross - deductions;
 
   return (
@@ -530,7 +650,7 @@ export function FarmerPayoutSlipScreen() {
             <td className="py-2.5 text-muted-foreground">
               {t("Litre zilizokusanywa", "Litres collected")}
             </td>
-            <td className="py-2.5 text-right">{litres} L</td>
+            <td className="py-2.5 text-right">{num(litres)} L</td>
           </tr>
           <tr className="border-b border-border">
             <td className="py-2.5 text-muted-foreground">{t("Bei", "Rate")}</td>
@@ -584,9 +704,7 @@ export function FarmerPayoutSlipScreen() {
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-8">
             {t("Saini, Finance", "Finance signature")}
           </div>
-          <div className="border-t border-border pt-1 text-xs text-muted-foreground">
-            Asha Mwakasege
-          </div>
+          <div className="border-t border-border pt-1 text-xs text-muted-foreground">Finance</div>
         </div>
       </div>
     </PrintShell>

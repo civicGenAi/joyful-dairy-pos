@@ -15,7 +15,13 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { useApp } from "@/app/context";
-import { ALERTS, ROLE_LABEL, USERS, CUSTOMERS, FARMERS, PRODUCTS } from "@/mock/data";
+// BACKEND: live data via src/lib/data hooks; ROLE_LABEL is static UI config.
+import { ROLE_LABEL } from "@/mock/data";
+import { useCustomers } from "@/lib/data/hooks/customers";
+import { useFarmers } from "@/lib/data/hooks/farmers";
+import { useProducts } from "@/lib/data/hooks/products";
+import { useAlerts } from "@/lib/data/hooks/reports";
+import type { Customer, Farmer, Product } from "@/mock/types";
 import type { Role } from "@/mock/types";
 import { Input } from "@/components/ui/input";
 import {
@@ -46,18 +52,25 @@ export function Topbar({
   const nav = useNavigate();
   const isAdmin = roles.includes("admin");
   const [q, setQ] = useState("");
+  // Search + alerts tolerate missing read capability: errors render as empty.
+  const customers = useCustomers().data ?? [];
+  const farmers = useFarmers().data ?? [];
+  const products = useProducts().data ?? [];
+  const alerts = useAlerts().data ?? [];
 
   const results = useMemo(() => {
     if (!q.trim()) return null;
     const needle = q.toLowerCase();
     return {
-      customers: CUSTOMERS.filter((c) => c.name.toLowerCase().includes(needle)).slice(0, 4),
-      farmers: FARMERS.filter((f) => f.name.toLowerCase().includes(needle)).slice(0, 4),
-      products: PRODUCTS.filter(
-        (p) => p.name.toLowerCase().includes(needle) || p.swName.toLowerCase().includes(needle),
-      ).slice(0, 4),
+      customers: customers.filter((c) => c.name.toLowerCase().includes(needle)).slice(0, 4),
+      farmers: farmers.filter((f) => f.name.toLowerCase().includes(needle)).slice(0, 4),
+      products: products
+        .filter(
+          (p) => p.name.toLowerCase().includes(needle) || p.swName.toLowerCase().includes(needle),
+        )
+        .slice(0, 4),
     };
-  }, [q]);
+  }, [q, customers, farmers, products]);
 
   if (!user) return null;
 
@@ -151,7 +164,7 @@ export function Topbar({
               className="absolute -top-1 -right-1 grid place-items-center h-4 min-w-4 px-1 rounded-full text-[10px] font-bold text-white"
               style={{ background: "#E11B22" }}
             >
-              {ALERTS.length}
+              {alerts.length}
             </span>
           </button>
         </PopoverTrigger>
@@ -159,11 +172,11 @@ export function Topbar({
           <div className="px-4 py-3 border-b border-border">
             <div className="text-sm font-semibold">{t("Arifa", "Notifications")}</div>
             <div className="text-xs text-muted-foreground">
-              {ALERTS.length} {t("zinazohitaji uangalizi", "items need attention")}
+              {alerts.length} {t("zinazohitaji uangalizi", "items need attention")}
             </div>
           </div>
           <ul className="max-h-[360px] overflow-y-auto divide-y divide-border">
-            {ALERTS.map((a) => {
+            {alerts.map((a) => {
               const link =
                 a.kind === "low-stock"
                   ? "/stock"
@@ -367,7 +380,7 @@ function SearchResults({
   onPick,
   onClose,
 }: {
-  results: { customers: typeof CUSTOMERS; farmers: typeof FARMERS; products: typeof PRODUCTS };
+  results: { customers: Customer[]; farmers: Farmer[]; products: Product[] };
   onPick: (to: string) => void;
   onClose: () => void;
 }) {
@@ -425,5 +438,3 @@ function SearchResults({
     </div>
   );
 }
-
-export const ALL_USERS = USERS;
