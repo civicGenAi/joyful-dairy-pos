@@ -2,16 +2,20 @@ import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
 import { SectionCard, Pill } from "@/components/ui/data-bits";
 import { CountUp } from "@/components/ui/CountUp";
+// BACKEND: data now flows through src/lib/data/{reports,farmers,customers,stock,recon}.
 import {
-  ALERTS,
-  FARMERS,
-  MILK_TREND_30,
-  SALES_BY_CATEGORY_WEEK,
-  SALES_CHANNEL_SPLIT,
-  TOP_CUSTOMERS,
-  YIELD_WEEK,
-  TODAY,
-} from "@/mock/data";
+  useMilkTrend,
+  useSalesByCategory,
+  useChannelSplit,
+  useTopCustomers,
+  useAlerts,
+} from "@/lib/data/hooks/reports";
+import { useFarmers } from "@/lib/data/hooks/farmers";
+import { useCustomers } from "@/lib/data/hooks/customers";
+import { useStock } from "@/lib/data/hooks/stock";
+import { useYieldTrend } from "@/lib/data/hooks/production";
+import { useDayLock } from "@/lib/data/hooks/recon";
+import { todayISO, daysAgoISO } from "@/lib/data/dates";
 import {
   AreaChart,
   Area,
@@ -45,22 +49,153 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ProductShowcase } from "@/components/brand/ProductShowcase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { KPISkeleton, SectionSkeleton, ChartSkeleton } from "@/components/ui/Skeletons";
-import { useSimulatedLoad } from "@/hooks/use-simulated-load";
 
 const GREENS = ["#1E7C3F", "#2F9E44", "#6FBF59", "#8CC63F", "#1D9E75", "#14532D"];
 
+const CATEGORY_COLUMN: Record<string, string> = {
+  "fresh-milk": "Fresh milk",
+  cultured: "Mtindi",
+  yoghurt: "Yoghurt",
+  cheese: "Cheese",
+  ghee: "Ghee",
+  butter: "Butter",
+};
+
 export function DashboardScreen() {
   const { t, lang, role, can } = useApp();
-  const loading = useSimulatedLoad(400);
-  const top = FARMERS.slice()
+  const today = todayISO();
+  const { data: milkTrend = [], isPending } = useMilkTrend(30);
+  const { data: channelToday = [] } = useChannelSplit(today, today);
+  const { data: channelMonth = [] } = useChannelSplit(daysAgoISO(29), today);
+  const { data: categoryWeek = [] } = useSalesByCategory(daysAgoISO(6), today);
+  const { data: topCustomers = [] } = useTopCustomers(daysAgoISO(29), today);
+  const { data: yieldWeek = [] } = useYieldTrend(7);
+  const { data: alerts = [] } = useAlerts();
+  const { data: farmers = [] } = useFarmers();
+  const { data: customers = [] } = useCustomers();
+  const { data: stock = [] } = useStock();
+  const { data: dayLock } = useDayLock(today);
+
+  const top = farmers
+    .slice()
     .sort((a, b) => b.litresThisCycle - a.litresThisCycle)
     .slice(0, 6);
 
-  if (loading) {
+  // KPI rollups from real data.
+  const todayPoint = milkTrend[milkTrend.length - 1];
+  const yesterdayPoint = milkTrend[milkTrend.length - 2];
+  const collectedToday = todayPoint?.collected ?? 0;
+  const spoiltToday = todayPoint?.spoilt ?? 0;
+  const collectedDelta =
+    yesterdayPoint && yesterdayPoint.collected > 0
+      ? ((collectedToday - yesterdayPoint.collected) / yesterdayPoint.collected) * 100
+      : 0;
+  const salesToday = channelToday.reduce((a, c) => a + c.amountTZS, 0);
+  const cashInToday = channelToday
+    .filter((c) => c.payment === "cash" || c.payment === "mpesa")
+    .reduce((a, c) => a + c.amountTZS, 0);
+  const receivable = customers.reduce((a, c) => a + c.outstandingTZS, 0);
+  const payable = farmers.reduce((a, f) => a + f.currentBalanceTZS, 0);
+  const freshClosing = stock.find((s) => s.id === "s-fresh")?.onHand ?? 0;
+  const outCount = stock.filter((s) => s.onHand <= 0).length;
+
+  const milkChart = milkTrend.map((p, i) => ({
+    day: `D${i + 1}`,
+    collected: p.collected,
+    sold: p.sold,
+    spoilt: p.spoilt,
+  }));
+
+  const channelPie = useMemo(() => {
+    const counter = channelMonth
+      .filter((c) => c.channel === "counter" && c.payment !== "mpesa")
+      .reduce((a, c) => a + c.amountTZS, 0);
+    const route = channelMonth
+      .filter((c) => c.channel === "route" && c.payment !== "mpesa")
+      .reduce((a, c) => a + c.amountTZS, 0);
+    const mpesa = channelMonth
+      .filter((c) => c.payment === "mpesa")
+      .reduce((a, c) => a + c.amountTZS, 0);
+    const total = counter + route + mpesa || 1;
+    return [
+      { name: "Counter", value: Math.round((counter / total) * 100) },
+      { name: "Route", value: Math.round((route / total) * 100) },
+      { name: "M-Pesa", value: Math.round((mpesa / total) * 100) },
+    ];
+  }, [channelMonth]);
+
+  const categoryChart = useMemo(() => {
+    const byDate: Record<string, Record<string, number | string>> = {};
+    for (const p of categoryWeek) {
+      const day = new Date(`${p.date}T00:00:00`).toLocaleDateString("en-GB", {
+        weekday: "short",
+      });
+      byDate[p.date] = byDate[p.date] ?? { day };
+      const col = CATEGORY_COLUMN[p.category];
+      if (!col) continue;
+      byDate[p.date][col] = ((byDate[p.date][col] as number) ?? 0) + p.qty;
+    }
+    return Object.keys(byDate)
+      .sort()
+      .map((d) => byDate[d]);
+  }, [categoryWeek]);
+
+  const yieldChart = yieldWeek.map((p) => ({
+    day: new Date(`${p.date}T00:00:00`).toLocaleDateString("en-GB", { weekday: "short" }),
+    yield: p.yieldPct ?? 0,
+  }));
+  const avgYield = (() => {
+    const vals = yieldWeek.map((p) => p.yieldPct).filter((v): v is number => v !== null && v > 0);
+    return vals.length ? Math.round(vals.reduce((a, v) => a + v, 0) / vals.length) : 0;
+  })();
+
+  const topCustomersChart = topCustomers.map((c) => ({ name: c.name, value: c.amountTZS }));
+
+  // Stock health: the five items closest to (or past) their reorder level.
+  const stockHealth = stock
+    .slice()
+    .sort((a, b) => a.onHand / Math.max(a.reorder, 1) - b.onHand / Math.max(b.reorder, 1))
+    .slice(0, 5);
+
+  // Channel cards for "today".
+  const channelCards = useMemo(() => {
+    const counter = channelToday
+      .filter((c) => c.channel === "counter" && c.payment !== "mpesa")
+      .reduce((a, c) => a + c.amountTZS, 0);
+    const route = channelToday
+      .filter((c) => c.channel === "route" && c.payment !== "mpesa")
+      .reduce((a, c) => a + c.amountTZS, 0);
+    const mpesa = channelToday
+      .filter((c) => c.payment === "mpesa")
+      .reduce((a, c) => a + c.amountTZS, 0);
+    const total = counter + route + mpesa || 1;
+    return [
+      {
+        label: t("Kaunta", "Counter"),
+        value: tzs(counter),
+        pct: Math.round((counter / total) * 100),
+        to: "/pos",
+      },
+      {
+        label: t("Njia", "Route"),
+        value: tzs(route),
+        pct: Math.round((route / total) * 100),
+        to: "/van",
+      },
+      {
+        label: "M-Pesa",
+        value: tzs(mpesa),
+        pct: Math.round((mpesa / total) * 100),
+        to: "/finance",
+      },
+    ];
+  }, [channelToday, t]);
+
+  if (isPending) {
     return (
       <AppShell title={t("Dashibodi", "Dashboard")}>
         <div className="flex items-center justify-between mb-4">
@@ -89,10 +224,17 @@ export function DashboardScreen() {
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
         <LiveDateTime />
         <div className="flex flex-wrap gap-1.5">
-          <Pill tone="success">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#2F9E44]" />{" "}
-            {t("Siku imefunguliwa", "Day open")}
-          </Pill>
+          {dayLock ? (
+            <Pill tone="info">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#1D9E75]" />{" "}
+              {t("Siku imefungwa", "Day locked")}
+            </Pill>
+          ) : (
+            <Pill tone="success">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#2F9E44]" />{" "}
+              {t("Siku imefunguliwa", "Day open")}
+            </Pill>
+          )}
           <Pill tone="info">{t("Salio sawa", "Balanced")}</Pill>
           <Pill tone="slate">
             {t("Jukumu", "Role")}, {role}
@@ -107,15 +249,22 @@ export function DashboardScreen() {
           label={t("Yamekusanywa", "Collected")}
           value={
             <>
-              <CountUp value={882} /> L
+              <CountUp value={collectedToday} /> L
             </>
           }
-          delta={{ up: true, text: "+4.2%" }}
+          delta={
+            yesterdayPoint
+              ? {
+                  up: collectedDelta >= 0,
+                  text: `${collectedDelta >= 0 ? "+" : ""}${collectedDelta.toFixed(1)}%`,
+                }
+              : undefined
+          }
         />
         <MiniStat
           accent="info"
           label={t("Mauzo", "Sales")}
-          value={<CountUp value={1428000} format={(v) => tzs(v, false)} />}
+          value={<CountUp value={salesToday} format={(v) => tzs(v, false)} />}
           sub="TZS"
         />
         <MiniStat
@@ -123,43 +272,42 @@ export function DashboardScreen() {
           label={t("Yameharibika", "Spoilt")}
           value={
             <>
-              <CountUp value={12} /> L
+              <CountUp value={spoiltToday} /> L
             </>
           }
-          delta={{ up: false, text: "-1.5 L" }}
         />
         <MiniStat
           accent="green"
           label={t("Yamebakia", "Closing")}
           value={
             <>
-              <CountUp value={214} /> L
+              <CountUp value={freshClosing} /> L
             </>
           }
         />
         <MiniStat
           accent="green"
           label={t("Cash benki", "Cash in")}
-          value={<CountUp value={860000} format={(v) => tzs(v, false)} />}
+          value={<CountUp value={cashInToday} format={(v) => tzs(v, false)} />}
           sub="TZS"
         />
         <MiniStat
           accent="amber"
           label={t("Madeni", "Receivable")}
-          value={<CountUp value={3680000} format={(v) => tzs(v, false)} />}
+          value={<CountUp value={receivable} format={(v) => tzs(v, false)} />}
           sub="TZS"
         />
         <MiniStat
           accent="info"
           label={t("Wafugaji", "Payables")}
-          value={<CountUp value={4830000} format={(v) => tzs(v, false)} />}
+          value={<CountUp value={payable} format={(v) => tzs(v, false)} />}
           sub="TZS"
         />
         <MiniStat
           accent="red"
           label={t("Tahadhari", "Alerts")}
-          value={<CountUp value={5} />}
-          sub={t("2 nje", "2 out")}
+          value={<CountUp value={alerts.length} />}
+          sub={t(`${outCount} nje`, `${outCount} out`)}
         />
       </div>
 
@@ -210,7 +358,7 @@ export function DashboardScreen() {
         >
           <div className="h-56 sm:h-64">
             <ResponsiveContainer>
-              <AreaChart data={MILK_TREND_30} margin={{ left: -10, right: 5 }}>
+              <AreaChart data={milkChart} margin={{ left: -10, right: 5 }}>
                 <defs>
                   <linearGradient id="g1" x1="0" x2="0" y1="0" y2="1">
                     <stop offset="0%" stopColor="#2F9E44" stopOpacity={0.5} />
@@ -262,13 +410,13 @@ export function DashboardScreen() {
             <ResponsiveContainer>
               <PieChart>
                 <Pie
-                  data={SALES_CHANNEL_SPLIT}
+                  data={channelPie}
                   dataKey="value"
                   innerRadius={50}
                   outerRadius={80}
                   paddingAngle={3}
                 >
-                  {SALES_CHANNEL_SPLIT.map((_, i) => (
+                  {channelPie.map((_, i) => (
                     <Cell key={i} fill={GREENS[i]} />
                   ))}
                 </Pie>
@@ -287,7 +435,7 @@ export function DashboardScreen() {
         >
           <div className="h-56">
             <ResponsiveContainer>
-              <BarChart data={SALES_BY_CATEGORY_WEEK} margin={{ left: -10 }}>
+              <BarChart data={categoryChart} margin={{ left: -10 }}>
                 <CartesianGrid stroke="#E6EBE1" vertical={false} />
                 <XAxis
                   dataKey="day"
@@ -313,7 +461,7 @@ export function DashboardScreen() {
         <SectionCard title={t("Yield wiki hii", "Yield this week")}>
           <div className="h-56">
             <ResponsiveContainer>
-              <LineChart data={YIELD_WEEK}>
+              <LineChart data={yieldChart}>
                 <CartesianGrid stroke="#E6EBE1" vertical={false} />
                 <XAxis
                   dataKey="day"
@@ -325,7 +473,7 @@ export function DashboardScreen() {
                 <YAxis
                   stroke="#6B776E"
                   fontSize={11}
-                  domain={[70, 95]}
+                  domain={[0, 100]}
                   tickLine={false}
                   axisLine={false}
                 />
@@ -341,7 +489,7 @@ export function DashboardScreen() {
             </ResponsiveContainer>
           </div>
           <div className="mt-2 text-xs text-muted-foreground">
-            {t("Wastani 83%, lengo 85%", "Average 83%, target 85%")}
+            {t(`Wastani ${avgYield}%, lengo 85%`, `Average ${avgYield}%, target 85%`)}
           </div>
         </SectionCard>
       </div>
@@ -353,7 +501,7 @@ export function DashboardScreen() {
         >
           <div className="h-64 sm:h-72">
             <ResponsiveContainer>
-              <BarChart data={TOP_CUSTOMERS} layout="vertical" margin={{ left: 10 }}>
+              <BarChart data={topCustomersChart} layout="vertical" margin={{ left: 10 }}>
                 <CartesianGrid stroke="#E6EBE1" horizontal={false} />
                 <XAxis
                   type="number"
@@ -387,7 +535,7 @@ export function DashboardScreen() {
           }
         >
           <ul className="space-y-1">
-            {ALERTS.slice(0, 5).map((a) => {
+            {alerts.slice(0, 5).map((a) => {
               const to =
                 a.kind === "low-stock"
                   ? "/stock"
@@ -458,26 +606,29 @@ export function DashboardScreen() {
 
         <SectionCard title={t("Hali ya stock", "Stock health")}>
           <div className="space-y-3">
-            {[
-              { name: t("Maziwa fresh", "Fresh milk"), v: 240, max: 300, tone: "success" as const },
-              { name: "Mtindi", v: 180, max: 250, tone: "success" as const },
-              { name: "Halloumi", v: 4.2, max: 10, tone: "warning" as const },
-              { name: t("Siagi 250g", "Butter 250g"), v: 0, max: 30, tone: "danger" as const },
-              { name: t("Vikopo robo", "Vikopo robo"), v: 140, max: 300, tone: "warning" as const },
-            ].map((s) => (
-              <Link key={s.name} to="/stock" className="block group">
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="group-hover:text-foreground">{s.name}</span>
-                  <Pill tone={s.tone}>{num(s.v)}</Pill>
-                </div>
-                <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${s.tone === "danger" ? "bg-[#E11B22]" : s.tone === "warning" ? "bg-[#E5A100]" : "bg-[#2F9E44]"}`}
-                    style={{ width: `${Math.max(4, (s.v / s.max) * 100)}%` }}
-                  />
-                </div>
-              </Link>
-            ))}
+            {stockHealth.map((s) => {
+              const tone =
+                s.onHand <= 0
+                  ? ("danger" as const)
+                  : s.onHand < s.reorder
+                    ? ("warning" as const)
+                    : ("success" as const);
+              const max = Math.max(s.reorder * 2, s.onHand, 1);
+              return (
+                <Link key={s.id} to="/stock" className="block group">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="group-hover:text-foreground">{s.name}</span>
+                    <Pill tone={tone}>{num(s.onHand)}</Pill>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${tone === "danger" ? "bg-[#E11B22]" : tone === "warning" ? "bg-[#E5A100]" : "bg-[#2F9E44]"}`}
+                      style={{ width: `${Math.max(4, (s.onHand / max) * 100)}%` }}
+                    />
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </SectionCard>
       </div>
@@ -501,11 +652,7 @@ export function DashboardScreen() {
           className="lg:col-span-2"
         >
           <div className="grid sm:grid-cols-3 gap-3">
-            {[
-              { label: t("Kaunta", "Counter"), value: tzs(685000), pct: 48, to: "/pos" },
-              { label: t("Njia", "Route"), value: tzs(485000), pct: 34, to: "/van" },
-              { label: "M-Pesa", value: tzs(258000), pct: 18, to: "/finance" },
-            ].map((c) => (
+            {channelCards.map((c) => (
               <Link
                 key={c.label}
                 to={c.to}
@@ -543,8 +690,7 @@ function LiveDateTime() {
     return () => clearInterval(id);
   }, []);
 
-  // Demo date for the dataset, clock is real wall-time.
-  const dateLabel = new Date(TODAY).toLocaleDateString(lang === "sw" ? "sw-TZ" : "en-GB", {
+  const dateLabel = now.toLocaleDateString(lang === "sw" ? "sw-TZ" : "en-GB", {
     weekday: "long",
     day: "numeric",
     month: "long",
