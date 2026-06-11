@@ -1,6 +1,19 @@
 import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
-import { FARMERS, TODAY } from "@/mock/data";
+// BACKEND: data now flows through src/lib/data/farmers + collections (was @/mock/data).
+import {
+  useFarmers,
+  useCycleSummary,
+  useFarmerPayouts,
+  useCreateFarmer,
+  useUpdateFarmer,
+  useDeleteFarmer,
+  usePayFarmer,
+} from "@/lib/data/hooks/farmers";
+import { useRecordCollection } from "@/lib/data/hooks/collections";
+import { useQuery } from "@tanstack/react-query";
+import { collectionKeys, collectionsRepo } from "@/lib/data/collections";
+import { todayISO, dateLabel } from "@/lib/data/dates";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { tzs, L, num } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -22,7 +35,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -40,16 +52,18 @@ import { Link } from "@tanstack/react-router";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
-import { useSimulatedLoad } from "@/hooks/use-simulated-load";
 import { RowActions } from "@/components/ui/RowActions";
 import type { Farmer } from "@/mock/types";
 
+const VILLAGES = ["Olasiti", "Sakina", "Kisongo", "Ngaramtoni", "Tengeru", "Usa River"];
+
 export function FarmersScreen() {
   const { t } = useApp();
-  const loading = useSimulatedLoad(350);
+  const { data: farmers = [], isPending, isError, refetch } = useFarmers();
+  const { data: cycle } = useCycleSummary();
+  const deleteFarmer = useDeleteFarmer();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<string>("all");
-  const [farmers, setFarmers] = useState<Farmer[]>(FARMERS);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -68,7 +82,7 @@ export function FarmersScreen() {
   const totalFarmers = farmers.length;
   const dueCount = farmers.filter((f) => f.status === "due" || f.status === "delayed").length;
 
-  if (loading) {
+  if (isPending) {
     return (
       <AppShell title={t("Wafugaji", "Farmers")}>
         <KPISkeleton />
@@ -77,6 +91,23 @@ export function FarmersScreen() {
             <TableSkeleton rows={8} cols={7} />
           </SectionSkeleton>
         </div>
+      </AppShell>
+    );
+  }
+
+  if (isError) {
+    return (
+      <AppShell title={t("Wafugaji", "Farmers")}>
+        <EmptyState
+          icon={Users}
+          title={t("Imeshindikana kupakia wafugaji", "Could not load farmers")}
+          description={t("Tafadhali jaribu tena.", "Please try again.")}
+          action={
+            <Button onClick={() => refetch()} variant="outline">
+              {t("Jaribu tena", "Retry")}
+            </Button>
+          }
+        />
       </AppShell>
     );
   }
@@ -128,8 +159,8 @@ export function FarmersScreen() {
               </SelectContent>
             </Select>
             <ExportMenu formats={["excel", "csv", "pdf"]} filename="farmers" />
-            <AddFarmerDialog onAdd={(nf) => setFarmers((xs) => [nf, ...xs])} />
-            <RecordCollectionDialog />
+            <AddFarmerDialog />
+            <RecordCollectionDialog farmers={farmers} />
           </div>
         }
       >
@@ -176,7 +207,7 @@ export function FarmersScreen() {
                       {tzs(f.currentBalanceTZS)}
                     </td>
                     <td className="py-2.5 px-3 text-xs text-muted-foreground">
-                      {f.lastPaymentDate}
+                      {f.lastPaymentDate || "–"}
                     </td>
                     <td className="py-2.5 px-3">
                       <Pill
@@ -205,8 +236,15 @@ export function FarmersScreen() {
                         onView={() => setViewingId(f.id)}
                         onEdit={() => setEditingId(f.id)}
                         onDelete={() => {
-                          setFarmers((xs) => xs.filter((x) => x.id !== f.id));
-                          toast.success(t("Mfugaji amefutwa", "Farmer deleted"));
+                          deleteFarmer.mutate(
+                            { id: f.id, name: f.name },
+                            {
+                              onSuccess: () =>
+                                toast.success(t("Mfugaji amefutwa", "Farmer deleted")),
+                              onError: () =>
+                                toast.error(t("Imeshindikana kufuta", "Could not delete farmer")),
+                            },
+                          );
                         }}
                       />
                     </td>
@@ -218,16 +256,16 @@ export function FarmersScreen() {
         )}
       </SectionCard>
       {viewingId && (
-        <FarmerDetailDrawer farmerId={viewingId} open onClose={() => setViewingId(null)} />
+        <FarmerDetailDrawer
+          farmer={farmers.find((x) => x.id === viewingId)!}
+          open
+          onClose={() => setViewingId(null)}
+        />
       )}
       {editingId && (
         <EditFarmerDialog
           farmer={farmers.find((x) => x.id === editingId)!}
           onClose={() => setEditingId(null)}
-          onSave={(upd) => {
-            setFarmers((xs) => xs.map((x) => (x.id === upd.id ? upd : x)));
-            setEditingId(null);
-          }}
         />
       )}
 
@@ -236,13 +274,26 @@ export function FarmersScreen() {
           <div className="grid lg:grid-cols-2 gap-6">
             <div>
               <div className="text-xs text-muted-foreground mb-2">
-                {t("Mzunguko wa sasa", "Current cycle")}: 01 Jun – 15 Jun 2026
+                {t("Mzunguko wa sasa", "Current cycle")}:{" "}
+                {cycle
+                  ? `${dateLabel(cycle.startDate)} – ${dateLabel(cycle.endDate)}`
+                  : t("Hakuna mzunguko wazi", "No open cycle")}
               </div>
               <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                <div className="h-full brand-gradient" style={{ width: "62%" }} />
+                <div
+                  className="h-full brand-gradient"
+                  style={{
+                    width: cycle
+                      ? `${Math.round((cycle.daysElapsed / cycle.daysTotal) * 100)}%`
+                      : "0%",
+                  }}
+                />
               </div>
               <div className="flex justify-between mt-2 text-xs">
-                <span>{t("Siku zilizopita", "Days elapsed")}: 9/15</span>
+                <span>
+                  {t("Siku zilizopita", "Days elapsed")}: {cycle?.daysElapsed ?? 0}/
+                  {cycle?.daysTotal ?? 15}
+                </span>
                 <span className="font-num">{tzs(totalDue)}</span>
               </div>
             </div>
@@ -251,13 +302,13 @@ export function FarmersScreen() {
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   {t("Wamelipwa", "Paid")}
                 </div>
-                <div className="font-num font-bold text-lg">{tzs(2150000)}</div>
+                <div className="font-num font-bold text-lg">{tzs(cycle?.paidTZS ?? 0)}</div>
               </div>
               <div className="rounded-xl bg-secondary/60 p-3">
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   {t("Wanasubiri", "Pending")}
                 </div>
-                <div className="font-num font-bold text-lg">{tzs(2680000)}</div>
+                <div className="font-num font-bold text-lg">{tzs(totalDue)}</div>
               </div>
             </div>
           </div>
@@ -267,9 +318,38 @@ export function FarmersScreen() {
   );
 }
 
-function RecordCollectionDialog() {
+function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
+  const [farmerId, setFarmerId] = useState<string>("");
+  const [date, setDate] = useState(todayISO());
+  const [session, setSession] = useState<"morning" | "evening">("morning");
+  const [litres, setLitres] = useState(32);
+  const [point, setPoint] = useState<"field-a" | "main">("field-a");
+  const [note, setNote] = useState("");
+  const record = useRecordCollection();
+
+  const save = () => {
+    const fid = farmerId || farmers[0]?.id;
+    if (!fid || litres <= 0) return;
+    record.mutate(
+      { farmerId: fid, date, session, litres, point, qualityNote: note || undefined },
+      {
+        onSuccess: () => {
+          toast.success(t("Ukusanyaji umerekodiwa", "Collection recorded"));
+          setOpen(false);
+          setNote("");
+        },
+        onError: (e) =>
+          toast.error(
+            e.message.includes("day-locked")
+              ? t("Siku hii imefungwa", "This day is locked")
+              : t("Imeshindikana kurekodi", "Could not record collection"),
+          ),
+      },
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -287,12 +367,12 @@ function RecordCollectionDialog() {
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Mfugaji", "Farmer")}</Label>
-            <Select defaultValue={FARMERS[0].id}>
+            <Select value={farmerId || farmers[0]?.id} onValueChange={setFarmerId}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {FARMERS.map((f) => (
+                {farmers.map((f) => (
                   <SelectItem key={f.id} value={f.id}>
                     {f.name}
                   </SelectItem>
@@ -303,11 +383,11 @@ function RecordCollectionDialog() {
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label>{t("Tarehe", "Date")}</Label>
-              <Input type="date" defaultValue={TODAY} />
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
             <div className="grid gap-1.5">
               <Label>{t("Kipindi", "Session")}</Label>
-              <Select defaultValue="morning">
+              <Select value={session} onValueChange={(v) => setSession(v as typeof session)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -321,29 +401,44 @@ function RecordCollectionDialog() {
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label>{t("Litre", "Litres")}</Label>
-              <Input type="number" defaultValue={32} />
+              <Input
+                type="number"
+                value={litres}
+                onChange={(e) => setLitres(Number(e.target.value))}
+              />
             </div>
             <div className="grid gap-1.5">
-              <Label>{t("Bei (TZS/L)", "Rate (TZS/L)")}</Label>
-              <Input type="number" defaultValue={1200} />
+              <Label>{t("Pointi", "Point")}</Label>
+              <Select value={point} onValueChange={(v) => setPoint(v as typeof point)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="field-a">
+                    {t("Pointi A, Olasiti", "Point A, Olasiti")}
+                  </SelectItem>
+                  <SelectItem value="main">
+                    {t("Kiwandani, Arusha", "Main plant, Arusha")}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="grid gap-1.5">
             <Label>{t("Maelezo (hiari)", "Notes (optional)")}</Label>
-            <Input placeholder={t("Ubora mzuri", "Good quality")} />
+            <Input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={t("Ubora mzuri", "Good quality")}
+            />
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
-          <Button
-            onClick={() => {
-              toast.success(t("Ukusanyaji umerekodiwa", "Collection recorded"));
-              setOpen(false);
-            }}
-          >
-            {t("Hifadhi", "Save")}
+          <Button onClick={save} disabled={record.isPending}>
+            {record.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -352,17 +447,35 @@ function RecordCollectionDialog() {
 }
 
 function FarmerDetailDrawer({
-  farmerId,
+  farmer: f,
   open,
   onClose,
 }: {
-  farmerId: string;
+  farmer: Farmer;
   open: boolean;
   onClose: () => void;
 }) {
-  const { t } = useApp();
-  const f = FARMERS.find((x) => x.id === farmerId)!;
-  const days = Array.from({ length: 30 }).map((_, i) => 8 + (((i + farmerId.length) * 7) % 35));
+  const { t, lang } = useApp();
+  const monthStart = `${todayISO().slice(0, 8)}01`;
+  const { data: monthCollections = [] } = useQuery({
+    queryKey: collectionKeys.byFarmer(f.id, monthStart),
+    queryFn: () => collectionsRepo.listByFarmer(f.id, monthStart),
+  });
+  const { data: payouts = [] } = useFarmerPayouts(f.id);
+
+  const litresByDay = useMemo(() => {
+    const map: Record<number, number> = {};
+    for (const c of monthCollections) {
+      const d = Number(c.date.slice(8, 10));
+      map[d] = (map[d] ?? 0) + c.litres;
+    }
+    return map;
+  }, [monthCollections]);
+  const todayDay = new Date().getDate();
+  const monthLabel = new Date().toLocaleDateString(lang === "sw" ? "sw-TZ" : "en-GB", {
+    month: "long",
+    year: "numeric",
+  });
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
@@ -413,7 +526,7 @@ function FarmerDetailDrawer({
         <div className="mt-5">
           <div className="text-xs font-semibold mb-2 flex items-center gap-1.5">
             <Calendar className="h-3.5 w-3.5" />{" "}
-            {t("Ukusanyaji wa mwezi, Mei 2026", "Monthly collection, May 2026")}
+            {t(`Ukusanyaji wa mwezi, ${monthLabel}`, `Monthly collection, ${monthLabel}`)}
           </div>
           <div className="grid grid-cols-7 gap-1">
             {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
@@ -425,17 +538,20 @@ function FarmerDetailDrawer({
               </div>
             ))}
             {Array.from({ length: 31 }).map((_, i) => {
-              const v = days[i % days.length];
-              const isToday = i + 1 === 28;
+              const v = litresByDay[i + 1] ?? 0;
+              const isToday = i + 1 === todayDay;
               return (
                 <div
                   key={i}
                   className={`aspect-square rounded-md p-1 text-[10px] font-num font-semibold flex flex-col justify-between ${isToday ? "ring-2 ring-[#1E7C3F]" : ""}`}
-                  style={{ background: `rgba(47,158,68,${0.1 + v / 100})`, color: "#14532D" }}
+                  style={{
+                    background: `rgba(47,158,68,${v > 0 ? 0.1 + Math.min(v / 100, 0.7) : 0.05})`,
+                    color: "#14532D",
+                  }}
                   title={`Day ${i + 1}: ${v} L`}
                 >
                   <span className="text-[9px] opacity-70">{i + 1}</span>
-                  <span className="text-right text-[10px]">{v}</span>
+                  <span className="text-right text-[10px]">{v > 0 ? v : ""}</span>
                 </div>
               );
             })}
@@ -449,19 +565,25 @@ function FarmerDetailDrawer({
           <div className="text-xs font-semibold mb-2">
             {t("Historia ya malipo", "Payment history")}
           </div>
-          <ul className="divide-y divide-border text-sm">
-            {[1, 2, 3].map((i) => (
-              <li key={i} className="flex justify-between py-2">
-                <div>
-                  <div className="font-medium">
-                    {t("Malipo ya mzunguko", "Cycle payout")} #{i}
+          {payouts.length === 0 ? (
+            <div className="text-xs text-muted-foreground py-2">
+              {t("Hakuna malipo bado", "No payouts yet")}
+            </div>
+          ) : (
+            <ul className="divide-y divide-border text-sm">
+              {payouts.map((p) => (
+                <li key={p.id} className="flex justify-between py-2">
+                  <div>
+                    <div className="font-medium">
+                      {t("Malipo ya mzunguko", "Cycle payout")} · {p.method}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{p.date}</div>
                   </div>
-                  <div className="text-xs text-muted-foreground">2026-0{6 - i}-15</div>
-                </div>
-                <div className="font-num font-semibold">{tzs(420000 + i * 20000)}</div>
-              </li>
-            ))}
-          </ul>
+                  <div className="font-num font-semibold">{tzs(p.amountTZS)}</div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2">
@@ -473,11 +595,7 @@ function FarmerDetailDrawer({
             </Link>
           </Button>
           <Button asChild variant="outline" className="rounded-xl">
-            <Link
-              to="/payout/farmer/$id"
-              params={{ id: f.id }}
-              search={{ cycle: "01-15 Jun 2026" }}
-            >
+            <Link to="/payout/farmer/$id" params={{ id: f.id }} search={{ cycle: undefined }}>
               <Wallet className="h-3.5 w-3.5 mr-1.5" />
               {t("Karatasi ya malipo", "Payout slip")}
             </Link>
@@ -488,33 +606,29 @@ function FarmerDetailDrawer({
   );
 }
 
-function AddFarmerDialog({ onAdd }: { onAdd: (f: Farmer) => void }) {
+function AddFarmerDialog() {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [village, setVillage] = useState("Olasiti");
   const [rate, setRate] = useState(1200);
+  const create = useCreateFarmer();
 
   const save = () => {
     if (!name.trim()) return;
-    const f: Farmer = {
-      id: `f-new-${Date.now()}`,
-      name,
-      phone,
-      village,
-      litresThisCycle: 0,
-      ratePerL: rate,
-      lastPaymentTZS: 0,
-      lastPaymentDate: TODAY,
-      currentBalanceTZS: 0,
-      status: "active",
-    };
-    onAdd(f);
-    toast.success(t("Mfugaji ameongezwa", "Farmer added"));
-    setOpen(false);
-    setName("");
-    setPhone("");
+    create.mutate(
+      { name, phone, village, ratePerL: rate },
+      {
+        onSuccess: () => {
+          toast.success(t("Mfugaji ameongezwa", "Farmer added"));
+          setOpen(false);
+          setName("");
+          setPhone("");
+        },
+        onError: () => toast.error(t("Imeshindikana kuongeza", "Could not add farmer")),
+      },
+    );
   };
 
   return (
@@ -549,13 +663,11 @@ function AddFarmerDialog({ onAdd }: { onAdd: (f: Farmer) => void }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {["Olasiti", "Sakina", "Kisongo", "Ngaramtoni", "Tengeru", "Usa River"].map(
-                    (v) => (
-                      <SelectItem key={v} value={v}>
-                        {v}
-                      </SelectItem>
-                    ),
-                  )}
+                  {VILLAGES.map((v) => (
+                    <SelectItem key={v} value={v}>
+                      {v}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -571,10 +683,11 @@ function AddFarmerDialog({ onAdd }: { onAdd: (f: Farmer) => void }) {
           </Button>
           <Button
             onClick={save}
+            disabled={create.isPending}
             className="text-white"
             style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
           >
-            {t("Sajili", "Register")}
+            {create.isPending ? t("Inasajili…", "Registering…") : t("Sajili", "Register")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -582,21 +695,26 @@ function AddFarmerDialog({ onAdd }: { onAdd: (f: Farmer) => void }) {
   );
 }
 
-function EditFarmerDialog({
-  farmer,
-  onClose,
-  onSave,
-}: {
-  farmer: Farmer;
-  onClose: () => void;
-  onSave: (f: Farmer) => void;
-}) {
+function EditFarmerDialog({ farmer, onClose }: { farmer: Farmer; onClose: () => void }) {
   const { t } = useApp();
   const [name, setName] = useState(farmer.name);
   const [phone, setPhone] = useState(farmer.phone);
   const [village, setVillage] = useState(farmer.village);
   const [rate, setRate] = useState(farmer.ratePerL);
-  const [active, setActive] = useState(farmer.status !== "delayed");
+  const update = useUpdateFarmer();
+
+  const save = () => {
+    update.mutate(
+      { id: farmer.id, name, phone, village, ratePerL: rate },
+      {
+        onSuccess: () => {
+          toast.success(t("Imehifadhiwa", "Saved"));
+          onClose();
+        },
+        onError: () => toast.error(t("Imeshindikana kuhifadhi", "Could not save")),
+      },
+    );
+  };
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -621,13 +739,11 @@ function EditFarmerDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {["Olasiti", "Sakina", "Kisongo", "Ngaramtoni", "Tengeru", "Usa River"].map(
-                    (v) => (
-                      <SelectItem key={v} value={v}>
-                        {v}
-                      </SelectItem>
-                    ),
-                  )}
+                  {VILLAGES.map((v) => (
+                    <SelectItem key={v} value={v}>
+                      {v}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -636,22 +752,13 @@ function EditFarmerDialog({
             <Label>{t("Bei (TZS/L)", "Rate (TZS/L)")}</Label>
             <Input type="number" value={rate} onChange={(e) => setRate(Number(e.target.value))} />
           </div>
-          <label className="flex items-center gap-2 text-sm rounded-xl border border-border p-2.5">
-            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />{" "}
-            {t("Mfugaji hai", "Farmer active")}
-          </label>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             {t("Ghairi", "Cancel")}
           </Button>
-          <Button
-            onClick={() => {
-              onSave({ ...farmer, name, phone, village, ratePerL: rate });
-              toast.success(t("Imehifadhiwa", "Saved"));
-            }}
-          >
-            {t("Hifadhi", "Save")}
+          <Button onClick={save} disabled={update.isPending}>
+            {update.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -662,9 +769,29 @@ function EditFarmerDialog({
 function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState(Math.min(farmer.currentBalanceTZS, 540000));
-  const [method, setMethod] = useState("mpesa");
+  const [amount, setAmount] = useState(farmer.currentBalanceTZS);
+  const [method, setMethod] = useState<"cash" | "mpesa" | "bank">("mpesa");
   const [ref, setRef] = useState(`PAY-${Date.now().toString().slice(-4)}`);
+  const pay = usePayFarmer();
+
+  const save = () => {
+    if (amount <= 0) return;
+    pay.mutate(
+      { farmerId: farmer.id, amountTZS: amount, method, ref },
+      {
+        onSuccess: () => {
+          toast.success(t(`Malipo ${tzs(amount)} yamerekodiwa`, `Payment ${tzs(amount)} recorded`));
+          setOpen(false);
+        },
+        onError: (e) =>
+          toast.error(
+            e.message.includes("amount-exceeds-balance")
+              ? t("Kiasi kinazidi salio", "Amount exceeds the balance")
+              : t("Imeshindikana kulipa", "Could not record payment"),
+          ),
+      },
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -698,7 +825,7 @@ function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label>{t("Njia", "Method")}</Label>
-              <Select value={method} onValueChange={setMethod}>
+              <Select value={method} onValueChange={(v) => setMethod(v as typeof method)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -720,16 +847,12 @@ function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
             {t("Ghairi", "Cancel")}
           </Button>
           <Button
-            onClick={() => {
-              toast.success(
-                t(`Malipo ${tzs(amount)} yamerekodiwa`, `Payment ${tzs(amount)} recorded`),
-              );
-              setOpen(false);
-            }}
+            onClick={save}
+            disabled={pay.isPending}
             className="text-white"
             style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
           >
-            {t("Lipa sasa", "Pay now")}
+            {pay.isPending ? t("Inalipa…", "Paying…") : t("Lipa sasa", "Pay now")}
           </Button>
         </DialogFooter>
       </DialogContent>
