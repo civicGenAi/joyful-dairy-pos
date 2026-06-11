@@ -1,6 +1,12 @@
 import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
-import { CUSTOMERS, FARMERS, TODAY } from "@/mock/data";
+// BACKEND: data now flows through src/lib/data/{customers,farmers,sales,finance,recon}.
+import { useCustomers } from "@/lib/data/hooks/customers";
+import { useFarmers, useCycleSummary } from "@/lib/data/hooks/farmers";
+import { useDeposits, useRecordDeposit } from "@/lib/data/hooks/sales";
+import { useCashPosition, useInitiatePayouts } from "@/lib/data/hooks/finance";
+import { useDayLocks, useConfirmDay } from "@/lib/data/hooks/recon";
+import { todayISO, dateLabel } from "@/lib/data/dates";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { tzs, num } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -51,90 +57,39 @@ import { toast } from "sonner";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Link } from "@tanstack/react-router";
+import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
+import { EmptyState } from "@/components/ui/EmptyState";
 
-interface Deposit {
-  id: string;
-  time: string;
-  ref: string;
-  src: string;
-  kind: string;
-  amount: number;
-  method: "cash" | "mpesa" | "bank";
-}
-
-const SEED_DEPOSITS: Deposit[] = [
-  {
-    id: "d1",
-    time: "08:15",
-    ref: "RCT-5810",
-    src: "Route van #1, Baraka",
-    kind: "Route cash-up",
-    amount: 540000,
-    method: "cash",
-  },
-  {
-    id: "d2",
-    time: "10:42",
-    ref: "RCT-5811",
-    src: "Mamis Bistro",
-    kind: "Customer deposit",
-    amount: 150000,
-    method: "mpesa",
-  },
-  {
-    id: "d3",
-    time: "12:05",
-    ref: "RCT-5812",
-    src: "POS, counter",
-    kind: "Cash banking",
-    amount: 320000,
-    method: "cash",
-  },
-  {
-    id: "d4",
-    time: "14:30",
-    ref: "RCT-5813",
-    src: "Jovinary Hotel",
-    kind: "Customer deposit",
-    amount: 200000,
-    method: "bank",
-  },
-];
-
-const PAYOUTS_QUEUE = [
-  {
-    date: "2026-05-27",
-    by: "Daudi Massawe",
-    status: "balanced" as const,
-    products: 6,
-    balanced: 6,
-  },
-  {
-    date: "2026-05-26",
-    by: "Daudi Massawe",
-    status: "balanced" as const,
-    products: 6,
-    balanced: 6,
-  },
-  {
-    date: "2026-05-25",
-    by: "Daudi Massawe",
-    status: "needs-review" as const,
-    products: 6,
-    balanced: 5,
-  },
-];
+const SOURCE_LABEL: Record<string, { sw: string; en: string }> = {
+  customer: { sw: "Amana ya mteja", en: "Customer deposit" },
+  route: { sw: "Cash ya njia", en: "Route cash-up" },
+  pos: { sw: "Cash benki", en: "Cash banking" },
+  other: { sw: "Nyingine", en: "Other" },
+};
 
 export function FinanceScreen() {
-  const { t, can } = useApp();
-  const receivable = CUSTOMERS.reduce((a, c) => a + c.outstandingTZS, 0);
-  const payable = FARMERS.reduce((a, f) => a + f.currentBalanceTZS, 0);
-  const [deposits, setDeposits] = useState<Deposit[]>(SEED_DEPOSITS);
+  const { t } = useApp();
+  const today = todayISO();
+  const { data: customers = [], isPending } = useCustomers();
+  const { data: farmers = [] } = useFarmers();
+  const { data: deposits = [] } = useDeposits();
+  const { data: cash } = useCashPosition(today);
+  const { data: cycle } = useCycleSummary();
+  const { data: locks = [] } = useDayLocks();
+  const confirmDay = useConfirmDay();
+  const canConfirm = useApp().can("dayclose:confirm");
+  const canDeposit = useApp().can("deposit:write");
 
-  const cashPos = deposits.filter((d) => d.method === "cash").reduce((a, d) => a + d.amount, 0);
-  const mpesaPos = deposits.filter((d) => d.method === "mpesa").reduce((a, d) => a + d.amount, 0);
-  const bankPos = deposits.filter((d) => d.method === "bank").reduce((a, d) => a + d.amount, 0);
-  const totalCash = cashPos + mpesaPos + bankPos;
+  const receivable = customers.reduce((a, c) => a + c.outstandingTZS, 0);
+  const payable = farmers.reduce((a, f) => a + f.currentBalanceTZS, 0);
+
+  const cashPos = deposits.filter((d) => d.method === "cash").reduce((a, d) => a + d.amountTZS, 0);
+  const mpesaPos = deposits
+    .filter((d) => d.method === "mpesa")
+    .reduce((a, d) => a + d.amountTZS, 0);
+  const bankPos = deposits.filter((d) => d.method === "bank").reduce((a, d) => a + d.amountTZS, 0);
+  const totalCash = cash?.total ?? 0;
+  const monthLabel = new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" });
 
   const ageing = [
     { name: "Current", value: Math.round(receivable * 0.5), color: "#2F9E44" },
@@ -143,30 +98,50 @@ export function FinanceScreen() {
     { name: "90+ days", value: Math.round(receivable * 0.07), color: "#E11B22" },
   ];
 
+  if (isPending) {
+    return (
+      <AppShell title={t("Fedha", "Finance")}>
+        <KPISkeleton />
+        <div className="mt-5">
+          <SectionSkeleton>
+            <TableSkeleton rows={8} cols={5} />
+          </SectionSkeleton>
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell title={t("Fedha", "Finance")}>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         <StatCard
           label={t("Madeni ya wateja", "Receivables")}
           value={tzs(receivable)}
-          sub={`${CUSTOMERS.filter((c) => c.outstandingTZS > 0).length} ${t("wateja", "customers")}`}
+          sub={`${customers.filter((c) => c.outstandingTZS > 0).length} ${t("wateja", "customers")}`}
           accent="amber"
         />
         <StatCard
           label={t("Malipo wafugaji", "Farmer payables")}
           value={tzs(payable)}
-          sub={t("Mzunguko 15-siku, 15 Jun", "15-day cycle, Jun 15")}
+          sub={
+            cycle
+              ? t(
+                  `Mzunguko 15-siku, ${dateLabel(cycle.endDate)}`,
+                  `15-day cycle, ${dateLabel(cycle.endDate)}`,
+                )
+              : t("Hakuna mzunguko wazi", "No open cycle")
+          }
           accent="info"
         />
         <StatCard
           label={t("Cash leo", "Cash position today")}
           value={tzs(totalCash)}
-          sub={`${deposits.length} ${t("risiti", "receipts")}`}
+          sub={`${deposits.filter((d) => d.date === today).length} ${t("risiti", "receipts")}`}
           accent="green"
         />
         <StatCard
           label={t("Amana zilizopokelewa", "Deposits received")}
-          value={tzs(totalCash)}
+          value={tzs(cashPos + mpesaPos + bankPos)}
           sub={`Cash · M-Pesa · Bank`}
           accent="green"
         />
@@ -201,7 +176,8 @@ export function FinanceScreen() {
                   </tr>
                 </thead>
                 <tbody>
-                  {CUSTOMERS.filter((c) => c.outstandingTZS > 0)
+                  {customers
+                    .filter((c) => c.outstandingTZS > 0)
                     .sort((a, b) => b.outstandingTZS - a.outstandingTZS)
                     .slice(0, 10)
                     .map((c) => (
@@ -223,7 +199,7 @@ export function FinanceScreen() {
                             <Link
                               to="/statement/customer/$id"
                               params={{ id: c.id }}
-                              search={{ month: "May 2026" }}
+                              search={{ month: monthLabel }}
                             >
                               <FileText className="h-3.5 w-3.5 mr-1" />
                               {t("Statimenti", "Statement")}
@@ -272,14 +248,23 @@ export function FinanceScreen() {
               <Calendar className="h-5 w-5 text-[#1E7C3F]" />
               <div>
                 <div className="font-semibold">
-                  {t("Malipo yajayo", "Next payout")}: 15 Jun 2026
+                  {t("Malipo yajayo", "Next payout")}:{" "}
+                  {cycle ? dateLabel(cycle.endDate) : t("Haijapangwa", "Not scheduled")}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {t("Wafugaji 15 · Jumla", "15 farmers · Total")}{" "}
+                  {t(
+                    `Wafugaji ${farmers.filter((f) => f.currentBalanceTZS > 0).length} · Jumla`,
+                    `${farmers.filter((f) => f.currentBalanceTZS > 0).length} farmers · Total`,
+                  )}{" "}
                   <span className="font-num font-semibold text-[#14532D]">{tzs(payable)}</span>
                 </div>
               </div>
-              <InitiatePayoutsDialog />
+              <InitiatePayoutsDialog
+                totalPayable={payable}
+                cycleLabel={
+                  cycle ? `${dateLabel(cycle.startDate)} – ${dateLabel(cycle.endDate)}` : ""
+                }
+              />
             </div>
             <table className="w-full text-sm">
               <thead>
@@ -292,36 +277,40 @@ export function FinanceScreen() {
                 </tr>
               </thead>
               <tbody>
-                {FARMERS.slice(0, 10).map((f) => (
-                  <tr key={f.id} className="border-b border-border last:border-0">
-                    <td className="py-2.5 px-3 font-medium">{f.name}</td>
-                    <td className="py-2.5 text-right font-num">{num(f.litresThisCycle)}</td>
-                    <td className="py-2.5 text-right font-num font-semibold">
-                      {tzs(f.currentBalanceTZS)}
-                    </td>
-                    <td className="py-2.5">
-                      <Pill
-                        tone={
-                          f.status === "delayed"
-                            ? "danger"
-                            : f.status === "due"
-                              ? "warning"
-                              : "success"
-                        }
-                      >
-                        {f.status}
-                      </Pill>
-                    </td>
-                    <td className="py-2.5 text-right">
-                      <Button asChild size="sm" variant="ghost" className="h-7 text-xs">
-                        <Link to="/statement/farmer/$id" params={{ id: f.id }}>
-                          <FileText className="h-3.5 w-3.5 mr-1" />
-                          {t("Statimenti", "Statement")}
-                        </Link>
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                {farmers
+                  .filter((f) => f.currentBalanceTZS > 0)
+                  .sort((a, b) => b.currentBalanceTZS - a.currentBalanceTZS)
+                  .slice(0, 10)
+                  .map((f) => (
+                    <tr key={f.id} className="border-b border-border last:border-0">
+                      <td className="py-2.5 px-3 font-medium">{f.name}</td>
+                      <td className="py-2.5 text-right font-num">{num(f.litresThisCycle)}</td>
+                      <td className="py-2.5 text-right font-num font-semibold">
+                        {tzs(f.currentBalanceTZS)}
+                      </td>
+                      <td className="py-2.5">
+                        <Pill
+                          tone={
+                            f.status === "delayed"
+                              ? "danger"
+                              : f.status === "due"
+                                ? "warning"
+                                : "success"
+                          }
+                        >
+                          {f.status}
+                        </Pill>
+                      </td>
+                      <td className="py-2.5 text-right">
+                        <Button asChild size="sm" variant="ghost" className="h-7 text-xs">
+                          <Link to="/statement/farmer/$id" params={{ id: f.id }}>
+                            <FileText className="h-3.5 w-3.5 mr-1" />
+                            {t("Statimenti", "Statement")}
+                          </Link>
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </SectionCard>
@@ -332,59 +321,76 @@ export function FinanceScreen() {
             title={t("Amana zilizopokelewa", "Deposits & receipts log")}
             action={
               <div className="flex gap-2">
-                <ExportMenu formats={["csv", "excel"]} filename={`deposits-${TODAY}`} />
-                {can("deposit:write") && (
-                  <RecordReceiptDialog onSave={(d) => setDeposits((xs) => [d, ...xs])} />
-                )}
+                <ExportMenu formats={["csv", "excel"]} filename={`deposits-${today}`} />
+                {canDeposit && <RecordReceiptDialog />}
               </div>
             }
           >
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                  <th className="py-2 px-3">{t("Wakati", "Time")}</th>
-                  <th>{t("Rejea", "Reference")}</th>
-                  <th>{t("Chanzo", "Source")}</th>
-                  <th>{t("Aina", "Type")}</th>
-                  <th>{t("Njia", "Method")}</th>
-                  <th className="text-right">{t("Kiasi", "Amount")}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {deposits.map((d) => (
-                  <tr key={d.id} className="border-b border-border last:border-0">
-                    <td className="py-2.5 px-3 font-num text-xs text-muted-foreground">{d.time}</td>
-                    <td className="py-2.5 font-num text-xs">{d.ref}</td>
-                    <td className="py-2.5 font-medium">{d.src}</td>
-                    <td className="py-2.5">
-                      <Pill tone="info">{d.kind}</Pill>
-                    </td>
-                    <td className="py-2.5">
-                      <span className="inline-flex items-center gap-1 text-xs">
-                        {d.method === "cash" ? (
-                          <Banknote className="h-3 w-3" />
-                        ) : d.method === "mpesa" ? (
-                          <Smartphone className="h-3 w-3" />
-                        ) : (
-                          <ArrowUpRight className="h-3 w-3" />
-                        )}
-                        {d.method}
-                      </span>
-                    </td>
-                    <td className="py-2.5 text-right font-num font-semibold">{tzs(d.amount)}</td>
-                    <td className="py-2.5 text-right">
-                      <Button asChild size="sm" variant="ghost" className="text-xs h-7">
-                        <Link to="/receipt/deposit/$id" params={{ id: d.ref }}>
-                          <Receipt className="h-3.5 w-3.5 mr-1" />
-                          {t("Risiti", "Print")}
-                        </Link>
-                      </Button>
-                    </td>
+            {deposits.length === 0 ? (
+              <EmptyState icon={Receipt} title={t("Hakuna amana bado", "No deposits yet")} />
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                    <th className="py-2 px-3">{t("Wakati", "Time")}</th>
+                    <th>{t("Rejea", "Reference")}</th>
+                    <th>{t("Chanzo", "Source")}</th>
+                    <th>{t("Aina", "Type")}</th>
+                    <th>{t("Njia", "Method")}</th>
+                    <th className="text-right">{t("Kiasi", "Amount")}</th>
+                    <th />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {deposits.map((d) => (
+                    <tr key={d.id} className="border-b border-border last:border-0">
+                      <td className="py-2.5 px-3 font-num text-xs text-muted-foreground">
+                        {d.date} ·{" "}
+                        {new Date(d.at).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </td>
+                      <td className="py-2.5 font-num text-xs">{d.ref ?? d.id}</td>
+                      <td className="py-2.5 font-medium">
+                        {d.customerName ?? d.note ?? t("Nyingine", "Other")}
+                      </td>
+                      <td className="py-2.5">
+                        <Pill tone="info">
+                          {t(
+                            SOURCE_LABEL[d.source]?.sw ?? d.source,
+                            SOURCE_LABEL[d.source]?.en ?? d.source,
+                          )}
+                        </Pill>
+                      </td>
+                      <td className="py-2.5">
+                        <span className="inline-flex items-center gap-1 text-xs">
+                          {d.method === "cash" ? (
+                            <Banknote className="h-3 w-3" />
+                          ) : d.method === "mpesa" ? (
+                            <Smartphone className="h-3 w-3" />
+                          ) : (
+                            <ArrowUpRight className="h-3 w-3" />
+                          )}
+                          {d.method}
+                        </span>
+                      </td>
+                      <td className="py-2.5 text-right font-num font-semibold">
+                        {tzs(d.amountTZS)}
+                      </td>
+                      <td className="py-2.5 text-right">
+                        <Button asChild size="sm" variant="ghost" className="text-xs h-7">
+                          <Link to="/receipt/deposit/$id" params={{ id: d.id }}>
+                            <Receipt className="h-3.5 w-3.5 mr-1" />
+                            {t("Risiti", "Print")}
+                          </Link>
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </SectionCard>
         </TabsContent>
 
@@ -441,7 +447,7 @@ export function FinanceScreen() {
                 </li>
                 <li className="flex justify-between border-t-2 border-border pt-2 font-bold">
                   <span>{t("Jumla", "Total")}</span>
-                  <span className="font-num">{tzs(totalCash)}</span>
+                  <span className="font-num">{tzs(cashPos + mpesaPos + bankPos)}</span>
                 </li>
               </ul>
             </SectionCard>
@@ -450,56 +456,74 @@ export function FinanceScreen() {
 
         <TabsContent value="dayclose" className="mt-4">
           <SectionCard title={t("Kuthibitisha siku", "Day-close confirmation queue")}>
-            <ul className="divide-y divide-border">
-              {PAYOUTS_QUEUE.map((d) => (
-                <li key={d.date} className="flex items-center gap-3 py-3">
-                  <span
-                    className={`grid h-9 w-9 place-items-center rounded-full ${d.status === "balanced" ? "bg-[#2F9E44]/15 text-[#1E7C3F]" : "bg-[#E5A100]/15 text-[#E5A100]"}`}
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                  </span>
-                  <div className="flex-1">
-                    <div className="font-medium">{d.date}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {t("Imefungwa na", "Locked by")} {d.by} · {d.balanced}/{d.products}{" "}
-                      {t("zimesawazi", "balanced")}
-                    </div>
-                  </div>
-                  <Pill tone={d.status === "balanced" ? "success" : "warning"}>
-                    {d.status === "balanced"
-                      ? t("Imesawazi", "Balanced")
-                      : t("Inahitaji ukaguzi", "Needs review")}
-                  </Pill>
-                  <Button asChild size="sm" variant="outline">
-                    <Link to="/report/day-close/$date" params={{ date: d.date }}>
-                      <FileText className="h-3.5 w-3.5 mr-1.5" />
-                      {t("Tazama", "Review")}
-                    </Link>
-                  </Button>
-                  {can("dayclose:confirm") && (
-                    <ConfirmDialog
-                      title={t("Thibitisha kufunga siku?", "Confirm day close?")}
-                      description={t(
-                        "Hili linaweka muhuri wa Finance kwenye siku hii.",
-                        "This places the Finance seal on this day's books.",
+            {locks.length === 0 ? (
+              <EmptyState
+                icon={CheckCircle2}
+                title={t("Hakuna siku zilizofungwa bado", "No locked days yet")}
+              />
+            ) : (
+              <ul className="divide-y divide-border">
+                {locks.map((d) => {
+                  const confirmed = !!d.confirmedAt;
+                  return (
+                    <li key={d.date} className="flex items-center gap-3 py-3">
+                      <span
+                        className={`grid h-9 w-9 place-items-center rounded-full ${confirmed ? "bg-[#2F9E44]/15 text-[#1E7C3F]" : "bg-[#E5A100]/15 text-[#E5A100]"}`}
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                      </span>
+                      <div className="flex-1">
+                        <div className="font-medium">{d.date}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {t("Imefungwa na", "Locked by")} {d.lockedByName ?? "·"} · {d.rows.length}{" "}
+                          {t("bidhaa", "products")}
+                        </div>
+                      </div>
+                      <Pill tone={confirmed ? "success" : "warning"}>
+                        {confirmed
+                          ? t("Imethibitishwa", "Confirmed")
+                          : t("Inasubiri Finance", "Awaiting finance")}
+                      </Pill>
+                      <Button asChild size="sm" variant="outline">
+                        <Link to="/report/day-close/$date" params={{ date: d.date }}>
+                          <FileText className="h-3.5 w-3.5 mr-1.5" />
+                          {t("Tazama", "Review")}
+                        </Link>
+                      </Button>
+                      {canConfirm && !confirmed && (
+                        <ConfirmDialog
+                          title={t("Thibitisha kufunga siku?", "Confirm day close?")}
+                          description={t(
+                            "Hili linaweka muhuri wa Finance kwenye siku hii.",
+                            "This places the Finance seal on this day's books.",
+                          )}
+                          confirmLabel={t("Thibitisha", "Confirm")}
+                          onConfirm={() =>
+                            confirmDay.mutate(d.date, {
+                              onSuccess: () => toast.success(t("Imethibitishwa", "Confirmed")),
+                              onError: () =>
+                                toast.error(t("Imeshindikana kuthibitisha", "Could not confirm")),
+                            })
+                          }
+                          trigger={
+                            <Button
+                              size="sm"
+                              className="text-white"
+                              style={{
+                                background: "linear-gradient(135deg, #1E7C3F, #8CC63F)",
+                              }}
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                              {t("Thibitisha", "Confirm")}
+                            </Button>
+                          }
+                        />
                       )}
-                      confirmLabel={t("Thibitisha", "Confirm")}
-                      onConfirm={() => toast.success(t("Imethibitishwa", "Confirmed"))}
-                      trigger={
-                        <Button
-                          size="sm"
-                          className="text-white"
-                          style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                          {t("Thibitisha", "Confirm")}
-                        </Button>
-                      }
-                    />
-                  )}
-                </li>
-              ))}
-            </ul>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </SectionCard>
         </TabsContent>
       </Tabs>
@@ -507,14 +531,31 @@ export function FinanceScreen() {
   );
 }
 
-function RecordReceiptDialog({ onSave }: { onSave: (d: Deposit) => void }) {
+function RecordReceiptDialog() {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
   const [src, setSrc] = useState("");
-  const [kind, setKind] = useState("Customer deposit");
+  const [source, setSource] = useState<"customer" | "route" | "pos" | "other">("customer");
   const [amount, setAmount] = useState(100000);
   const [method, setMethod] = useState<"cash" | "mpesa" | "bank">("mpesa");
   const [ref, setRef] = useState(`RCT-${Date.now().toString().slice(-4)}`);
+  const record = useRecordDeposit();
+
+  const save = () => {
+    if (amount <= 0) return;
+    record.mutate(
+      { source, method, amountTZS: amount, ref, note: src || undefined },
+      {
+        onSuccess: () => {
+          toast.success(t("Imerekodiwa", "Recorded"));
+          setOpen(false);
+          setSrc("");
+        },
+        onError: () => toast.error(t("Imeshindikana kurekodi", "Could not record receipt")),
+      },
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -539,19 +580,17 @@ function RecordReceiptDialog({ onSave }: { onSave: (d: Deposit) => void }) {
             </div>
             <div className="grid gap-1.5">
               <Label>{t("Aina", "Type")}</Label>
-              <Select value={kind} onValueChange={setKind}>
+              <Select value={source} onValueChange={(v) => setSource(v as typeof source)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Customer deposit">
+                  <SelectItem value="customer">
                     {t("Amana ya mteja", "Customer deposit")}
                   </SelectItem>
-                  <SelectItem value="Route cash-up">
-                    {t("Cash ya njia", "Route cash-up")}
-                  </SelectItem>
-                  <SelectItem value="Cash banking">{t("Cash benki", "Cash banking")}</SelectItem>
-                  <SelectItem value="Other">{t("Nyingine", "Other")}</SelectItem>
+                  <SelectItem value="route">{t("Cash ya njia", "Route cash-up")}</SelectItem>
+                  <SelectItem value="pos">{t("Cash benki", "Cash banking")}</SelectItem>
+                  <SelectItem value="other">{t("Nyingine", "Other")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -592,22 +631,8 @@ function RecordReceiptDialog({ onSave }: { onSave: (d: Deposit) => void }) {
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
-          <Button
-            onClick={() => {
-              onSave({
-                id: `d-${Date.now()}`,
-                time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                ref,
-                src,
-                kind,
-                amount,
-                method,
-              });
-              toast.success(t("Imerekodiwa", "Recorded"));
-              setOpen(false);
-            }}
-          >
-            {t("Hifadhi", "Save")}
+          <Button onClick={save} disabled={record.isPending}>
+            {record.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -615,12 +640,38 @@ function RecordReceiptDialog({ onSave }: { onSave: (d: Deposit) => void }) {
   );
 }
 
-function InitiatePayoutsDialog() {
+function InitiatePayoutsDialog({
+  totalPayable,
+  cycleLabel,
+}: {
+  totalPayable: number;
+  cycleLabel: string;
+}) {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
-  const [batch, setBatch] = useState("01–15 Jun 2026");
-  const [method, setMethod] = useState("mpesa");
-  const total = FARMERS.reduce((a, f) => a + f.currentBalanceTZS, 0);
+  const [method, setMethod] = useState<"cash" | "mpesa" | "bank">("mpesa");
+  const initiate = useInitiatePayouts();
+
+  const save = () => {
+    initiate.mutate(method, {
+      onSuccess: () => {
+        toast.success(
+          t(
+            `Malipo ya ${tzs(totalPayable)} yameanzishwa`,
+            `Payouts of ${tzs(totalPayable)} initiated`,
+          ),
+        );
+        setOpen(false);
+      },
+      onError: (e) =>
+        toast.error(
+          e.message.includes("no-open-cycle")
+            ? t("Hakuna mzunguko wazi", "No open payout cycle")
+            : t("Imeshindikana kuanzisha malipo", "Could not initiate payouts"),
+        ),
+    });
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -641,15 +692,15 @@ function InitiatePayoutsDialog() {
             <span className="text-sm text-muted-foreground">
               {t("Jumla ya malipo", "Total payable")}
             </span>
-            <span className="font-num font-bold">{tzs(total)}</span>
+            <span className="font-num font-bold">{tzs(totalPayable)}</span>
           </div>
           <div className="grid gap-1.5">
             <Label>{t("Mzunguko", "Cycle")}</Label>
-            <Input value={batch} onChange={(e) => setBatch(e.target.value)} />
+            <Input value={cycleLabel} readOnly />
           </div>
           <div className="grid gap-1.5">
             <Label>{t("Njia", "Method")}</Label>
-            <Select value={method} onValueChange={setMethod}>
+            <Select value={method} onValueChange={(v) => setMethod(v as typeof method)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -672,16 +723,12 @@ function InitiatePayoutsDialog() {
             {t("Ghairi", "Cancel")}
           </Button>
           <Button
-            onClick={() => {
-              toast.success(
-                t(`Malipo ya ${tzs(total)} yameanzishwa`, `Payouts of ${tzs(total)} initiated`),
-              );
-              setOpen(false);
-            }}
+            onClick={save}
+            disabled={initiate.isPending}
             className="text-white"
             style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
           >
-            {t("Anzisha", "Initiate")}
+            {initiate.isPending ? t("Inaanzisha…", "Initiating…") : t("Anzisha", "Initiate")}
           </Button>
         </DialogFooter>
       </DialogContent>
