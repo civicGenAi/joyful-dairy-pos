@@ -16,7 +16,10 @@ export function RequireCap({
   cap: Capability | Capability[];
   children: ReactNode;
 }) {
-  const { user, can } = useApp();
+  const { user, authReady, can } = useApp();
+  // Session restore is async: render nothing until it settles so a refresh
+  // doesn't bounce a signed-in user to the login page.
+  if (!authReady) return null;
   if (!user) return <Navigate to="/" />;
   const needed = Array.isArray(cap) ? cap : [cap];
   if (!needed.some((c) => can(c))) return <Navigate to="/403" />;
