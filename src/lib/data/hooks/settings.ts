@@ -35,6 +35,21 @@ export function useSetUserActive() {
   });
 }
 
+export function useSetUserPassword() {
+  return useMutation({
+    mutationFn: ({ id, password }: { id: string; password: string }) =>
+      usersRepo.setPassword(id, password),
+  });
+}
+
+export function useDeleteUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { id: string; name: string }) => usersRepo.remove(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.all }),
+  });
+}
+
 export function useCompany() {
   return useQuery({ queryKey: settingsKeys.company(), queryFn: companyRepo.get });
 }

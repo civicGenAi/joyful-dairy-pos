@@ -58,7 +58,8 @@ import type { Farmer } from "@/mock/types";
 const VILLAGES = ["Olasiti", "Sakina", "Kisongo", "Ngaramtoni", "Tengeru", "Usa River"];
 
 export function FarmersScreen() {
-  const { t } = useApp();
+  const { t, can } = useApp();
+  const canWrite = can("farmers:write");
   const { data: farmers = [], isPending, isError, refetch } = useFarmers();
   const { data: cycle } = useCycleSummary();
   const deleteFarmer = useDeleteFarmer();
@@ -159,8 +160,8 @@ export function FarmersScreen() {
               </SelectContent>
             </Select>
             <ExportMenu formats={["excel", "csv", "pdf"]} filename="farmers" />
-            <AddFarmerDialog />
-            <RecordCollectionDialog farmers={farmers} />
+            {canWrite && <AddFarmerDialog />}
+            {can("collection:write") && <RecordCollectionDialog farmers={farmers} />}
           </div>
         }
       >
@@ -234,18 +235,24 @@ export function FarmersScreen() {
                       <RowActions
                         itemName={f.name}
                         onView={() => setViewingId(f.id)}
-                        onEdit={() => setEditingId(f.id)}
-                        onDelete={() => {
-                          deleteFarmer.mutate(
-                            { id: f.id, name: f.name },
-                            {
-                              onSuccess: () =>
-                                toast.success(t("Mfugaji amefutwa", "Farmer deleted")),
-                              onError: () =>
-                                toast.error(t("Imeshindikana kufuta", "Could not delete farmer")),
-                            },
-                          );
-                        }}
+                        onEdit={canWrite ? () => setEditingId(f.id) : undefined}
+                        onDelete={
+                          !canWrite
+                            ? undefined
+                            : () => {
+                                deleteFarmer.mutate(
+                                  { id: f.id, name: f.name },
+                                  {
+                                    onSuccess: () =>
+                                      toast.success(t("Mfugaji amefutwa", "Farmer deleted")),
+                                    onError: () =>
+                                      toast.error(
+                                        t("Imeshindikana kufuta", "Could not delete farmer"),
+                                      ),
+                                  },
+                                );
+                              }
+                        }
                       />
                     </td>
                   </tr>
@@ -455,7 +462,8 @@ function FarmerDetailDrawer({
   open: boolean;
   onClose: () => void;
 }) {
-  const { t, lang } = useApp();
+  const { t, lang, can } = useApp();
+  const canPay = can("payout:write");
   const monthStart = `${todayISO().slice(0, 8)}01`;
   const { data: monthCollections = [] } = useQuery({
     queryKey: collectionKeys.byFarmer(f.id, monthStart),
@@ -587,7 +595,7 @@ function FarmerDetailDrawer({
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2">
-          <RecordFarmerPaymentDialog farmer={f} />
+          {canPay && <RecordFarmerPaymentDialog farmer={f} />}
           <Button asChild variant="outline" className="rounded-xl">
             <Link to="/statement/farmer/$id" params={{ id: f.id }}>
               <FileText className="h-3.5 w-3.5 mr-1.5" />

@@ -79,6 +79,7 @@ export function FinanceScreen() {
   const confirmDay = useConfirmDay();
   const canConfirm = useApp().can("dayclose:confirm");
   const canDeposit = useApp().can("deposit:write");
+  const canPayout = useApp().can("payout:write");
 
   const receivable = customers.reduce((a, c) => a + c.outstandingTZS, 0);
   const payable = farmers.reduce((a, f) => a + f.currentBalanceTZS, 0);
@@ -259,12 +260,14 @@ export function FinanceScreen() {
                   <span className="font-num font-semibold text-[#14532D]">{tzs(payable)}</span>
                 </div>
               </div>
-              <InitiatePayoutsDialog
-                totalPayable={payable}
-                cycleLabel={
-                  cycle ? `${dateLabel(cycle.startDate)} – ${dateLabel(cycle.endDate)}` : ""
-                }
-              />
+              {canPayout && (
+                <InitiatePayoutsDialog
+                  totalPayable={payable}
+                  cycleLabel={
+                    cycle ? `${dateLabel(cycle.startDate)} – ${dateLabel(cycle.endDate)}` : ""
+                  }
+                />
+              )}
             </div>
             <table className="w-full text-sm">
               <thead>

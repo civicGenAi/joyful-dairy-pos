@@ -12,7 +12,8 @@
     "format": "prettier --write .",
     "db:push": "bun scripts/db-push.ts",
     "db:seed": "bun scripts/seed.ts",
-    "db:setup": "bun scripts/db-push.ts && bun scripts/seed.ts"
+    "db:setup": "bun scripts/db-push.ts && bun scripts/seed.ts",
+    "db:clear": "bun scripts/clear-data.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

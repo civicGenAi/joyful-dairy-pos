@@ -60,7 +60,7 @@ function ageOfActivity(date: string, todayIso: string): "current" | "30d" | "60d
 }
 
 export function CustomersScreen() {
-  const { t } = useApp();
+  const { t, can } = useApp();
   const { data: customers = [], isPending, isError, refetch } = useCustomers();
   const [tab, setTab] = useState("all");
   const [q, setQ] = useState("");
@@ -143,7 +143,7 @@ export function CustomersScreen() {
                 placeholder={t("Tafuta…", "Search…")}
               />
             </div>
-            <AddCustomerDialog />
+            {can("customers:write") && <AddCustomerDialog />}
             <ExportMenu formats={["excel", "csv"]} filename="customers" />
           </div>
         }
@@ -234,7 +234,8 @@ export function CustomersScreen() {
 }
 
 function CustomerDrawer({ c }: { c: Customer }) {
-  const { t } = useApp();
+  const { t, can } = useApp();
+  const canDeposit = can("deposit:write");
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(MONTHS[0].id);
   // BACKEND: activities and deposits are fetched per customer when the drawer opens.
@@ -467,7 +468,7 @@ function CustomerDrawer({ c }: { c: Customer }) {
 
           <TabsContent value="deposits" className="mt-3">
             <div className="flex justify-end mb-3">
-              <RecordDepositDialog customerId={c.id} />
+              {canDeposit && <RecordDepositDialog customerId={c.id} />}
             </div>
             {deposits.length === 0 ? (
               <EmptyState

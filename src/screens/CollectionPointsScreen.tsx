@@ -34,7 +34,7 @@ import type { CollectionWithFarmer } from "@/lib/data/collections";
 import type { Location } from "@/mock/data";
 
 export function CollectionPointsScreen() {
-  const { t } = useApp();
+  const { t, can } = useApp();
   const today = todayISO();
   const { data: collections = [], isPending } = useCollections(today);
   const { data: transfers = [] } = useTransfers();
@@ -119,11 +119,13 @@ export function CollectionPointsScreen() {
               <div className="text-xs opacity-85">{t("Yamekusanywa leo", "Collected today")}</div>
             </div>
             <div className="p-4 flex gap-2">
-              <TransferDialog
-                fromLocationId={p.locationId}
-                fromName={p.name}
-                locations={locations}
-              />
+              {can("transfer:write") && (
+                <TransferDialog
+                  fromLocationId={p.locationId}
+                  fromName={p.name}
+                  locations={locations}
+                />
+              )}
               <Button variant="outline" className="rounded-xl" onClick={() => setViewing(p.id)}>
                 <Eye className="h-3.5 w-3.5 mr-1.5" />
                 {t("Tazama matokeo", "View intake log")}

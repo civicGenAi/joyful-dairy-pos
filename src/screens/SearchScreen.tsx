@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
-// BACKEND: data now flows through src/lib/data hooks; NAV_GROUPS_BY_ROLE is static UI config.
-import { NAV_GROUPS_BY_ROLE } from "@/mock/data";
+// BACKEND: data now flows through src/lib/data hooks; nav is capability-driven.
+import { navGroupsFor } from "@/lib/nav";
 import { useCustomers } from "@/lib/data/hooks/customers";
 import { useFarmers } from "@/lib/data/hooks/farmers";
 import { useProducts } from "@/lib/data/hooks/products";
@@ -14,7 +14,7 @@ import { Search as SearchIcon, User as UserIcon, Tractor, Package, MapPin } from
 import * as Icons from "lucide-react";
 
 export function SearchScreen() {
-  const { t, lang, role } = useApp();
+  const { t, lang, can } = useApp();
   const nav = useNavigate();
   const search = useSearch({ from: "/search" }) as { q?: string };
   const [q, setQ] = useState(search.q ?? "");
@@ -32,7 +32,7 @@ export function SearchScreen() {
   }, [q, nav]);
 
   const needle = q.trim().toLowerCase();
-  const groups = useMemo(() => NAV_GROUPS_BY_ROLE[role] ?? [], [role]);
+  const groups = useMemo(() => navGroupsFor(can), [can]);
 
   const results = useMemo(() => {
     if (!needle) return null;

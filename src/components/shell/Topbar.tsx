@@ -1,11 +1,8 @@
 import {
   Search,
   Bell,
-  ChevronDown,
   Languages,
   LogOut,
-  UserCog,
-  ArrowLeftRight,
   X,
   Menu,
   Settings,
@@ -38,8 +35,6 @@ import { useNavigate } from "@tanstack/react-router";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useMemo, useState } from "react";
 
-const ROLES: Role[] = ["admin", "finance", "production", "sales", "route", "store", "viewer"];
-
 export function Topbar({
   title,
   onOpenMobileNav,
@@ -47,10 +42,8 @@ export function Topbar({
   title: string;
   onOpenMobileNav?: () => void;
 }) {
-  const { user, role, setRole, resetRole, lang, setLang, logout, t, roles, can, theme, setTheme } =
-    useApp();
+  const { user, lang, setLang, logout, t, can, theme, setTheme } = useApp();
   const nav = useNavigate();
-  const isAdmin = roles.includes("admin");
   const [q, setQ] = useState("");
   // Search + alerts tolerate missing read capability: errors render as empty.
   const customers = useCustomers().data ?? [];
@@ -210,56 +203,6 @@ export function Topbar({
           </ul>
         </PopoverContent>
       </Popover>
-
-      {isAdmin && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="hidden md:inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-accent">
-              <UserCog className="h-3.5 w-3.5" />
-              {t("Tazama kama", "View as")}:{" "}
-              <Badge variant="secondary" className="font-semibold">
-                {lang === "sw" ? ROLE_LABEL[role].sw : ROLE_LABEL[role].en}
-              </Badge>
-              <ChevronDown className="h-3.5 w-3.5" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>
-              {t("Badilisha jukumu (demo)", "Switch role (demo)")}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {ROLES.map((r) => (
-              <DropdownMenuItem
-                key={r}
-                onClick={() => {
-                  setRole(r);
-                  if (r === "route") nav({ to: "/van" });
-                  else nav({ to: "/dashboard" });
-                }}
-              >
-                <span className="font-medium">
-                  {lang === "sw" ? ROLE_LABEL[r].sw : ROLE_LABEL[r].en}
-                </span>
-                {r === user.roles[0] && (
-                  <span className="ml-auto text-[10px] text-muted-foreground">
-                    {t("Yangu", "Mine")}
-                  </span>
-                )}
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => {
-                resetRole();
-                nav({ to: "/dashboard" });
-              }}
-            >
-              <ArrowLeftRight className="h-3.5 w-3.5 mr-2" />
-              {t("Rudi kwenye jukumu langu", "Reset to my role")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

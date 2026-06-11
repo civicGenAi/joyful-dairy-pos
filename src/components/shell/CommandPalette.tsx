@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { Command } from "cmdk";
 import { useNavigate } from "@tanstack/react-router";
 import { useApp } from "@/app/context";
-// BACKEND: live data via src/lib/data hooks; NAV_GROUPS_BY_ROLE is static UI config.
-import { NAV_GROUPS_BY_ROLE } from "@/mock/data";
+// BACKEND: live data via src/lib/data hooks; nav is capability-driven.
+import { navGroupsFor } from "@/lib/nav";
 import { useCustomers } from "@/lib/data/hooks/customers";
 import { useFarmers } from "@/lib/data/hooks/farmers";
 import { useProducts } from "@/lib/data/hooks/products";
@@ -29,8 +29,8 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const nav = useNavigate();
-  const { t, role, lang, setLang, setTheme, theme, logout, user } = useApp();
-  const groups = NAV_GROUPS_BY_ROLE[role] ?? [];
+  const { t, can, lang, setLang, setTheme, theme, logout, user } = useApp();
+  const groups = navGroupsFor(can);
   // Palette search tolerates missing read capability: errors render as empty.
   const customers = useCustomers().data ?? [];
   const farmers = useFarmers().data ?? [];
