@@ -48,7 +48,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import type { Product, StockItem } from "@/mock/types";
 
 export function ProductionScreen() {
-  const { t } = useApp();
+  const { t, can } = useApp();
+  const canWrite = can("production:write");
   const today = todayISO();
   const { data: batches = [], isPending, isError, refetch } = useBatches(today);
   const { data: spoilage = [] } = useSpoilages(today);
@@ -137,10 +138,12 @@ export function ProductionScreen() {
           title={t("Mpango wa kuzalisha leo", "To produce today")}
           className="lg:col-span-2"
           action={
-            <div className="flex gap-2">
-              <RecordSpoilageDialog stock={stock} />
-              <RecordBatchDialog products={products} />
-            </div>
+            canWrite && (
+              <div className="flex gap-2">
+                <RecordSpoilageDialog stock={stock} />
+                <RecordBatchDialog products={products} />
+              </div>
+            )
           }
         >
           <ul className="divide-y divide-border">

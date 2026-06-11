@@ -1,7 +1,8 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import * as Icons from "lucide-react";
 import { useApp } from "@/app/context";
-import { NAV_GROUPS_BY_ROLE } from "@/mock/data";
+// BACKEND: sidebar tabs are capability-driven; more privileges, more tabs.
+import { navGroupsFor } from "@/lib/nav";
 import { JoyLogo } from "@/components/brand/JoyLogo";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/utils";
@@ -16,9 +17,9 @@ interface Props {
 }
 
 export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobile }: Props) {
-  const { role, lang, t } = useApp();
+  const { can, lang, t } = useApp();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const groups = NAV_GROUPS_BY_ROLE[role] ?? [];
+  const groups = navGroupsFor(can);
 
   const width = collapsed ? "w-[72px]" : "w-[252px]";
 

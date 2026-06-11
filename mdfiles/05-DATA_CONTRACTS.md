@@ -43,9 +43,10 @@ Screen (src/screens/*)
 # one-time: put secrets in .env.local
 #   SUPABASE_DB_URL=postgresql://...          (Project Settings -> Database)
 #   SUPABASE_SERVICE_ROLE_KEY=...             (Project Settings -> API)
-bun run db:push    # applies supabase/migrations/*.sql (tracked in _migrations)
-bun run db:seed    # wipes data, creates the 9 demo auth users (joy1234), seeds demo world
-bun run db:setup   # both
+bun run db:push            # applies supabase/migrations/*.sql (tracked in _migrations)
+bun run db:seed            # wipes data, creates the 9 demo auth users (joy1234), seeds demo world
+bun run db:setup           # both
+bun run db:clear -- --yes  # go-live: wipe demo data, keep users/products/prices/locations
 ```
 
 Publishable values (`VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY`) live in `.env`
@@ -132,12 +133,23 @@ data-import site carries a `// BACKEND:` comment marking the seam.
 `src/hooks/use-simulated-load.ts` has been deleted; every screen's skeleton
 is driven by `useQuery().isPending`.
 
-## 7. Known gaps / follow-ups
+## 7. Access model (production)
 
-- **User provisioning**: Settings → Add user creates a `profiles` row only;
-  the Supabase auth account must be created by an admin (dashboard or a
-  future edge function with the service role key). The seed script links the
-  nine demo accounts.
+- **Sidebar is capability-driven** (`src/lib/nav.ts`): a user sees exactly
+  the tabs their capabilities allow; granting more roles in Settings makes
+  more tabs appear. The old admin "view as" switcher is removed.
+- **Write actions are double-gated**: buttons and dialogs only render when
+  the user holds the write capability (`can("...:write")`), and the same
+  check is enforced server-side by RLS / the RPCs.
+- **User lifecycle is fully in-app** (Settings → Users, `users:write` only):
+  `admin_create_user` (auth account + profile, signs in immediately),
+  `admin_set_password`, `admin_set_active` (suspension also bans the auth
+  account), `admin_set_roles` and `admin_delete_user`. Guards prevent
+  suspending/deleting yourself or removing the last active admin.
+- **Login page is clean**: no demo chips or password hints.
+
+## 8. Known gaps / follow-ups
+
 - **Receipt voiding** (`sales.voided`) exists in the schema but has no UI.
 - **Report scheduling** (WhatsApp/Email/SMS) is still a UI preview; needs an
   edge function + provider integration.

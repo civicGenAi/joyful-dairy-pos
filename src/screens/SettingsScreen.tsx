@@ -9,6 +9,8 @@ import {
   useCreateUser,
   useSetUserRoles,
   useSetUserActive,
+  useSetUserPassword,
+  useDeleteUser,
   useCompany,
   useUpdateCompany,
   useAuditLog,
@@ -64,6 +66,8 @@ import {
   Download,
   ShieldCheck,
   FileClock,
+  Eye,
+  KeyRound,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ExportMenu } from "@/components/ui/ExportMenu";
@@ -170,26 +174,54 @@ export function SettingsScreen() {
                           setUserActive.mutate(
                             { id: u.id, name: u.name, active: c },
                             {
-                              onError: () =>
-                                toast.error(t("Imeshindikana kubadilisha", "Could not update")),
+                              onSuccess: () =>
+                                toast.success(
+                                  c
+                                    ? t("Akaunti imewashwa", "Account reinstated")
+                                    : t("Akaunti imesimamishwa", "Account suspended"),
+                                ),
+                              onError: (e) =>
+                                toast.error(
+                                  e.message.includes("cannot-suspend-self")
+                                    ? t(
+                                        "Huwezi kujisimamisha mwenyewe",
+                                        "You cannot suspend your own account",
+                                      )
+                                    : e.message.includes("last-admin")
+                                      ? t(
+                                          "Huwezi kumsimamisha admin wa mwisho",
+                                          "Cannot suspend the last admin",
+                                        )
+                                      : t("Imeshindikana kubadilisha", "Could not update"),
+                                ),
                             },
                           )
                         }
                       />
                     </td>
                     <td className="py-2.5 text-right">
-                      <AssignRolesDialog
-                        user={u}
-                        onSave={(roles) =>
-                          setUserRoles.mutate(
-                            { id: u.id, name: u.name, roles },
-                            {
-                              onError: () =>
-                                toast.error(t("Imeshindikana kuhifadhi", "Could not save roles")),
-                            },
-                          )
-                        }
-                      />
+                      <div className="inline-flex items-center gap-1">
+                        <AssignRolesDialog
+                          user={u}
+                          onSave={(roles) =>
+                            setUserRoles.mutate(
+                              { id: u.id, name: u.name, roles },
+                              {
+                                onError: (e) =>
+                                  toast.error(
+                                    e.message.includes("last-admin")
+                                      ? t(
+                                          "Huwezi kumwondoa admin wa mwisho",
+                                          "Cannot remove the last admin",
+                                        )
+                                      : t("Imeshindikana kuhifadhi", "Could not save roles"),
+                                  ),
+                              },
+                            )
+                          }
+                        />
+                        <UserActions user={u} />
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -428,6 +460,7 @@ function AddUserDialog() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [roles, setRoles] = useState<Role[]>(["sales"]);
+  const [password, setPassword] = useState("");
   const create = useCreateUser();
 
   return (
@@ -470,6 +503,15 @@ function AddUserDialog() {
             />
           </div>
           <div className="grid gap-1.5">
+            <Label>{t("Nenosiri la kuanzia", "Initial password")}</Label>
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={t("Angalau herufi 6", "At least 6 characters")}
+            />
+          </div>
+          <div className="grid gap-1.5">
             <Label>{t("Majukumu (chagua moja au zaidi)", "Roles (pick one or more)")}</Label>
             <div className="grid grid-cols-2 gap-1.5">
               {ALL_ROLES.map((r) => (
@@ -498,24 +540,37 @@ function AddUserDialog() {
           <Button
             onClick={() => {
               if (!name.trim() || !email.trim()) return;
+              if (password.length < 6) {
+                toast.error(
+                  t("Nenosiri liwe angalau herufi 6", "Password must be at least 6 characters"),
+                );
+                return;
+              }
               create.mutate(
-                { name, email, phone, roles: roles.length ? roles : ["viewer"] },
+                { name, email, phone, roles: roles.length ? roles : ["viewer"], password },
                 {
                   onSuccess: () => {
-                    toast.success(t("Mtumiaji ameongezwa", "User added"));
-                    toast(
+                    toast.success(
                       t(
-                        "Akaunti ya kuingia itaundwa na msimamizi",
-                        "Sign-in account is provisioned by the admin",
+                        "Mtumiaji ameongezwa, anaweza kuingia sasa",
+                        "User added and can sign in now",
                       ),
                     );
                     setOpen(false);
                     setName("");
                     setEmail("");
                     setPhone("");
+                    setPassword("");
                     setRoles(["sales"]);
                   },
-                  onError: () => toast.error(t("Imeshindikana kuongeza", "Could not add user")),
+                  onError: (e) =>
+                    toast.error(
+                      e.message.includes("email-taken")
+                        ? t("Barua pepe tayari inatumika", "Email is already in use")
+                        : e.message.includes("weak-password")
+                          ? t("Nenosiri ni fupi mno", "Password is too short")
+                          : t("Imeshindikana kuongeza", "Could not add user"),
+                    ),
                 },
               );
             }}
@@ -1027,5 +1082,170 @@ function AlertThresholdsTab() {
         </Button>
       </div>
     </SectionCard>
+  );
+}
+
+function UserActions({ user }: { user: User }) {
+  const { t, lang } = useApp();
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [pwdOpen, setPwdOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const setUserPassword = useSetUserPassword();
+  const deleteUser = useDeleteUser();
+
+  const savePassword = () => {
+    if (password.length < 6) {
+      toast.error(t("Nenosiri liwe angalau herufi 6", "Password must be at least 6 characters"));
+      return;
+    }
+    setUserPassword.mutate(
+      { id: user.id, password },
+      {
+        onSuccess: () => {
+          toast.success(t("Nenosiri limebadilishwa", "Password changed"));
+          setPwdOpen(false);
+          setPassword("");
+        },
+        onError: (e) =>
+          toast.error(
+            e.message.includes("no-auth-account")
+              ? t("Akaunti ya kuingia haipo bado", "No sign-in account exists yet")
+              : t("Imeshindikana kubadilisha nenosiri", "Could not change the password"),
+          ),
+      },
+    );
+  };
+
+  return (
+    <>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-7 w-7"
+        title={t("Taarifa za mtumiaji", "User information")}
+        onClick={() => setInfoOpen(true)}
+      >
+        <Eye className="h-3.5 w-3.5" />
+      </Button>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-7 w-7"
+        title={t("Badilisha nenosiri", "Change password")}
+        onClick={() => setPwdOpen(true)}
+      >
+        <KeyRound className="h-3.5 w-3.5" />
+      </Button>
+      <ConfirmDialog
+        destructive
+        title={t("Futa mtumiaji?", "Delete user?")}
+        description={t(
+          `${user.name} hataweza kuingia tena na akaunti yake itafutwa kabisa.`,
+          `${user.name} will no longer be able to sign in and the account is removed permanently.`,
+        )}
+        confirmLabel={t("Futa", "Delete")}
+        onConfirm={() =>
+          deleteUser.mutate(
+            { id: user.id, name: user.name },
+            {
+              onSuccess: () => toast.success(t("Mtumiaji amefutwa", "User deleted")),
+              onError: (e) =>
+                toast.error(
+                  e.message.includes("cannot-delete-self")
+                    ? t("Huwezi kujifuta mwenyewe", "You cannot delete your own account")
+                    : e.message.includes("last-admin")
+                      ? t("Huwezi kumfuta admin wa mwisho", "Cannot delete the last admin")
+                      : t("Imeshindikana kufuta", "Could not delete the user"),
+                ),
+            },
+          )
+        }
+        trigger={
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-muted-foreground hover:text-[#E11B22]"
+            title={t("Futa mtumiaji", "Delete user")}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        }
+      />
+
+      <Dialog open={infoOpen} onOpenChange={setInfoOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <span
+                className="grid h-10 w-10 place-items-center rounded-full text-sm font-bold text-white"
+                style={{ background: user.avatarColor }}
+              >
+                {user.name
+                  .split(" ")
+                  .map((p) => p[0])
+                  .slice(0, 2)
+                  .join("")}
+              </span>
+              {user.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-2 text-sm">
+            <div className="flex justify-between rounded-xl bg-secondary/60 p-3">
+              <span className="text-muted-foreground">{t("Barua pepe", "Email")}</span>
+              <span className="font-medium">{user.email}</span>
+            </div>
+            <div className="flex justify-between rounded-xl bg-secondary/60 p-3">
+              <span className="text-muted-foreground">{t("Simu", "Phone")}</span>
+              <span className="font-medium">{user.phone || "·"}</span>
+            </div>
+            <div className="flex justify-between rounded-xl bg-secondary/60 p-3">
+              <span className="text-muted-foreground">{t("Hali", "Status")}</span>
+              <Pill tone={user.active ? "success" : "danger"}>
+                {user.active ? t("Hai", "Active") : t("Imesimamishwa", "Suspended")}
+              </Pill>
+            </div>
+            <div className="rounded-xl bg-secondary/60 p-3">
+              <div className="text-muted-foreground mb-1.5">{t("Majukumu", "Roles")}</div>
+              <div className="flex gap-1 flex-wrap">
+                {user.roles.map((r) => (
+                  <Pill key={r} tone="success">
+                    {lang === "sw" ? ROLE_LABEL[r].sw : ROLE_LABEL[r].en}
+                  </Pill>
+                ))}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={pwdOpen} onOpenChange={setPwdOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {t("Badilisha nenosiri la", "Change password for")} {user.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-1.5">
+            <Label>{t("Nenosiri jipya", "New password")}</Label>
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={t("Angalau herufi 6", "At least 6 characters")}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPwdOpen(false)}>
+              {t("Ghairi", "Cancel")}
+            </Button>
+            <Button onClick={savePassword} disabled={setUserPassword.isPending}>
+              {setUserPassword.isPending
+                ? t("Inabadilisha…", "Changing…")
+                : t("Badilisha", "Change")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -4,9 +4,9 @@ import type { Role, User } from "@/mock/types";
 import { profileToUser, type ProfileRow } from "@/lib/data/auth";
 
 // BACKEND: settings repository: users (profiles) + company settings.
-// Note: creating a profile here does NOT provision a Supabase auth account;
-// the new user can sign in once an admin creates the auth user (seed script
-// or Supabase dashboard). The profile row links by email at that point.
+// User lifecycle goes through the admin_* RPCs (security definer, gated on
+// users:write) so a created user can sign in immediately, passwords can be
+// changed, and suspension also bans the auth account.
 
 export interface CompanySettings {
   name: string;
@@ -33,51 +33,53 @@ export const usersRepo = {
     return rows.map(profileToUser);
   },
 
+  /** Creates the auth account + profile in one transaction; signs in right away. */
   async create(input: {
     name: string;
     email: string;
     phone: string;
     roles: Role[];
+    password: string;
   }): Promise<User> {
-    const row = unwrap(
-      await supabase
-        .from("profiles")
-        .insert({
-          name: input.name,
-          email: input.email,
-          phone: input.phone,
-          roles: input.roles,
-        })
-        .select("*")
-        .single(),
-    ) as ProfileRow;
-    await recordAudit(
-      "create",
-      "settings",
-      `Ameongeza mtumiaji mpya (${input.name})`,
-      `Added a new user (${input.name})`,
-    );
-    return profileToUser(row);
+    const { data, error } = await supabase.rpc("admin_create_user", {
+      p_email: input.email,
+      p_password: input.password,
+      p_name: input.name,
+      p_phone: input.phone,
+      p_roles: input.roles,
+    });
+    if (error) throw new Error(error.message);
+    return profileToUser(data as ProfileRow);
   },
 
-  async setRoles(id: string, name: string, roles: Role[]): Promise<void> {
-    unwrap(await supabase.from("profiles").update({ roles }).eq("id", id).select("id"));
-    await recordAudit(
-      "role-change",
-      "settings",
-      `Amebadilisha majukumu ya ${name} (${roles.join(", ")})`,
-      `Changed roles for ${name} (${roles.join(", ")})`,
-    );
+  async setRoles(id: string, _name: string, roles: Role[]): Promise<void> {
+    const { error } = await supabase.rpc("admin_set_roles", {
+      p_profile_id: id,
+      p_roles: roles,
+    });
+    if (error) throw new Error(error.message);
   },
 
-  async setActive(id: string, name: string, active: boolean): Promise<void> {
-    unwrap(await supabase.from("profiles").update({ active }).eq("id", id).select("id"));
-    await recordAudit(
-      "edit",
-      "settings",
-      active ? `Amewasha akaunti ya ${name}` : `Amezima akaunti ya ${name}`,
-      active ? `Enabled ${name}'s account` : `Disabled ${name}'s account`,
-    );
+  /** Suspend or reinstate: also bans/unbans the auth account server-side. */
+  async setActive(id: string, _name: string, active: boolean): Promise<void> {
+    const { error } = await supabase.rpc("admin_set_active", {
+      p_profile_id: id,
+      p_active: active,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  async setPassword(id: string, password: string): Promise<void> {
+    const { error } = await supabase.rpc("admin_set_password", {
+      p_profile_id: id,
+      p_password: password,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  async remove(id: string): Promise<void> {
+    const { error } = await supabase.rpc("admin_delete_user", { p_profile_id: id });
+    if (error) throw new Error(error.message);
   },
 };
 

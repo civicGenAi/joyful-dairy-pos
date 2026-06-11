@@ -51,7 +51,9 @@ const CATEGORIES: ProductCategory[] = [
 const TIERS: PriceTier[] = ["own", "bottle", "bulk"];
 
 export function ProductsScreen() {
-  const { t } = useApp();
+  const { t, can } = useApp();
+  const canWrite = can("products:write");
+  const canPrice = can("prices:write");
   const { data: products = [], isPending, isError, refetch } = useProducts();
   const { data: prices = {} } = usePriceMatrix();
   const setActive = useSetProductActive();
@@ -185,7 +187,7 @@ export function ProductsScreen() {
                   {t("Onyesha zisizo hai", "Show inactive")}
                 </label>
                 <ExportMenu formats={["excel", "csv"]} filename="products" />
-                <AddProductDialog />
+                {canWrite && <AddProductDialog />}
               </div>
             }
           >
@@ -224,6 +226,7 @@ export function ProductsScreen() {
                       <td className="py-2.5">
                         <Switch
                           checked={p.active}
+                          disabled={!canWrite}
                           onCheckedChange={(checked) =>
                             setActive.mutate(
                               { id: p.id, name: p.name, active: checked },
@@ -251,7 +254,7 @@ export function ProductsScreen() {
                 size="sm"
                 className="text-white"
                 style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
-                disabled={setPriceMut.isPending}
+                disabled={!canPrice || setPriceMut.isPending}
                 onClick={savePrices}
               >
                 <Save className="h-3.5 w-3.5 mr-1.5" />
@@ -284,6 +287,7 @@ export function ProductsScreen() {
                               onChange={(e) => setPrice(p.id, tier, Number(e.target.value))}
                               className="h-8 w-28 ml-auto text-right font-num"
                               type="number"
+                              readOnly={!canPrice}
                             />
                           </td>
                         ))}
