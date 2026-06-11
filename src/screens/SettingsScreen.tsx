@@ -1,17 +1,24 @@
 import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
-import {
-  USERS,
-  ROLE_LABEL,
-  COMPANY,
-  LOCATIONS,
-  AUDIT_LOG,
-  type Location,
-  type LocationKind,
-  type AuditAction,
-  type AuditModule,
-} from "@/mock/data";
+// BACKEND: data now flows through src/lib/data/{settings,locations,audit};
+// only static UI config (ROLE_LABEL) and types still come from @/mock/data.
+import { ROLE_LABEL, type LocationKind, type AuditAction, type AuditModule } from "@/mock/data";
 import type { Role, User } from "@/mock/types";
+import {
+  useUsers,
+  useCreateUser,
+  useSetUserRoles,
+  useSetUserActive,
+  useCompany,
+  useUpdateCompany,
+  useAuditLog,
+} from "@/lib/data/hooks/settings";
+import {
+  useLocations,
+  useCreateLocation,
+  useSetLocationActive,
+  useDeleteLocation,
+} from "@/lib/data/hooks/locations";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,8 +80,12 @@ const LOCATION_KIND_LABEL: Record<LocationKind, { sw: string; en: string }> = {
 
 export function SettingsScreen() {
   const { t, lang, can } = useApp();
-  const [users, setUsers] = useState<User[]>(USERS);
-  const [locations, setLocations] = useState<Location[]>(LOCATIONS);
+  const { data: users = [] } = useUsers();
+  const { data: locations = [] } = useLocations();
+  const setUserActive = useSetUserActive();
+  const setUserRoles = useSetUserRoles();
+  const setLocationActive = useSetLocationActive();
+  const deleteLocation = useDeleteLocation();
 
   return (
     <AppShell title={t("Mipangilio", "Settings / Admin")}>
@@ -110,10 +121,7 @@ export function SettingsScreen() {
             />
           </div>
 
-          <SectionCard
-            title={t("Watumiaji wa mfumo", "System users")}
-            action={<AddUserDialog onAdd={(u) => setUsers((xs) => [u, ...xs])} />}
-          >
+          <SectionCard title={t("Watumiaji wa mfumo", "System users")} action={<AddUserDialog />}>
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
@@ -159,7 +167,13 @@ export function SettingsScreen() {
                       <Switch
                         checked={u.active}
                         onCheckedChange={(c) =>
-                          setUsers((xs) => xs.map((x) => (x.id === u.id ? { ...x, active: c } : x)))
+                          setUserActive.mutate(
+                            { id: u.id, name: u.name, active: c },
+                            {
+                              onError: () =>
+                                toast.error(t("Imeshindikana kubadilisha", "Could not update")),
+                            },
+                          )
                         }
                       />
                     </td>
@@ -167,7 +181,13 @@ export function SettingsScreen() {
                       <AssignRolesDialog
                         user={u}
                         onSave={(roles) =>
-                          setUsers((xs) => xs.map((x) => (x.id === u.id ? { ...x, roles } : x)))
+                          setUserRoles.mutate(
+                            { id: u.id, name: u.name, roles },
+                            {
+                              onError: () =>
+                                toast.error(t("Imeshindikana kuhifadhi", "Could not save roles")),
+                            },
+                          )
                         }
                       />
                     </td>
@@ -208,10 +228,7 @@ export function SettingsScreen() {
             />
           </div>
 
-          <SectionCard
-            title={t("Maeneo yote", "All locations")}
-            action={<AddLocationDialog onAdd={(loc) => setLocations((xs) => [...xs, loc])} />}
-          >
+          <SectionCard title={t("Maeneo yote", "All locations")} action={<AddLocationDialog />}>
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
@@ -246,8 +263,12 @@ export function SettingsScreen() {
                       <Switch
                         checked={loc.active}
                         onCheckedChange={(c) =>
-                          setLocations((xs) =>
-                            xs.map((x) => (x.id === loc.id ? { ...x, active: c } : x)),
+                          setLocationActive.mutate(
+                            { id: loc.id, name: loc.name, active: c },
+                            {
+                              onError: () =>
+                                toast.error(t("Imeshindikana kubadilisha", "Could not update")),
+                            },
                           )
                         }
                       />
@@ -260,7 +281,17 @@ export function SettingsScreen() {
                           "Eneo halitaonekana kwenye fomu za uhamishaji, mauzo wala uzalishaji.",
                           "It will no longer appear in transfers, sales, or production forms.",
                         )}
-                        onConfirm={() => setLocations((xs) => xs.filter((x) => x.id !== loc.id))}
+                        onConfirm={() =>
+                          deleteLocation.mutate(
+                            { id: loc.id, name: loc.name },
+                            {
+                              onSuccess: () =>
+                                toast.success(t("Eneo limefutwa", "Location deleted")),
+                              onError: () =>
+                                toast.error(t("Imeshindikana kufuta", "Could not delete")),
+                            },
+                          )
+                        }
                         trigger={
                           <Button
                             size="icon"
@@ -286,120 +317,11 @@ export function SettingsScreen() {
         )}
 
         <TabsContent value="company" className="mt-4">
-          <SectionCard
-            title={t("Profaili ya kampuni", "Company profile")}
-            action={<Building2 className="h-4 w-4 text-muted-foreground" />}
-          >
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <div>
-                  <Label>{t("Jina la kampuni", "Company name")}</Label>
-                  <Input defaultValue={COMPANY.name} />
-                </div>
-                <div>
-                  <Label>{t("Eneo", "Location")}</Label>
-                  <Input defaultValue={COMPANY.city} />
-                </div>
-                <div>
-                  <Label>{t("Simu ya msaada", "Support phone")}</Label>
-                  <Input defaultValue={COMPANY.phone} />
-                </div>
-                <div>
-                  <Label>{t("Barua pepe", "Email")}</Label>
-                  <Input defaultValue={COMPANY.email} />
-                </div>
-                <div>
-                  <Label>{t("Lugha chaguo-msingi", "Default language")}</Label>
-                  <select
-                    className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    defaultValue="sw"
-                  >
-                    <option value="sw">Kiswahili</option>
-                    <option value="en">English</option>
-                  </select>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <Label>{t("Ujumbe wa risiti", "Receipt footer")}</Label>
-                  <Input defaultValue={COMPANY.footer} />
-                </div>
-                <div>
-                  <Label>{t("Sarafu", "Currency")}</Label>
-                  <Input defaultValue="TZS" />
-                </div>
-                <div>
-                  <Label>{t("Eneo la wakati", "Timezone")}</Label>
-                  <Input defaultValue="Africa/Dar_es_Salaam" />
-                </div>
-                <div>
-                  <Label>{t("TIN", "TIN")}</Label>
-                  <Input defaultValue={COMPANY.tin} />
-                </div>
-                <div>
-                  <Label>{t("VRN", "VRN")}</Label>
-                  <Input defaultValue={COMPANY.vrn} />
-                </div>
-                <Button
-                  className="mt-2 text-white"
-                  style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
-                  onClick={() => toast.success(t("Mipangilio imehifadhiwa", "Settings saved"))}
-                >
-                  {t("Hifadhi mipangilio", "Save settings")}
-                </Button>
-              </div>
-            </div>
-          </SectionCard>
+          <CompanyTab />
         </TabsContent>
 
         <TabsContent value="alerts" className="mt-4">
-          <SectionCard
-            title={t("Mipaka ya arifa", "Alert thresholds")}
-            action={<Bell className="h-4 w-4 text-muted-foreground" />}
-          >
-            <div className="space-y-3 max-w-2xl">
-              {[
-                {
-                  label: t("Litre za chini za fresh milk", "Fresh milk low threshold (L)"),
-                  v: 100,
-                },
-                { label: t("Litre za chini za mtindi", "Mtindi low threshold (L)"), v: 80 },
-                { label: t("Idadi ya chini ya butter", "Butter low threshold (pcs)"), v: 20 },
-                {
-                  label: t("Siku za madeni kabla ya arifa", "Days credit aged before warning"),
-                  v: 14,
-                },
-                { label: t("Asilimia ya juu ya spoilage", "Max spoilage % per day"), v: 3 },
-                {
-                  label: t("Siku kabla ya mzunguko wa malipo", "Days before payout cycle warning"),
-                  v: 3,
-                },
-                {
-                  label: t("Saa za kungoja kufunga siku", "Hours after midnight to nag day-close"),
-                  v: 6,
-                },
-                {
-                  label: t(
-                    "Vikopo robo, kiwango cha chini",
-                    "Vikopo robo (containers) low threshold",
-                  ),
-                  v: 200,
-                },
-              ].map((x) => (
-                <div key={x.label} className="flex items-center gap-3">
-                  <div className="flex-1 text-sm">{x.label}</div>
-                  <Input type="number" defaultValue={x.v} className="w-28 font-num text-right" />
-                </div>
-              ))}
-              <Button
-                className="text-white mt-3"
-                style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
-                onClick={() => toast.success(t("Mipaka imehifadhiwa", "Thresholds saved"))}
-              >
-                {t("Hifadhi", "Save")}
-              </Button>
-            </div>
-          </SectionCard>
+          <AlertThresholdsTab />
         </TabsContent>
 
         <TabsContent value="schedule" className="mt-4">
@@ -419,7 +341,7 @@ export function SettingsScreen() {
                 {t("kila siku", "daily")}, {t("kila wiki", "weekly")}, {t("kila mwezi", "monthly")}
               </div>
               <div className="flex items-center gap-2">
-                <Bell className="h-4 w-4 text-[#1E7C3F]" /> WhatsApp {COMPANY.phone},{" "}
+                <Bell className="h-4 w-4 text-[#1E7C3F]" /> WhatsApp +255 754 100 000,{" "}
                 {t("muhtasari wa kila siku", "daily summary")}
               </div>
               <div className="flex items-center gap-2">
@@ -499,13 +421,14 @@ function AssignRolesDialog({ user, onSave }: { user: User; onSave: (roles: Role[
   );
 }
 
-function AddUserDialog({ onAdd }: { onAdd: (u: User) => void }) {
+function AddUserDialog() {
   const { t, lang } = useApp();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [roles, setRoles] = useState<Role[]>(["sales"]);
+  const create = useCreateUser();
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -575,35 +498,32 @@ function AddUserDialog({ onAdd }: { onAdd: (u: User) => void }) {
           <Button
             onClick={() => {
               if (!name.trim() || !email.trim()) return;
-              onAdd({
-                id: `u-new-${Date.now()}`,
-                name,
-                email,
-                phone,
-                roles: roles.length ? roles : ["viewer"],
-                active: true,
-                avatarColor: [
-                  "#1E7C3F",
-                  "#2F9E44",
-                  "#6FBF59",
-                  "#8CC63F",
-                  "#1D9E75",
-                  "#14532D",
-                  "#E5A100",
-                  "#E11B22",
-                ][Math.floor(Math.random() * 8)],
-              });
-              toast.success(t("Mtumiaji ameongezwa", "User added"));
-              setOpen(false);
-              setName("");
-              setEmail("");
-              setPhone("");
-              setRoles(["sales"]);
+              create.mutate(
+                { name, email, phone, roles: roles.length ? roles : ["viewer"] },
+                {
+                  onSuccess: () => {
+                    toast.success(t("Mtumiaji ameongezwa", "User added"));
+                    toast(
+                      t(
+                        "Akaunti ya kuingia itaundwa na msimamizi",
+                        "Sign-in account is provisioned by the admin",
+                      ),
+                    );
+                    setOpen(false);
+                    setName("");
+                    setEmail("");
+                    setPhone("");
+                    setRoles(["sales"]);
+                  },
+                  onError: () => toast.error(t("Imeshindikana kuongeza", "Could not add user")),
+                },
+              );
             }}
+            disabled={create.isPending}
             className="text-white"
             style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
           >
-            {t("Sajili", "Register")}
+            {create.isPending ? t("Inasajili…", "Registering…") : t("Sajili", "Register")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -611,13 +531,14 @@ function AddUserDialog({ onAdd }: { onAdd: (u: User) => void }) {
   );
 }
 
-function AddLocationDialog({ onAdd }: { onAdd: (loc: Location) => void }) {
+function AddLocationDialog() {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [swName, setSwName] = useState("");
   const [kind, setKind] = useState<LocationKind>("collection-point");
   const [note, setNote] = useState("");
+  const create = useCreateLocation();
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -678,24 +599,25 @@ function AddLocationDialog({ onAdd }: { onAdd: (loc: Location) => void }) {
           <Button
             onClick={() => {
               if (!name.trim()) return;
-              onAdd({
-                id: `loc-new-${Date.now()}`,
-                name,
-                swName: swName || name,
-                kind,
-                note: note || undefined,
-                active: true,
-              });
-              toast.success(t("Eneo limeongezwa", "Location added"));
-              setOpen(false);
-              setName("");
-              setSwName("");
-              setNote("");
+              create.mutate(
+                { name, swName: swName || name, kind, note: note || undefined },
+                {
+                  onSuccess: () => {
+                    toast.success(t("Eneo limeongezwa", "Location added"));
+                    setOpen(false);
+                    setName("");
+                    setSwName("");
+                    setNote("");
+                  },
+                  onError: () => toast.error(t("Imeshindikana kuongeza", "Could not add location")),
+                },
+              );
             }}
+            disabled={create.isPending}
             className="text-white"
             style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
           >
-            {t("Hifadhi", "Save")}
+            {create.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -729,6 +651,7 @@ const ACTION_META: Record<
 
 function AuditTrail() {
   const { t, lang } = useApp();
+  const { data: auditLog = [] } = useAuditLog();
   const [q, setQ] = useState("");
   const [action, setAction] = useState<AuditAction | "all">("all");
   const [moduleFilter, setModuleFilter] = useState<AuditModule | "all">("all");
@@ -749,7 +672,7 @@ function AuditTrail() {
 
   const filtered = useMemo(
     () =>
-      AUDIT_LOG.filter((e) => {
+      auditLog.filter((e) => {
         if (action !== "all" && e.action !== action) return false;
         if (moduleFilter !== "all" && e.module !== moduleFilter) return false;
         if (q) {
@@ -759,7 +682,7 @@ function AuditTrail() {
         }
         return true;
       }),
-    [q, action, moduleFilter],
+    [auditLog, q, action, moduleFilter],
   );
 
   const fmtTime = (iso: string) =>
@@ -775,22 +698,22 @@ function AuditTrail() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <StatCard
           label={t("Vitendo leo", "Actions today")}
-          value={AUDIT_LOG.length}
+          value={auditLog.length}
           accent="green"
         />
         <StatCard
           label={t("Kuingia", "Logins")}
-          value={AUDIT_LOG.filter((e) => e.action === "login").length}
+          value={auditLog.filter((e) => e.action === "login").length}
           accent="info"
         />
         <StatCard
           label={t("Mabadiliko", "Edits & deletes")}
-          value={AUDIT_LOG.filter((e) => e.action === "edit" || e.action === "delete").length}
+          value={auditLog.filter((e) => e.action === "edit" || e.action === "delete").length}
           accent="amber"
         />
         <StatCard
           label={t("Watumiaji hai", "Distinct actors")}
-          value={new Set(AUDIT_LOG.map((e) => e.actor)).size}
+          value={new Set(auditLog.map((e) => e.actor)).size}
           accent="green"
         />
       </div>
@@ -904,5 +827,205 @@ function AuditTrail() {
         </div>
       </SectionCard>
     </>
+  );
+}
+
+function CompanyTab() {
+  const { t } = useApp();
+  const { data: company } = useCompany();
+  const update = useUpdateCompany();
+  const [form, setForm] = useState<Record<string, string>>({});
+  const val = (k: "name" | "city" | "phone" | "email" | "footer" | "tin" | "vrn") =>
+    form[k] ?? company?.[k] ?? "";
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const save = () => {
+    update.mutate(
+      {
+        name: val("name"),
+        city: val("city"),
+        phone: val("phone"),
+        email: val("email"),
+        footer: val("footer"),
+        tin: val("tin"),
+        vrn: val("vrn"),
+      },
+      {
+        onSuccess: () => toast.success(t("Mipangilio imehifadhiwa", "Settings saved")),
+        onError: () => toast.error(t("Imeshindikana kuhifadhi", "Could not save settings")),
+      },
+    );
+  };
+
+  return (
+    <SectionCard
+      title={t("Profaili ya kampuni", "Company profile")}
+      action={<Building2 className="h-4 w-4 text-muted-foreground" />}
+    >
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="space-y-3">
+          <div>
+            <Label>{t("Jina la kampuni", "Company name")}</Label>
+            <Input value={val("name")} onChange={set("name")} />
+          </div>
+          <div>
+            <Label>{t("Eneo", "Location")}</Label>
+            <Input value={val("city")} onChange={set("city")} />
+          </div>
+          <div>
+            <Label>{t("Simu ya msaada", "Support phone")}</Label>
+            <Input value={val("phone")} onChange={set("phone")} />
+          </div>
+          <div>
+            <Label>{t("Barua pepe", "Email")}</Label>
+            <Input value={val("email")} onChange={set("email")} />
+          </div>
+          <div>
+            <Label>{t("Lugha chaguo-msingi", "Default language")}</Label>
+            <select
+              className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              defaultValue="sw"
+            >
+              <option value="sw">Kiswahili</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <Label>{t("Ujumbe wa risiti", "Receipt footer")}</Label>
+            <Input value={val("footer")} onChange={set("footer")} />
+          </div>
+          <div>
+            <Label>{t("Sarafu", "Currency")}</Label>
+            <Input defaultValue="TZS" readOnly />
+          </div>
+          <div>
+            <Label>{t("Eneo la wakati", "Timezone")}</Label>
+            <Input defaultValue="Africa/Dar_es_Salaam" readOnly />
+          </div>
+          <div>
+            <Label>{t("TIN", "TIN")}</Label>
+            <Input value={val("tin")} onChange={set("tin")} />
+          </div>
+          <div>
+            <Label>{t("VRN", "VRN")}</Label>
+            <Input value={val("vrn")} onChange={set("vrn")} />
+          </div>
+          <Button
+            className="mt-2 text-white"
+            style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+            disabled={update.isPending}
+            onClick={save}
+          >
+            {update.isPending
+              ? t("Inahifadhi…", "Saving…")
+              : t("Hifadhi mipangilio", "Save settings")}
+          </Button>
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
+const THRESHOLD_FIELDS: { key: string; sw: string; en: string; fallback: number }[] = [
+  {
+    key: "freshLowL",
+    sw: "Litre za chini za fresh milk",
+    en: "Fresh milk low threshold (L)",
+    fallback: 100,
+  },
+  {
+    key: "mtindiLowL",
+    sw: "Litre za chini za mtindi",
+    en: "Mtindi low threshold (L)",
+    fallback: 80,
+  },
+  {
+    key: "butterLowPcs",
+    sw: "Idadi ya chini ya butter",
+    en: "Butter low threshold (pcs)",
+    fallback: 20,
+  },
+  {
+    key: "overdueDays",
+    sw: "Siku za madeni kabla ya arifa",
+    en: "Days credit aged before warning",
+    fallback: 14,
+  },
+  {
+    key: "spoilagePctWarn",
+    sw: "Asilimia ya juu ya spoilage",
+    en: "Max spoilage % per day",
+    fallback: 3,
+  },
+  {
+    key: "payableWarningDays",
+    sw: "Siku kabla ya mzunguko wa malipo",
+    en: "Days before payout cycle warning",
+    fallback: 3,
+  },
+  {
+    key: "dayCloseNagHours",
+    sw: "Saa za kungoja kufunga siku",
+    en: "Hours after midnight to nag day-close",
+    fallback: 6,
+  },
+  {
+    key: "vikopoRoboLow",
+    sw: "Vikopo robo, kiwango cha chini",
+    en: "Vikopo robo (containers) low threshold",
+    fallback: 200,
+  },
+];
+
+function AlertThresholdsTab() {
+  const { t } = useApp();
+  const { data: company } = useCompany();
+  const update = useUpdateCompany();
+  const [form, setForm] = useState<Record<string, number>>({});
+  const val = (key: string, fallback: number) =>
+    form[key] ?? Number(company?.alertThresholds?.[key] ?? fallback);
+
+  const save = () => {
+    const thresholds: Record<string, number> = {};
+    for (const f of THRESHOLD_FIELDS) thresholds[f.key] = val(f.key, f.fallback);
+    update.mutate(
+      { alertThresholds: thresholds },
+      {
+        onSuccess: () => toast.success(t("Mipaka imehifadhiwa", "Thresholds saved")),
+        onError: () => toast.error(t("Imeshindikana kuhifadhi", "Could not save thresholds")),
+      },
+    );
+  };
+
+  return (
+    <SectionCard
+      title={t("Mipaka ya arifa", "Alert thresholds")}
+      action={<Bell className="h-4 w-4 text-muted-foreground" />}
+    >
+      <div className="space-y-3 max-w-2xl">
+        {THRESHOLD_FIELDS.map((x) => (
+          <div key={x.key} className="flex items-center gap-3">
+            <div className="flex-1 text-sm">{t(x.sw, x.en)}</div>
+            <Input
+              type="number"
+              value={val(x.key, x.fallback)}
+              onChange={(e) => setForm((f) => ({ ...f, [x.key]: Number(e.target.value) }))}
+              className="w-28 font-num text-right"
+            />
+          </div>
+        ))}
+        <Button
+          className="text-white mt-3"
+          style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+          disabled={update.isPending}
+          onClick={save}
+        >
+          {update.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
+        </Button>
+      </div>
+    </SectionCard>
   );
 }

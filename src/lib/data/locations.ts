@@ -59,6 +59,16 @@ export const locationsRepo = {
     return toLocation(row);
   },
 
+  async setActive(id: string, name: string, active: boolean): Promise<void> {
+    unwrap(await supabase.from("locations").update({ active }).eq("id", id).select("id"));
+    await recordAudit(
+      "edit",
+      "settings",
+      active ? `Amewasha eneo (${name})` : `Amezima eneo (${name})`,
+      active ? `Activated location (${name})` : `Deactivated location (${name})`,
+    );
+  },
+
   async remove(id: string, name: string): Promise<void> {
     unwrap(await supabase.from("locations").delete().eq("id", id).select("id"));
     await recordAudit("delete", "settings", `Amefuta eneo (${name})`, `Deleted location (${name})`);
