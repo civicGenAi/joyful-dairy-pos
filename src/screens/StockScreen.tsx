@@ -1,7 +1,17 @@
 import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
-import { STOCK, TODAY } from "@/mock/data";
+// BACKEND: data now flows through src/lib/data/stock (was @/mock/data).
+import {
+  useStock,
+  useStockMovements,
+  useItemMovements,
+  useStockMove,
+  useRecordSpoilage,
+  useSetReorder,
+} from "@/lib/data/hooks/stock";
+import { todayISO } from "@/lib/data/dates";
 import type { StockItem } from "@/mock/types";
+import type { StockMovement } from "@/lib/data/stock";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -31,95 +41,6 @@ import { toast } from "sonner";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
-import { useSimulatedLoad } from "@/hooks/use-simulated-load";
-
-interface Movement {
-  id: string;
-  time: string;
-  itemId: string;
-  itemName: string;
-  kind: "Receive" | "Issue" | "Sale" | "Adjust" | "Spoilage";
-  delta: number;
-  unit: string;
-  by: string;
-  reason?: string;
-}
-
-const MOVEMENT_SEED: Movement[] = [
-  {
-    id: "m1",
-    time: "08:12",
-    itemId: "s-fresh",
-    itemName: "Fresh milk",
-    kind: "Receive",
-    delta: 220,
-    unit: "L",
-    by: "Joyce",
-  },
-  {
-    id: "m2",
-    time: "09:30",
-    itemId: "s-mozz",
-    itemName: "Mozzarella",
-    kind: "Issue",
-    delta: -3,
-    unit: "kg",
-    by: "Neema",
-    reason: "POS sale",
-  },
-  {
-    id: "m3",
-    time: "10:05",
-    itemId: "c-vik-r",
-    itemName: "Vikopo robo",
-    kind: "Issue",
-    delta: -60,
-    unit: "pcs",
-    by: "Mama Esther",
-    reason: "Production",
-  },
-  {
-    id: "m4",
-    time: "10:42",
-    itemId: "s-butter",
-    itemName: "Butter 250g",
-    kind: "Sale",
-    delta: -12,
-    unit: "pcs",
-    by: "POS",
-  },
-  {
-    id: "m5",
-    time: "12:18",
-    itemId: "s-hall",
-    itemName: "Halloumi",
-    kind: "Receive",
-    delta: 6.35,
-    unit: "kg",
-    by: "Production",
-  },
-  {
-    id: "m6",
-    time: "13:50",
-    itemId: "c-mad5",
-    itemName: "Madumu 5L",
-    kind: "Issue",
-    delta: -4,
-    unit: "pcs",
-    by: "Route",
-  },
-  {
-    id: "m7",
-    time: "14:20",
-    itemId: "s-cream",
-    itemName: "Cream",
-    kind: "Spoilage",
-    delta: -2,
-    unit: "L",
-    by: "Production",
-    reason: "Quality fail",
-  },
-];
 
 function statusOf(s: { onHand: number; reorder: number }) {
   if (s.onHand <= 0) return "danger" as const;
@@ -127,13 +48,34 @@ function statusOf(s: { onHand: number; reorder: number }) {
   return "success" as const;
 }
 
+const KIND_LABEL: Record<string, { sw: string; en: string }> = {
+  received: { sw: "Pokea", en: "Receive" },
+  issued: { sw: "Toa", en: "Issue" },
+  adjusted: { sw: "Rekebisha", en: "Adjust" },
+  spoilt: { sw: "Uharibifu", en: "Spoilage" },
+  produced: { sw: "Uzalishaji", en: "Produced" },
+  collected: { sw: "Ukusanyaji", en: "Collected" },
+  separated: { sw: "Kutenganisha", en: "Separated" },
+  returned: { sw: "Marejesho", en: "Return" },
+  "sold-cash": { sw: "Mauzo", en: "Sale" },
+  "sold-credit": { sw: "Mauzo (mkopo)", en: "Sale (credit)" },
+  "transfer-in": { sw: "Hamisho ndani", en: "Transfer in" },
+  "transfer-out": { sw: "Hamisho nje", en: "Transfer out" },
+};
+
+function movementTone(m: StockMovement) {
+  if (m.kind === "spoilt") return "danger" as const;
+  if (m.qty > 0) return "success" as const;
+  return "warning" as const;
+}
+
 export function StockScreen() {
   const { t, can } = useApp();
-  const loading = useSimulatedLoad(350);
   const writable = can("stock:write");
-  const [items, setItems] = useState<StockItem[]>(STOCK);
+  const { data: items = [], isPending, isError, refetch } = useStock();
+  const { data: movements = [] } = useStockMovements();
+  const setReorderMut = useSetReorder();
   const [tab, setTab] = useState<"finished" | "consumable" | "raw" | "movements">("finished");
-  const [movements, setMovements] = useState<Movement[]>(MOVEMENT_SEED);
   const [viewingId, setViewingId] = useState<string | null>(null);
 
   const lowCount = items.filter((s) => s.onHand < s.reorder && s.onHand > 0).length;
@@ -144,63 +86,11 @@ export function StockScreen() {
     return items.filter((s) => s.category === tab);
   }, [tab, items]);
 
-  const addMovement = (m: Omit<Movement, "id" | "time">) => {
-    const mv: Movement = {
-      ...m,
-      id: `m-${Date.now()}`,
-      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    };
-    setMovements((xs) => [mv, ...xs]);
-    setItems((xs) =>
-      xs.map((x) =>
-        x.id === m.itemId
-          ? {
-              ...x,
-              onHand: Math.max(0, x.onHand + m.delta),
-              lastMovement: t("Sasa hivi", "Just now"),
-            }
-          : x,
-      ),
-    );
-  };
+  const itemName = (id: string | null) => items.find((x) => x.id === id)?.name ?? id ?? "";
 
-  const setReorder = (id: string, val: number) =>
-    setItems((xs) => xs.map((x) => (x.id === id ? { ...x, reorder: val } : x)));
+  const rawItems = items.filter((s) => s.category === "raw");
 
-  // Raw category may be empty in the seed; show a couple of mock raw rows so the tab is alive.
-  const rawItems: StockItem[] = items.filter((s) => s.category === "raw").length
-    ? items.filter((s) => s.category === "raw")
-    : [
-        {
-          id: "raw-milk",
-          name: "Raw milk",
-          category: "raw",
-          unit: "L",
-          onHand: 284,
-          reorder: 100,
-          lastMovement: t("Mwagiko leo asubuhi", "Field intake this morning"),
-        },
-        {
-          id: "raw-cream",
-          name: "Cream",
-          category: "raw",
-          unit: "L",
-          onHand: 18,
-          reorder: 10,
-          lastMovement: t("Imetenganishwa leo", "Separated today"),
-        },
-        {
-          id: "raw-curd",
-          name: "Curd for cheese",
-          category: "raw",
-          unit: "kg",
-          onHand: 32,
-          reorder: 15,
-          lastMovement: t("Imepika asubuhi", "Made this morning"),
-        },
-      ];
-
-  if (loading) {
+  if (isPending) {
     return (
       <AppShell title={t("Ghala na Stock", "Stock & store")}>
         <KPISkeleton />
@@ -209,6 +99,23 @@ export function StockScreen() {
             <TableSkeleton rows={8} cols={6} />
           </SectionSkeleton>
         </div>
+      </AppShell>
+    );
+  }
+
+  if (isError) {
+    return (
+      <AppShell title={t("Ghala na Stock", "Stock & store")}>
+        <EmptyState
+          icon={Boxes}
+          title={t("Imeshindikana kupakia stock", "Could not load stock")}
+          description={t("Tafadhali jaribu tena.", "Please try again.")}
+          action={
+            <Button onClick={() => refetch()} variant="outline">
+              {t("Jaribu tena", "Retry")}
+            </Button>
+          }
+        />
       </AppShell>
     );
   }
@@ -278,17 +185,9 @@ export function StockScreen() {
               action={
                 <div className="flex gap-2">
                   <ExportMenu formats={["csv", "excel"]} filename={`stock-${thisTab}`} />
+                  {writable && <AdjustDialog items={items.filter((s) => s.category === thisTab)} />}
                   {writable && (
-                    <AdjustDialog
-                      items={items.filter((s) => s.category === thisTab)}
-                      onAdjust={addMovement}
-                    />
-                  )}
-                  {writable && (
-                    <ReceiveDialog
-                      items={items.filter((s) => s.category === thisTab)}
-                      onReceive={addMovement}
-                    />
+                    <ReceiveDialog items={items.filter((s) => s.category === thisTab)} />
                   )}
                 </div>
               }
@@ -337,8 +236,25 @@ export function StockScreen() {
                             {writable ? (
                               <Input
                                 type="number"
-                                value={s.reorder}
-                                onChange={(e) => setReorder(s.id, Number(e.target.value))}
+                                defaultValue={s.reorder}
+                                onBlur={(e) => {
+                                  const val = Number(e.target.value);
+                                  if (val !== s.reorder) {
+                                    setReorderMut.mutate(
+                                      { id: s.id, name: s.name, reorder: val },
+                                      {
+                                        onSuccess: () =>
+                                          toast.success(
+                                            t("Kiwango kimebadilishwa", "Threshold updated"),
+                                          ),
+                                        onError: () =>
+                                          toast.error(
+                                            t("Imeshindikana kubadilisha", "Could not update"),
+                                          ),
+                                      },
+                                    );
+                                  }
+                                }}
                                 className="h-7 w-20 ml-auto text-right font-num text-xs"
                               />
                             ) : (
@@ -377,57 +293,61 @@ export function StockScreen() {
         <TabsContent value="raw" className="mt-4">
           <SectionCard
             title={t("Maziwa ghafi na malighafi", "Raw milk and intermediates")}
-            action={writable && <SendToProductionDialog onAct={addMovement} />}
+            action={writable && <SendToProductionDialog rawItems={rawItems} />}
           >
-            <table className="w-full text-sm table-zebra">
-              <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                  <th className="py-2 px-3">{t("Bidhaa", "Item")}</th>
-                  <th className="text-right px-3">{t("Inayopatikana", "On hand")}</th>
-                  <th className="text-right px-3">{t("Kiwango cha chini", "Reorder")}</th>
-                  <th className="px-3">{t("Hali", "Status")}</th>
-                  <th className="px-3">{t("Harakati", "Last move")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rawItems.map((s) => {
-                  const tone = statusOf(s);
-                  return (
-                    <tr key={s.id} className="border-b border-border last:border-0">
-                      <td className="py-2.5 px-3 font-medium">{s.name}</td>
-                      <td className="py-2.5 px-3 text-right font-num font-semibold">
-                        {num(s.onHand)} {s.unit}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-num text-muted-foreground">
-                        {num(s.reorder)} {s.unit}
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <Pill tone={tone}>
-                          {tone === "danger"
-                            ? t("Imeisha", "Out")
-                            : tone === "warning"
-                              ? t("Chini", "Low")
-                              : "OK"}
-                        </Pill>
-                      </td>
-                      <td className="py-2.5 px-3 text-xs text-muted-foreground">
-                        {s.lastMovement}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            {rawItems.length === 0 ? (
+              <EmptyState icon={Boxes} title={t("Hakuna malighafi bado", "No raw stock yet")} />
+            ) : (
+              <table className="w-full text-sm table-zebra">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                    <th className="py-2 px-3">{t("Bidhaa", "Item")}</th>
+                    <th className="text-right px-3">{t("Inayopatikana", "On hand")}</th>
+                    <th className="text-right px-3">{t("Kiwango cha chini", "Reorder")}</th>
+                    <th className="px-3">{t("Hali", "Status")}</th>
+                    <th className="px-3">{t("Harakati", "Last move")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rawItems.map((s) => {
+                    const tone = statusOf(s);
+                    return (
+                      <tr key={s.id} className="border-b border-border last:border-0">
+                        <td className="py-2.5 px-3 font-medium">{s.name}</td>
+                        <td className="py-2.5 px-3 text-right font-num font-semibold">
+                          {num(s.onHand)} {s.unit}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-num text-muted-foreground">
+                          {num(s.reorder)} {s.unit}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <Pill tone={tone}>
+                            {tone === "danger"
+                              ? t("Imeisha", "Out")
+                              : tone === "warning"
+                                ? t("Chini", "Low")
+                                : "OK"}
+                          </Pill>
+                        </td>
+                        <td className="py-2.5 px-3 text-xs text-muted-foreground">
+                          {s.lastMovement}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </SectionCard>
         </TabsContent>
 
         <TabsContent value="movements" className="mt-4">
           <SectionCard
             title={t("Daftari la harakati za stock", "Stock movements log")}
-            action={<ExportMenu formats={["csv"]} filename={`stock-movements-${TODAY}`} />}
+            action={<ExportMenu formats={["csv"]} filename={`stock-movements-${todayISO()}`} />}
           >
             {movements.length === 0 ? (
-              <EmptyState title={t("Hakuna harakati leo", "No movements today")} />
+              <EmptyState title={t("Hakuna harakati bado", "No movements yet")} />
             ) : (
               <table className="w-full text-sm">
                 <thead>
@@ -444,28 +364,24 @@ export function StockScreen() {
                   {movements.map((m) => (
                     <tr key={m.id} className="border-b border-border last:border-0">
                       <td className="py-2.5 px-3 font-num text-xs text-muted-foreground">
-                        {m.time}
+                        {new Date(m.at).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}{" "}
+                        · {m.date}
                       </td>
-                      <td className="py-2.5 font-medium">{m.itemName}</td>
+                      <td className="py-2.5 font-medium">{itemName(m.stockItemId)}</td>
                       <td className="py-2.5">
-                        <Pill
-                          tone={
-                            m.kind === "Receive"
-                              ? "success"
-                              : m.kind === "Spoilage"
-                                ? "danger"
-                                : "warning"
-                          }
-                        >
-                          {m.kind}
+                        <Pill tone={movementTone(m)}>
+                          {t(KIND_LABEL[m.kind]?.sw ?? m.kind, KIND_LABEL[m.kind]?.en ?? m.kind)}
                         </Pill>
                       </td>
                       <td className="py-2.5 text-right font-num font-semibold">
-                        {m.delta > 0 ? "+" : ""}
-                        {num(m.delta)} {m.unit}
+                        {m.qty > 0 ? "+" : ""}
+                        {num(m.qty)} {m.unit}
                       </td>
-                      <td className="py-2.5 text-xs text-muted-foreground">{m.reason ?? "—"}</td>
-                      <td className="py-2.5 text-xs text-muted-foreground">{m.by}</td>
+                      <td className="py-2.5 text-xs text-muted-foreground">{m.reason ?? "·"}</td>
+                      <td className="py-2.5 text-xs text-muted-foreground">{m.byName ?? "·"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -478,9 +394,7 @@ export function StockScreen() {
       {viewingId && (
         <StockItemDrawer
           item={items.find((x) => x.id === viewingId)!}
-          movements={movements.filter((m) => m.itemId === viewingId)}
           onClose={() => setViewingId(null)}
-          onAdjust={addMovement}
           writable={writable}
         />
       )}
@@ -488,13 +402,7 @@ export function StockScreen() {
   );
 }
 
-function ReceiveDialog({
-  items,
-  onReceive,
-}: {
-  items: StockItem[];
-  onReceive: (m: Omit<Movement, "id" | "time">) => void;
-}) {
+function ReceiveDialog({ items }: { items: StockItem[] }) {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
   const [itemId, setItemId] = useState(items[0]?.id);
@@ -502,6 +410,27 @@ function ReceiveDialog({
   const [supplier, setSupplier] = useState("");
   const [cost, setCost] = useState(25000);
   const [batch, setBatch] = useState(`B-${Date.now().toString().slice(-4)}`);
+  const move = useStockMove();
+
+  const save = () => {
+    if (!itemId || qty <= 0) return;
+    move.mutate(
+      {
+        stockItemId: itemId,
+        kind: "received",
+        qty,
+        reason: supplier ? `${supplier} · ${batch} · TZS ${cost}` : batch,
+        ref: batch,
+      },
+      {
+        onSuccess: () => {
+          toast.success(t("Imepokelewa", "Received"));
+          setOpen(false);
+        },
+        onError: () => toast.error(t("Imeshindikana kupokea", "Could not record receipt")),
+      },
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -564,23 +493,8 @@ function ReceiveDialog({
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
-          <Button
-            onClick={() => {
-              const it = items.find((s) => s.id === itemId)!;
-              onReceive({
-                itemId: itemId!,
-                itemName: it.name,
-                kind: "Receive",
-                delta: qty,
-                unit: it.unit,
-                by: "Store",
-                reason: supplier ? `${supplier} · ${batch}` : batch,
-              });
-              toast.success(t("Imepokelewa", "Received"));
-              setOpen(false);
-            }}
-          >
-            {t("Hifadhi", "Save")}
+          <Button onClick={save} disabled={move.isPending}>
+            {move.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -588,18 +502,42 @@ function ReceiveDialog({
   );
 }
 
-function AdjustDialog({
-  items,
-  onAdjust,
-}: {
-  items: StockItem[];
-  onAdjust: (m: Omit<Movement, "id" | "time">) => void;
-}) {
+function AdjustDialog({ items }: { items: StockItem[] }) {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
   const [itemId, setItemId] = useState(items[0]?.id);
   const [delta, setDelta] = useState(-1);
   const [reason, setReason] = useState("");
+  const move = useStockMove();
+  const spoil = useRecordSpoilage();
+
+  const isSpoilage =
+    delta < 0 &&
+    (reason.toLowerCase().includes("haribika") || reason.toLowerCase().includes("spoil"));
+  const pending = move.isPending || spoil.isPending;
+
+  const save = () => {
+    if (!itemId || delta === 0) return;
+    const done = {
+      onSuccess: () => {
+        toast.success(t("Imefanyiwa marekebisho", "Adjustment recorded"));
+        setOpen(false);
+        setReason("");
+      },
+      onError: () => toast.error(t("Imeshindikana kurekodi", "Could not record adjustment")),
+    };
+    if (isSpoilage) {
+      spoil.mutate(
+        { stockItemId: itemId, qty: Math.abs(delta), reason: reason || undefined },
+        done,
+      );
+    } else {
+      move.mutate(
+        { stockItemId: itemId, kind: "adjusted", qty: delta, reason: reason || undefined },
+        done,
+      );
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -655,24 +593,8 @@ function AdjustDialog({
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
-          <Button
-            onClick={() => {
-              const it = items.find((s) => s.id === itemId)!;
-              onAdjust({
-                itemId: itemId!,
-                itemName: it.name,
-                kind:
-                  delta < 0 && reason.toLowerCase().includes("haribika") ? "Spoilage" : "Adjust",
-                delta,
-                unit: it.unit,
-                by: "Store",
-                reason: reason || undefined,
-              });
-              toast.success(t("Imefanyiwa marekebisho", "Adjustment recorded"));
-              setOpen(false);
-            }}
-          >
-            {t("Hifadhi", "Save")}
+          <Button onClick={save} disabled={pending}>
+            {pending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -680,10 +602,32 @@ function AdjustDialog({
   );
 }
 
-function SendToProductionDialog({ onAct }: { onAct: (m: Omit<Movement, "id" | "time">) => void }) {
+function SendToProductionDialog({ rawItems }: { rawItems: StockItem[] }) {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
   const [litres, setLitres] = useState(60);
+  const move = useStockMove();
+  const rawMilkId = rawItems.find((s) => s.id === "raw-milk")?.id ?? rawItems[0]?.id;
+
+  const save = () => {
+    if (!rawMilkId || litres <= 0) return;
+    move.mutate(
+      {
+        stockItemId: rawMilkId,
+        kind: "issued",
+        qty: litres,
+        reason: t("Kwenda uzalishaji", "To production line"),
+      },
+      {
+        onSuccess: () => {
+          toast.success(t("Imepelekwa", "Sent"));
+          setOpen(false);
+        },
+        onError: () => toast.error(t("Imeshindikana kutuma", "Could not send")),
+      },
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -716,22 +660,8 @@ function SendToProductionDialog({ onAct }: { onAct: (m: Omit<Movement, "id" | "t
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
-          <Button
-            onClick={() => {
-              onAct({
-                itemId: "raw-milk",
-                itemName: "Raw milk",
-                kind: "Issue",
-                delta: -litres,
-                unit: "L",
-                by: "Production",
-                reason: "To production line",
-              });
-              toast.success(t("Imepelekwa", "Sent"));
-              setOpen(false);
-            }}
-          >
-            {t("Tuma", "Send")}
+          <Button onClick={save} disabled={move.isPending}>
+            {move.isPending ? t("Inatuma…", "Sending…") : t("Tuma", "Send")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -741,19 +671,27 @@ function SendToProductionDialog({ onAct }: { onAct: (m: Omit<Movement, "id" | "t
 
 function StockItemDrawer({
   item,
-  movements,
   onClose,
-  onAdjust,
   writable,
 }: {
   item: StockItem;
-  movements: Movement[];
   onClose: () => void;
-  onAdjust: (m: Omit<Movement, "id" | "time">) => void;
   writable: boolean;
 }) {
   const { t } = useApp();
   const tone = statusOf(item);
+  const { data: movements = [] } = useItemMovements(item.id);
+  const move = useStockMove();
+
+  const quick = (kind: "received" | "issued", qty: number, okMsg: string) =>
+    move.mutate(
+      { stockItemId: item.id, kind, qty },
+      {
+        onSuccess: () => toast.success(okMsg),
+        onError: () => toast.error(t("Imeshindikana", "Could not record")),
+      },
+    );
+
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
@@ -810,25 +748,26 @@ function StockItemDrawer({
             {t("Harakati za hivi karibuni", "Recent movements")}
           </div>
           {movements.length === 0 ? (
-            <EmptyState title={t("Hakuna harakati leo", "No movements today")} />
+            <EmptyState title={t("Hakuna harakati bado", "No movements yet")} />
           ) : (
             <ul className="divide-y divide-border text-sm">
               {movements.map((m) => (
                 <li key={m.id} className="flex items-center justify-between py-2">
                   <div>
                     <div className="font-medium">
-                      {m.kind} <span className="text-xs text-muted-foreground">· {m.by}</span>
+                      {t(KIND_LABEL[m.kind]?.sw ?? m.kind, KIND_LABEL[m.kind]?.en ?? m.kind)}{" "}
+                      <span className="text-xs text-muted-foreground">· {m.byName ?? "·"}</span>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {m.time}
+                      {m.date}
                       {m.reason ? ` · ${m.reason}` : ""}
                     </div>
                   </div>
                   <div
-                    className={`font-num font-semibold ${m.delta < 0 ? "text-[#E11B22]" : "text-[#1E7C3F]"}`}
+                    className={`font-num font-semibold ${m.qty < 0 ? "text-[#E11B22]" : "text-[#1E7C3F]"}`}
                   >
-                    {m.delta > 0 ? "+" : ""}
-                    {num(m.delta)} {m.unit}
+                    {m.qty > 0 ? "+" : ""}
+                    {num(m.qty)} {m.unit}
                   </div>
                 </li>
               ))}
@@ -840,34 +779,16 @@ function StockItemDrawer({
             <Button
               className="flex-1 text-white"
               style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
-              onClick={() => {
-                onAdjust({
-                  itemId: item.id,
-                  itemName: item.name,
-                  kind: "Receive",
-                  delta: 1,
-                  unit: item.unit,
-                  by: "Store",
-                });
-                toast.success(t("Imepokelewa", "Received"));
-              }}
+              disabled={move.isPending}
+              onClick={() => quick("received", 1, t("Imepokelewa", "Received"))}
             >
               <Plus className="h-3.5 w-3.5 mr-1.5" />
               {t("Pokea +1", "Receive +1")}
             </Button>
             <Button
               variant="outline"
-              onClick={() => {
-                onAdjust({
-                  itemId: item.id,
-                  itemName: item.name,
-                  kind: "Issue",
-                  delta: -1,
-                  unit: item.unit,
-                  by: "Store",
-                });
-                toast.success(t("Imetolewa", "Issued"));
-              }}
+              disabled={move.isPending}
+              onClick={() => quick("issued", 1, t("Imetolewa", "Issued"))}
             >
               <Truck className="h-3.5 w-3.5 mr-1.5" />
               {t("Toa -1", "Issue -1")}

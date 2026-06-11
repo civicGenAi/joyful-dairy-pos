@@ -1,6 +1,15 @@
 import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
-import { CUSTOMERS, PRODUCTS, TODAY } from "@/mock/data";
+// BACKEND: data now flows through src/lib/data/customers + products (was @/mock/data).
+import {
+  useCustomers,
+  useCustomerActivities,
+  useCustomerDeposits,
+  useCreateCustomer,
+  useRecordCustomerDeposit,
+} from "@/lib/data/hooks/customers";
+import { useProducts } from "@/lib/data/hooks/products";
+import { todayISO } from "@/lib/data/dates";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { tzs, num } from "@/lib/format";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,7 +39,6 @@ import type { Customer, CustomerType } from "@/mock/types";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
-import { useSimulatedLoad } from "@/hooks/use-simulated-load";
 import { Link } from "@tanstack/react-router";
 
 const MONTHS = [
@@ -53,8 +61,7 @@ function ageOfActivity(date: string, todayIso: string): "current" | "30d" | "60d
 
 export function CustomersScreen() {
   const { t } = useApp();
-  const loading = useSimulatedLoad(350);
-  const [customers, setCustomers] = useState<Customer[]>(CUSTOMERS);
+  const { data: customers = [], isPending, isError, refetch } = useCustomers();
   const [tab, setTab] = useState("all");
   const [q, setQ] = useState("");
 
@@ -72,10 +79,7 @@ export function CustomersScreen() {
   const outstanding = customers.reduce((a, c) => a + c.outstandingTZS, 0);
   const overdue = customers.filter((c) => c.status === "overdue").length;
 
-  const updateCustomer = (id: string, fn: (c: Customer) => Customer) =>
-    setCustomers((xs) => xs.map((c) => (c.id === id ? fn(c) : c)));
-
-  if (loading) {
+  if (isPending) {
     return (
       <AppShell title={t("Wateja na Madeni", "Customers & receivables")}>
         <KPISkeleton />
@@ -84,6 +88,23 @@ export function CustomersScreen() {
             <TableSkeleton rows={8} cols={6} />
           </SectionSkeleton>
         </div>
+      </AppShell>
+    );
+  }
+
+  if (isError) {
+    return (
+      <AppShell title={t("Wateja na Madeni", "Customers & receivables")}>
+        <EmptyState
+          icon={Users}
+          title={t("Imeshindikana kupakia wateja", "Could not load customers")}
+          description={t("Tafadhali jaribu tena.", "Please try again.")}
+          action={
+            <Button onClick={() => refetch()} variant="outline">
+              {t("Jaribu tena", "Retry")}
+            </Button>
+          }
+        />
       </AppShell>
     );
   }
@@ -122,7 +143,7 @@ export function CustomersScreen() {
                 placeholder={t("Tafuta…", "Search…")}
               />
             </div>
-            <AddCustomerDialog onAdd={(c) => setCustomers((xs) => [c, ...xs])} />
+            <AddCustomerDialog />
             <ExportMenu formats={["excel", "csv"]} filename="customers" />
           </div>
         }
@@ -197,7 +218,7 @@ export function CustomersScreen() {
                           </Pill>
                         </td>
                         <td className="py-2.5 px-3 text-right">
-                          <CustomerDrawer c={c} onUpdate={(fn) => updateCustomer(c.id, fn)} />
+                          <CustomerDrawer c={c} />
                         </td>
                       </tr>
                     ))}
@@ -212,22 +233,20 @@ export function CustomersScreen() {
   );
 }
 
-function CustomerDrawer({
-  c,
-  onUpdate,
-}: {
-  c: Customer;
-  onUpdate: (fn: (c: Customer) => Customer) => void;
-}) {
+function CustomerDrawer({ c }: { c: Customer }) {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(MONTHS[0].id);
-  const totalTakings = (c.monthlyActivity ?? []).reduce((a, x) => a + x.amountTZS, 0);
-  const totalDeposits = (c.deposits ?? []).reduce((a, x) => a + x.amountTZS, 0);
+  // BACKEND: activities and deposits are fetched per customer when the drawer opens.
+  const { data: activities = [] } = useCustomerActivities(open ? c.id : null);
+  const { data: deposits = [] } = useCustomerDeposits(open ? c.id : null);
+  const { data: products = [] } = useProducts();
+  const totalTakings = activities.reduce((a, x) => a + x.amountTZS, 0);
+  const totalDeposits = deposits.reduce((a, x) => a + x.amountTZS, 0);
   const opening = 0;
   const closing = opening + totalTakings - totalDeposits;
 
-  // Real ageing computed from activity dates relative to TODAY.
+  // Real ageing computed from activity dates relative to the real today.
   const buckets = useMemo(() => {
     const result: Record<"current" | "30d" | "60d" | "90+", number> = {
       current: 0,
@@ -235,8 +254,9 @@ function CustomerDrawer({
       "60d": 0,
       "90+": 0,
     };
-    for (const a of c.monthlyActivity ?? []) {
-      if (!a.paid) result[ageOfActivity(a.date, TODAY)] += a.amountTZS;
+    const today = todayISO();
+    for (const a of activities) {
+      if (!a.paid) result[ageOfActivity(a.date, today)] += a.amountTZS;
     }
     const sum = Object.values(result).reduce((a, b) => a + b, 0) || 1;
     return {
@@ -245,7 +265,7 @@ function CustomerDrawer({
       "60d": Math.round((result["60d"] / sum) * 100),
       "90+": Math.round((result["90+"] / sum) * 100),
     };
-  }, [c]);
+  }, [activities]);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -312,7 +332,7 @@ function CustomerDrawer({
           </TabsList>
 
           <TabsContent value="activity" className="mt-3">
-            {(c.monthlyActivity ?? []).length === 0 ? (
+            {activities.length === 0 ? (
               <EmptyState
                 title={t("Hakuna shughuli", "No activity yet")}
                 description={t("Manunuzi yatatokea hapa.", "Purchases will show up here.")}
@@ -329,8 +349,8 @@ function CustomerDrawer({
                   </tr>
                 </thead>
                 <tbody>
-                  {(c.monthlyActivity ?? []).map((a) => {
-                    const p = PRODUCTS.find((x) => x.id === a.productId);
+                  {activities.map((a) => {
+                    const p = products.find((x) => x.id === a.productId);
                     return (
                       <tr key={a.id} className="border-b border-border last:border-0">
                         <td className="py-2 text-xs">{a.date}</td>
@@ -447,18 +467,9 @@ function CustomerDrawer({
 
           <TabsContent value="deposits" className="mt-3">
             <div className="flex justify-end mb-3">
-              <RecordDepositDialog
-                onSave={(d) => {
-                  onUpdate((cust) => ({
-                    ...cust,
-                    deposits: [...(cust.deposits ?? []), d],
-                    outstandingTZS: Math.max(0, cust.outstandingTZS - d.amountTZS),
-                  }));
-                  toast.success(t("Amana imerekodiwa", "Deposit recorded"));
-                }}
-              />
+              <RecordDepositDialog customerId={c.id} />
             </div>
-            {(c.deposits ?? []).length === 0 ? (
+            {deposits.length === 0 ? (
               <EmptyState
                 title={t("Hakuna amana bado", "No deposits yet")}
                 description={t("Bonyeza Rekodi amana kuanza.", "Click Record deposit to begin.")}
@@ -473,7 +484,7 @@ function CustomerDrawer({
                   </tr>
                 </thead>
                 <tbody>
-                  {(c.deposits ?? []).map((d) => (
+                  {deposits.map((d) => (
                     <tr key={d.id} className="border-b border-border last:border-0">
                       <td className="py-2.5 text-xs">{d.date}</td>
                       <td className="py-2.5 font-num text-xs">{d.ref}</td>
@@ -492,16 +503,33 @@ function CustomerDrawer({
   );
 }
 
-function RecordDepositDialog({
-  onSave,
-}: {
-  onSave: (d: { id: string; date: string; amountTZS: number; ref: string }) => void;
-}) {
+function RecordDepositDialog({ customerId }: { customerId: string }) {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
-  const [date, setDate] = useState(TODAY);
   const [amount, setAmount] = useState(150000);
+  const [method, setMethod] = useState<"cash" | "mpesa" | "bank">("cash");
   const [ref, setRef] = useState(`RCT-${1000 + Math.floor(Math.random() * 9000)}`);
+  const record = useRecordCustomerDeposit();
+
+  const save = () => {
+    if (amount <= 0) return;
+    record.mutate(
+      { customerId, amountTZS: amount, method, ref },
+      {
+        onSuccess: () => {
+          toast.success(t("Amana imerekodiwa", "Deposit recorded"));
+          setOpen(false);
+        },
+        onError: (e) =>
+          toast.error(
+            e.message.includes("day-locked")
+              ? t("Siku hii imefungwa", "This day is locked")
+              : t("Imeshindikana kurekodi amana", "Could not record deposit"),
+          ),
+      },
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -520,8 +548,17 @@ function RecordDepositDialog({
         </DialogHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
-            <Label>{t("Tarehe", "Date")}</Label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <Label>{t("Njia", "Method")}</Label>
+            <Select value={method} onValueChange={(v) => setMethod(v as typeof method)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cash">Cash</SelectItem>
+                <SelectItem value="mpesa">M-Pesa</SelectItem>
+                <SelectItem value="bank">Bank transfer</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid gap-1.5">
             <Label>{t("Kiasi (TZS)", "Amount (TZS)")}</Label>
@@ -540,13 +577,8 @@ function RecordDepositDialog({
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
-          <Button
-            onClick={() => {
-              onSave({ id: `d-${Date.now()}`, date, amountTZS: amount, ref });
-              setOpen(false);
-            }}
-          >
-            {t("Hifadhi", "Save")}
+          <Button onClick={save} disabled={record.isPending}>
+            {record.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -554,12 +586,30 @@ function RecordDepositDialog({
   );
 }
 
-function AddCustomerDialog({ onAdd }: { onAdd: (c: Customer) => void }) {
+function AddCustomerDialog() {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [type, setType] = useState<CustomerType>("cash");
+  const create = useCreateCustomer();
+
+  const save = () => {
+    if (!name.trim()) return;
+    create.mutate(
+      { name, phone, type },
+      {
+        onSuccess: () => {
+          toast.success(t("Mteja amesajiliwa", "Customer registered"));
+          setOpen(false);
+          setName("");
+          setPhone("");
+        },
+        onError: () => toast.error(t("Imeshindikana kusajili", "Could not register customer")),
+      },
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -611,28 +661,12 @@ function AddCustomerDialog({ onAdd }: { onAdd: (c: Customer) => void }) {
             {t("Ghairi", "Cancel")}
           </Button>
           <Button
-            onClick={() => {
-              if (!name.trim()) return;
-              onAdd({
-                id: `c-new-${Date.now()}`,
-                name,
-                phone,
-                type,
-                outstandingTZS: 0,
-                lastActivity: TODAY,
-                status: "ok",
-                monthlyActivity: [],
-                deposits: [],
-              });
-              toast.success(t("Mteja amesajiliwa", "Customer registered"));
-              setOpen(false);
-              setName("");
-              setPhone("");
-            }}
+            onClick={save}
+            disabled={create.isPending}
             className="text-white"
             style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
           >
-            {t("Sajili", "Register")}
+            {create.isPending ? t("Inasajili…", "Registering…") : t("Sajili", "Register")}
           </Button>
         </DialogFooter>
       </DialogContent>

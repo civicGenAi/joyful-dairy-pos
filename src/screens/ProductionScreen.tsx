@@ -20,8 +20,17 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { PRODUCTS, YIELD_WEEK, TODAY } from "@/mock/data";
-import { num, L, kg, tzs } from "@/lib/format";
+// BACKEND: data now flows through src/lib/data/production + stock + products.
+import {
+  useBatches,
+  useSpoilages,
+  useYieldTrend,
+  useRecordBatch,
+} from "@/lib/data/hooks/production";
+import { useProducts } from "@/lib/data/hooks/products";
+import { useStock, useRecordSpoilage } from "@/lib/data/hooks/stock";
+import { todayISO } from "@/lib/data/dates";
+import { num, L } from "@/lib/format";
 import {
   LineChart,
   Line,
@@ -33,107 +42,75 @@ import {
 } from "recharts";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Factory, Plus, Droplets, Flame, FlaskConical, TriangleAlert, History } from "lucide-react";
-
-interface Batch {
-  id: string;
-  time: string;
-  productId: string;
-  productName: string;
-  inputL: number;
-  output: number;
-  unit: string;
-  yieldPct: number;
-  wastage: number;
-}
-
-const SEED_BATCHES: Batch[] = [
-  {
-    id: "b1",
-    time: "07:50",
-    productId: "p-mtindi",
-    productName: "Mtindi",
-    inputL: 250,
-    output: 220,
-    unit: "L",
-    yieldPct: 88,
-    wastage: 6,
-  },
-  {
-    id: "b2",
-    time: "10:15",
-    productId: "p-mozz",
-    productName: "Mozzarella",
-    inputL: 244,
-    output: 20,
-    unit: "kg",
-    yieldPct: 8.2,
-    wastage: 4,
-  },
-  {
-    id: "b3",
-    time: "12:40",
-    productId: "p-hall",
-    productName: "Halloumi",
-    inputL: 75,
-    output: 6.35,
-    unit: "kg",
-    yieldPct: 8.5,
-    wastage: 2,
-  },
-  {
-    id: "b4",
-    time: "13:30",
-    productId: "p-ghee",
-    productName: "Ghee",
-    inputL: 18,
-    output: 6,
-    unit: "L",
-    yieldPct: 33,
-    wastage: 0,
-  },
-  {
-    id: "b5",
-    time: "15:00",
-    productId: "p-yog-straw",
-    productName: "Yoghurt Strawberry",
-    inputL: 30,
-    output: 60,
-    unit: "pcs",
-    yieldPct: 100,
-    wastage: 1,
-  },
-];
+import { Factory, Plus, Droplets, TriangleAlert, History } from "lucide-react";
+import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
+import { EmptyState } from "@/components/ui/EmptyState";
+import type { Product, StockItem } from "@/mock/types";
 
 export function ProductionScreen() {
   const { t } = useApp();
-  const [batches, setBatches] = useState<Batch[]>(SEED_BATCHES);
-  const [spoilage, setSpoilage] = useState<
-    { id: string; time: string; productName: string; qty: number; unit: string; reason: string }[]
-  >([
-    {
-      id: "sp1",
-      time: "11:00",
-      productName: "Yoghurt Strawberry",
-      qty: 1,
-      unit: "pcs",
-      reason: "Cap fail",
-    },
-    { id: "sp2", time: "14:20", productName: "Cream", qty: 2, unit: "L", reason: "Quality fail" },
-  ]);
+  const today = todayISO();
+  const { data: batches = [], isPending, isError, refetch } = useBatches(today);
+  const { data: spoilage = [] } = useSpoilages(today);
+  const { data: products = [] } = useProducts();
+  const { data: stock = [] } = useStock();
+  const { data: yieldTrend = [] } = useYieldTrend(7);
 
-  const totalRaw = useMemo(() => batches.reduce((a, b) => a + b.inputL, 0), [batches]);
+  const productName = (id: string) => products.find((p) => p.id === id)?.name ?? id;
+  const stockItemName = (id: string) => stock.find((s) => s.id === id)?.name ?? id;
+  const stockItemUnit = (id: string) => stock.find((s) => s.id === id)?.unit ?? "";
+  const onHandOf = (productId: string) =>
+    stock.find((s) => s.productId === productId && s.category === "finished")?.onHand ?? 0;
+  const rawOnHand = stock.find((s) => s.id === "raw-milk")?.onHand ?? 0;
+
+  const totalRaw = useMemo(() => batches.reduce((a, b) => a + b.inputLitres, 0), [batches]);
   const totalSpoiled = useMemo(() => spoilage.reduce((a, s) => a + s.qty, 0), [spoilage]);
-  const avgYield = batches.length
-    ? Math.round(batches.reduce((a, b) => a + b.yieldPct, 0) / batches.length)
+  const yieldedBatches = batches.filter((b) => b.yieldPct !== null);
+  const avgYield = yieldedBatches.length
+    ? Math.round(yieldedBatches.reduce((a, b) => a + (b.yieldPct ?? 0), 0) / yieldedBatches.length)
     : 0;
+
+  const yieldChart = yieldTrend.map((p) => ({
+    day: new Date(`${p.date}T00:00:00`).toLocaleDateString("en-GB", { weekday: "short" }),
+    yield: p.yieldPct ?? 0,
+  }));
+
+  if (isPending) {
+    return (
+      <AppShell title={t("Uzalishaji", "Production")}>
+        <KPISkeleton />
+        <div className="mt-5">
+          <SectionSkeleton>
+            <TableSkeleton rows={6} cols={6} />
+          </SectionSkeleton>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (isError) {
+    return (
+      <AppShell title={t("Uzalishaji", "Production")}>
+        <EmptyState
+          icon={Factory}
+          title={t("Imeshindikana kupakia uzalishaji", "Could not load production")}
+          description={t("Tafadhali jaribu tena.", "Please try again.")}
+          action={
+            <Button onClick={() => refetch()} variant="outline">
+              {t("Jaribu tena", "Retry")}
+            </Button>
+          }
+        />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title={t("Uzalishaji", "Production")}>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         <StatCard
           label={t("Maziwa ghafi yaliyopo", "Raw milk on hand")}
-          value={L(284)}
+          value={L(rawOnHand)}
           accent="info"
         />
         <StatCard
@@ -148,7 +125,11 @@ export function ProductionScreen() {
           sub={t("Lengo 85%", "Target 85%")}
           accent={avgYield >= 85 ? "green" : "amber"}
         />
-        <StatCard label={t("Wastage", "Wastage")} value={`${totalSpoiled} pcs/L`} accent="red" />
+        <StatCard
+          label={t("Wastage", "Wastage")}
+          value={`${num(totalSpoiled)} pcs/L`}
+          accent="red"
+        />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4 mb-5">
@@ -157,32 +138,44 @@ export function ProductionScreen() {
           className="lg:col-span-2"
           action={
             <div className="flex gap-2">
-              <RecordSpoilageDialog onSave={(s) => setSpoilage((xs) => [s, ...xs])} />
-              <RecordBatchDialog onSave={(b) => setBatches((xs) => [b, ...xs])} />
+              <RecordSpoilageDialog stock={stock} />
+              <RecordBatchDialog products={products} />
             </div>
           }
         >
           <ul className="divide-y divide-border">
             {[
               {
+                pid: "p-mtindi",
                 name: "Mtindi (Mgando)",
                 suggest: "250 L",
                 from: "250 L raw",
                 yield: "100%",
-                cur: 220,
               },
-              { name: "Mozzarella", suggest: "20 kg", from: "244 L raw", yield: "8.2%", cur: 12 },
-              { name: "Halloumi", suggest: "6.35 kg", from: "75 L raw", yield: "8.5%", cur: 4.2 },
               {
+                pid: "p-mozz",
+                name: "Mozzarella",
+                suggest: "20 kg",
+                from: "244 L raw",
+                yield: "8.2%",
+              },
+              {
+                pid: "p-hall",
+                name: "Halloumi",
+                suggest: "6.35 kg",
+                from: "75 L raw",
+                yield: "8.5%",
+              },
+              {
+                pid: "p-yog-straw",
                 name: "Yoghurt Strawberry",
                 suggest: "60 pcs (500ml)",
                 from: "30 L raw",
                 yield: "100%",
-                cur: 36,
               },
-              { name: "Ghee", suggest: "6 L", from: "Cream 18 L", yield: "33%", cur: 22 },
-            ].map((r, i) => (
-              <li key={i} className="flex items-center gap-3 py-3">
+              { pid: "p-ghee", name: "Ghee", suggest: "6 L", from: "Cream 18 L", yield: "33%" },
+            ].map((r) => (
+              <li key={r.pid} className="flex items-center gap-3 py-3">
                 <div className="flex-1">
                   <div className="font-medium">{r.name}</div>
                   <div className="text-xs text-muted-foreground">
@@ -192,7 +185,8 @@ export function ProductionScreen() {
                 <div className="text-right">
                   <div className="font-num font-semibold">{r.suggest}</div>
                   <div className="text-xs text-muted-foreground">
-                    {t("Stock sasa", "Now")}: <span className="font-num">{r.cur}</span>
+                    {t("Stock sasa", "Now")}:{" "}
+                    <span className="font-num">{num(onHandOf(r.pid))}</span>
                   </div>
                 </div>
               </li>
@@ -203,7 +197,7 @@ export function ProductionScreen() {
         <SectionCard title={t("Mlolongo wa yield", "Yield trend")}>
           <div className="h-44">
             <ResponsiveContainer>
-              <LineChart data={YIELD_WEEK}>
+              <LineChart data={yieldChart}>
                 <CartesianGrid stroke="#E6EBE1" vertical={false} />
                 <XAxis
                   dataKey="day"
@@ -215,7 +209,7 @@ export function ProductionScreen() {
                 <YAxis
                   stroke="#6B776E"
                   fontSize={11}
-                  domain={[70, 95]}
+                  domain={[0, 100]}
                   tickLine={false}
                   axisLine={false}
                 />
@@ -264,36 +258,43 @@ export function ProductionScreen() {
           title={t("Bidhaa zilizotengenezwa leo", "Produced today")}
           action={<History className="h-4 w-4 text-muted-foreground" />}
         >
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                <th className="py-2 px-3">{t("Wakati", "Time")}</th>
-                <th>{t("Bidhaa", "Product")}</th>
-                <th className="text-right px-3">{t("Raw", "Raw")}</th>
-                <th className="text-right px-3">{t("Imezalishwa", "Produced")}</th>
-                <th className="text-right px-3">Yield</th>
-                <th className="text-right px-3">{t("Wastage", "Waste")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {batches.map((b) => (
-                <tr key={b.id} className="border-b border-border last:border-0">
-                  <td className="py-2.5 px-3 font-num text-xs text-muted-foreground">{b.time}</td>
-                  <td className="py-2.5 px-3 font-medium">{b.productName}</td>
-                  <td className="py-2.5 px-3 text-right font-num">{num(b.inputL)} L</td>
-                  <td className="py-2.5 px-3 text-right font-num font-semibold">
-                    {num(b.output)} {b.unit}
-                  </td>
-                  <td className="py-2.5 px-3 text-right font-num text-[#1E7C3F]">
-                    {b.yieldPct.toFixed(1)}%
-                  </td>
-                  <td className="py-2.5 px-3 text-right font-num text-[#E11B22]">
-                    {num(b.wastage)}
-                  </td>
+          {batches.length === 0 ? (
+            <EmptyState
+              icon={Factory}
+              title={t("Hakuna batch leo bado", "No batches recorded today yet")}
+            />
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                  <th className="py-2 px-3">{t("Wakati", "Time")}</th>
+                  <th>{t("Bidhaa", "Product")}</th>
+                  <th className="text-right px-3">{t("Raw", "Raw")}</th>
+                  <th className="text-right px-3">{t("Imezalishwa", "Produced")}</th>
+                  <th className="text-right px-3">Yield</th>
+                  <th className="text-right px-3">{t("Wastage", "Waste")}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {batches.map((b) => (
+                  <tr key={b.id} className="border-b border-border last:border-0">
+                    <td className="py-2.5 px-3 font-num text-xs text-muted-foreground">{b.date}</td>
+                    <td className="py-2.5 px-3 font-medium">{productName(b.productId)}</td>
+                    <td className="py-2.5 px-3 text-right font-num">{num(b.inputLitres)} L</td>
+                    <td className="py-2.5 px-3 text-right font-num font-semibold">
+                      {num(b.outputQty)} {b.unit}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-num text-[#1E7C3F]">
+                      {b.yieldPct !== null ? `${b.yieldPct.toFixed(1)}%` : "·"}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-num text-[#E11B22]">
+                      {num(b.wastage)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </SectionCard>
 
         <SectionCard title={t("Yaliyoharibika leo", "Spoilage today")}>
@@ -307,13 +308,13 @@ export function ProductionScreen() {
                 <li key={s.id} className="flex items-start gap-2 py-2.5">
                   <TriangleAlert className="h-4 w-4 mt-0.5 text-[#E11B22]" />
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm">{s.productName}</div>
+                    <div className="font-medium text-sm">{stockItemName(s.stockItemId)}</div>
                     <div className="text-xs text-muted-foreground">
-                      {s.time} · {s.reason}
+                      {s.date} · {s.reason ?? t("Haijatajwa", "Not specified")}
                     </div>
                   </div>
                   <div className="font-num font-bold text-[#E11B22]">
-                    {num(s.qty)} {s.unit}
+                    {num(s.qty)} {stockItemUnit(s.stockItemId)}
                   </div>
                 </li>
               ))
@@ -325,14 +326,43 @@ export function ProductionScreen() {
   );
 }
 
-function RecordBatchDialog({ onSave }: { onSave: (b: Batch) => void }) {
+function RecordBatchDialog({ products }: { products: Product[] }) {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
   const [productId, setProductId] = useState("p-mozz");
   const [input, setInput] = useState(244);
   const [output, setOutput] = useState(20);
   const [wastage, setWastage] = useState(4);
+  const record = useRecordBatch();
   const yieldPct = input > 0 ? (output / input) * 100 : 0;
+  const producible = products.filter(
+    (p) =>
+      p.category === "cheese" ||
+      p.category === "yoghurt" ||
+      p.category === "cultured" ||
+      p.category === "ghee" ||
+      p.category === "butter" ||
+      p.category === "cream",
+  );
+
+  const save = () => {
+    if (!productId || output <= 0) return;
+    record.mutate(
+      { productId, inputLitres: input, outputQty: output, wastage },
+      {
+        onSuccess: () => {
+          toast.success(t("Batch imerekodiwa", "Batch recorded"));
+          setOpen(false);
+        },
+        onError: (e) =>
+          toast.error(
+            e.message.includes("day-locked")
+              ? t("Siku hii imefungwa", "This day is locked")
+              : t("Imeshindikana kurekodi batch", "Could not record batch"),
+          ),
+      },
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -361,14 +391,7 @@ function RecordBatchDialog({ onSave }: { onSave: (b: Batch) => void }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {PRODUCTS.filter(
-                  (p) =>
-                    p.category === "cheese" ||
-                    p.category === "yoghurt" ||
-                    p.category === "cultured" ||
-                    p.category === "ghee" ||
-                    p.category === "butter",
-                ).map((p) => (
+                {producible.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     {p.name}
                   </SelectItem>
@@ -413,25 +436,8 @@ function RecordBatchDialog({ onSave }: { onSave: (b: Batch) => void }) {
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
-          <Button
-            onClick={() => {
-              const p = PRODUCTS.find((x) => x.id === productId)!;
-              onSave({
-                id: `b-${Date.now()}`,
-                time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                productId,
-                productName: p.name,
-                inputL: input,
-                output,
-                unit: p.unit,
-                yieldPct,
-                wastage,
-              });
-              toast.success(t("Batch imerekodiwa", "Batch recorded"));
-              setOpen(false);
-            }}
-          >
-            {t("Hifadhi", "Save")}
+          <Button onClick={save} disabled={record.isPending}>
+            {record.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -439,23 +445,36 @@ function RecordBatchDialog({ onSave }: { onSave: (b: Batch) => void }) {
   );
 }
 
-function RecordSpoilageDialog({
-  onSave,
-}: {
-  onSave: (s: {
-    id: string;
-    time: string;
-    productName: string;
-    qty: number;
-    unit: string;
-    reason: string;
-  }) => void;
-}) {
+function RecordSpoilageDialog({ stock }: { stock: StockItem[] }) {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
-  const [productId, setProductId] = useState("p-cream");
+  const items = stock.filter((s) => s.category === "finished" || s.category === "raw");
+  const [itemId, setItemId] = useState("s-cream");
   const [qty, setQty] = useState(1);
   const [reason, setReason] = useState("");
+  const record = useRecordSpoilage();
+
+  const save = () => {
+    const id = items.some((s) => s.id === itemId) ? itemId : items[0]?.id;
+    if (!id || qty <= 0) return;
+    record.mutate(
+      { stockItemId: id, qty, reason: reason || undefined },
+      {
+        onSuccess: () => {
+          toast.success(t("Imerekodi", "Recorded"));
+          setOpen(false);
+          setReason("");
+        },
+        onError: (e) =>
+          toast.error(
+            e.message.includes("day-locked")
+              ? t("Siku hii imefungwa", "This day is locked")
+              : t("Imeshindikana kurekodi", "Could not record spoilage"),
+          ),
+      },
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -475,14 +494,14 @@ function RecordSpoilageDialog({
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Bidhaa", "Product")}</Label>
-            <Select value={productId} onValueChange={setProductId}>
+            <Select value={itemId} onValueChange={setItemId}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {PRODUCTS.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
+                {items.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -510,22 +529,11 @@ function RecordSpoilageDialog({
             {t("Ghairi", "Cancel")}
           </Button>
           <Button
-            onClick={() => {
-              const p = PRODUCTS.find((x) => x.id === productId)!;
-              onSave({
-                id: `sp-${Date.now()}`,
-                time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                productName: p.name,
-                qty,
-                unit: p.unit,
-                reason: reason || t("Haijatajwa", "Not specified"),
-              });
-              toast.success(t("Imerekodi", "Recorded"));
-              setOpen(false);
-            }}
+            onClick={save}
+            disabled={record.isPending}
             className="bg-[#E11B22] hover:bg-[#c41319] text-white"
           >
-            {t("Hifadhi", "Save")}
+            {record.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>

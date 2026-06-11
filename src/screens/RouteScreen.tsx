@@ -12,8 +12,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CUSTOMERS, PRODUCTS, PRICE_MATRIX, ROUTE_LOAD, TODAY } from "@/mock/data";
-import { tzs, L, num } from "@/lib/format";
+// BACKEND: data now flows through src/lib/data/{products,customers,stock,sales,collections}.
+import { useProducts, usePriceMatrix } from "@/lib/data/hooks/products";
+import { useCustomers } from "@/lib/data/hooks/customers";
+import { useStock } from "@/lib/data/hooks/stock";
+import { useSalesByDate, useCompleteSale } from "@/lib/data/hooks/sales";
+import { useRecordTransfer } from "@/lib/data/hooks/collections";
+import { useRecordReturn } from "@/lib/data/hooks/stock";
+import { depositsRepo } from "@/lib/data/sales";
+import { todayISO } from "@/lib/data/dates";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { tzs, num } from "@/lib/format";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -35,97 +44,198 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-type Tier = "own" | "bottle" | "bulk";
 interface CartLine {
   productId: string;
   qty: number;
-  tier: Tier;
 }
-interface RouteSale {
-  id: string;
-  at: string;
-  customerId: string;
-  customer: string;
-  lines: CartLine[];
-  total: number;
-  payment: "cash" | "credit" | "mpesa";
-}
+
+// Default van load; editable before confirming the load-out transfer.
+const DEFAULT_LOAD = [
+  { productId: "p-fresh", qty: 120 },
+  { productId: "p-mtindi", qty: 60 },
+  { productId: "p-yog-straw", qty: 24 },
+];
 
 export function RouteScreen() {
   const { user, authReady, t, logout } = useApp();
   const nav = useNavigate();
+  const qc = useQueryClient();
+  const today = todayISO();
+  const { data: products = [] } = useProducts();
+  const { data: priceMatrix = {} } = usePriceMatrix();
+  const { data: customers = [] } = useCustomers();
+  const { data: stock = [] } = useStock();
+  const { data: sales = [] } = useSalesByDate(today, "route");
+  const completeSaleMut = useCompleteSale();
+  const recordTransfer = useRecordTransfer();
+  const recordReturn = useRecordReturn();
+
   const [tab, setTab] = useState("plan");
   const [online, setOnline] = useState(true);
   const [session, setSession] = useState<"morning" | "evening">("morning");
   const [cart, setCart] = useState<CartLine[]>([]);
-  const [customer, setCustomer] = useState(CUSTOMERS[0].id);
+  const [customer, setCustomer] = useState<string>("");
   const [customerQ, setCustomerQ] = useState("");
   const [payment, setPayment] = useState<"cash" | "credit" | "mpesa">("cash");
-  const [sales, setSales] = useState<RouteSale[]>([]);
-  const [routeStops] = useState(["c1", "c5", "c9", "c11", "c15"]); // demo route plan
-  const [visited, setVisited] = useState<Set<string>>(new Set());
+  const [load, setLoad] = useState(DEFAULT_LOAD);
+  const [loadConfirmed, setLoadConfirmed] = useState(false);
   const [returned, setReturned] = useState<Record<string, number>>({});
   const [deposit, setDeposit] = useState(0);
 
-  const cartTotal = cart.reduce((a, l) => a + PRICE_MATRIX[l.productId][l.tier] * l.qty, 0);
-  const loadedValue = ROUTE_LOAD.reduce((a, l) => a + PRICE_MATRIX[l.productId].own * l.litres, 0);
+  const priceOf = (pid: string) => priceMatrix[pid]?.own ?? 0;
+  const productOf = (pid: string) => products.find((p) => p.id === pid);
+  const stockItemOf = (pid: string) =>
+    stock.find((s) => s.productId === pid && s.category === "finished");
 
-  // Derived cash-up from actual sales.
-  const cashTotal = sales.filter((s) => s.payment === "cash").reduce((a, s) => a + s.total, 0);
-  const creditTotal = sales.filter((s) => s.payment === "credit").reduce((a, s) => a + s.total, 0);
-  const mpesaTotal = sales.filter((s) => s.payment === "mpesa").reduce((a, s) => a + s.total, 0);
+  const cartTotal = cart.reduce((a, l) => a + priceOf(l.productId) * l.qty, 0);
+  const loadedValue = load.reduce((a, l) => a + priceOf(l.productId) * l.qty, 0);
+
+  // Derived cash-up from actual route sales.
+  const cashTotal = sales.filter((s) => s.payment === "cash").reduce((a, s) => a + s.totalTZS, 0);
+  const creditTotal = sales
+    .filter((s) => s.payment === "credit")
+    .reduce((a, s) => a + s.totalTZS, 0);
+  const mpesaTotal = sales.filter((s) => s.payment === "mpesa").reduce((a, s) => a + s.totalTZS, 0);
   const totalReturned = Object.values(returned).reduce((a, x) => a + x, 0);
   const expectedDeposit = cashTotal + mpesaTotal;
 
-  // Map per-product sold quantities.
+  // Per-product sold quantities from server sales.
   const soldByProduct: Record<string, number> = useMemo(() => {
     const m: Record<string, number> = {};
-    for (const s of sales) for (const l of s.lines) m[l.productId] = (m[l.productId] ?? 0) + l.qty;
+    for (const s of sales)
+      for (const l of s.lines ?? []) m[l.productId] = (m[l.productId] ?? 0) + l.qty;
     return m;
   }, [sales]);
 
+  const visited = useMemo(
+    () => new Set(sales.map((s) => s.customerId).filter(Boolean) as string[]),
+    [sales],
+  );
+  // Route plan: today's credit/monthly customers, first five stops.
+  const routeStops = useMemo(
+    () =>
+      customers
+        .filter((c) => c.type !== "cash")
+        .slice(0, 5)
+        .map((c) => c.id),
+    [customers],
+  );
+
   const customerMatches = useMemo(
     () =>
-      CUSTOMERS.filter(
-        (c) => !customerQ || c.name.toLowerCase().includes(customerQ.toLowerCase()),
-      ).slice(0, 6),
-    [customerQ],
+      customers
+        .filter((c) => !customerQ || c.name.toLowerCase().includes(customerQ.toLowerCase()))
+        .slice(0, 6),
+    [customers, customerQ],
   );
+
+  const cashUp = useMutation({
+    mutationFn: async (amount: number) => {
+      await depositsRepo.record({
+        source: "route",
+        method: "cash",
+        amountTZS: amount,
+        ref: `VAN1-${today}`,
+        note: t("Cash-up ya gari #1", "Van #1 cash-up"),
+      });
+      const [latest] = await depositsRepo.list(1);
+      return latest;
+    },
+    onSuccess: (latest) => {
+      qc.invalidateQueries({ queryKey: ["deposits"] });
+      qc.invalidateQueries({ queryKey: ["finance"] });
+      toast.success(t(`Risiti ${latest.id} imeundwa`, `Receipt ${latest.id} generated`));
+      nav({ to: "/receipt/deposit/$id", params: { id: latest.id } });
+    },
+    onError: () => toast.error(t("Imeshindikana kurekodi amana", "Could not record the deposit")),
+  });
 
   const addToCart = (pid: string) =>
     setCart((c) => {
       const ex = c.find((x) => x.productId === pid);
       if (ex) return c.map((x) => (x.productId === pid ? { ...x, qty: x.qty + 1 } : x));
-      return [...c, { productId: pid, qty: 1, tier: "own" }];
+      return [...c, { productId: pid, qty: 1 }];
     });
 
   const completeSale = () => {
     if (!cart.length) return;
-    const cust = CUSTOMERS.find((c) => c.id === customer)!;
-    const sale: RouteSale = {
-      id: `RV-${Date.now().toString().slice(-4)}`,
-      at: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      customerId: customer,
-      customer: cust.name,
-      lines: cart,
-      total: cartTotal,
-      payment,
-    };
-    setSales((xs) => [sale, ...xs]);
-    setVisited((v) => new Set(v).add(customer));
-    toast.success(t("Mauzo yamehifadhiwa", "Sale recorded"));
-    setCart([]);
+    const cid = customer || customers[0]?.id;
+    completeSaleMut.mutate(
+      {
+        channel: "route",
+        payment,
+        tier: "own",
+        lines: cart.map((l) => ({
+          productId: l.productId,
+          qty: l.qty,
+          unitPrice: priceOf(l.productId),
+        })),
+        customerId: cid,
+        locationId: "loc-van1",
+      },
+      {
+        onSuccess: () => {
+          toast.success(t("Mauzo yamehifadhiwa", "Sale recorded"));
+          setCart([]);
+        },
+        onError: (e) =>
+          toast.error(
+            e.message.includes("customer-overdue")
+              ? t("Mteja ana deni lililochelewa", "Customer is overdue, credit blocked")
+              : e.message.includes("day-locked")
+                ? t("Siku hii imefungwa", "This day is locked")
+                : t("Imeshindikana kurekodi mauzo", "Could not record the sale"),
+          ),
+      },
+    );
   };
 
-  const generateCashUp = () => {
-    if (expectedDeposit === 0) {
-      toast.error(t("Hakuna cash ya kuhifadhi", "No cash to deposit yet"));
+  const confirmLoad = async () => {
+    try {
+      for (const l of load) {
+        const item = stockItemOf(l.productId);
+        if (!item || l.qty <= 0) continue;
+        await new Promise<void>((resolve, reject) =>
+          recordTransfer.mutate(
+            {
+              fromLocation: "loc-main",
+              toLocation: "loc-van1",
+              stockItemId: item.id,
+              qty: l.qty,
+              note: t("Upakiaji wa gari", "Van load-out"),
+            },
+            { onSuccess: () => resolve(), onError: (e) => reject(e) },
+          ),
+        );
+      }
+      setLoadConfirmed(true);
+      toast.success(t("Upakiaji umerekodiwa", "Load-out recorded"));
+    } catch {
+      toast.error(t("Imeshindikana kurekodi upakiaji", "Could not record the load-out"));
+    }
+  };
+
+  const saveReturns = async () => {
+    const entries = Object.entries(returned).filter(([, qty]) => qty > 0);
+    if (entries.length === 0) {
+      toast.error(t("Hakuna marejesho ya kuhifadhi", "Nothing to return yet"));
       return;
     }
-    setDeposit(expectedDeposit);
-    const id = `RCT-${Date.now().toString().slice(-4)}`;
-    toast.success(t(`Risiti ${id} imeundwa`, `Receipt ${id} generated`));
-    nav({ to: "/receipt/deposit/$id", params: { id } });
+    try {
+      for (const [pid, qty] of entries) {
+        const item = stockItemOf(pid);
+        if (!item) continue;
+        await new Promise<void>((resolve, reject) =>
+          recordReturn.mutate(
+            { stockItemId: item.id, qty },
+            { onSuccess: () => resolve(), onError: (e) => reject(e) },
+          ),
+        );
+      }
+      toast.success(t(`${totalReturned} units zimerekodi`, `${totalReturned} units saved`));
+    } catch {
+      toast.error(t("Imeshindikana kurekodi marejesho", "Could not record returns"));
+    }
   };
 
   if (!authReady) return null;
@@ -188,12 +298,12 @@ export function RouteScreen() {
           </div>
           <div className="mt-3 flex justify-between text-xs opacity-85">
             <span>{user.name}</span>
-            <span>{TODAY}</span>
+            <span>{today}</span>
           </div>
           <div className="mt-2 text-[11px] opacity-90">
             {t("Wateja waliotembelewa", "Customers visited")}:{" "}
             <span className="font-num font-bold">
-              {visited.size}/{routeStops.length}
+              {routeStops.filter((id) => visited.has(id)).length}/{routeStops.length}
             </span>
           </div>
         </div>
@@ -215,7 +325,8 @@ export function RouteScreen() {
               </div>
               <ul className="space-y-2">
                 {routeStops.map((cid, i) => {
-                  const c = CUSTOMERS.find((x) => x.id === cid)!;
+                  const c = customers.find((x) => x.id === cid);
+                  if (!c) return null;
                   const done = visited.has(cid);
                   return (
                     <li
@@ -262,10 +373,11 @@ export function RouteScreen() {
                 {t("Bidhaa zilizo kwenye gari", "On the van")}
               </div>
               <ul className="space-y-2">
-                {ROUTE_LOAD.map((l) => {
-                  const p = PRODUCTS.find((x) => x.id === l.productId)!;
+                {load.map((l) => {
+                  const p = productOf(l.productId);
+                  if (!p) return null;
                   const sold = soldByProduct[l.productId] ?? 0;
-                  const remaining = Math.max(0, l.litres - sold);
+                  const remaining = Math.max(0, l.qty - sold);
                   return (
                     <li key={l.productId} className="rounded-xl bg-secondary/60 px-3 py-2.5">
                       <div className="flex items-center justify-between">
@@ -274,9 +386,26 @@ export function RouteScreen() {
                           <div className="text-xs text-muted-foreground">{p.swName}</div>
                         </div>
                         <div className="text-right">
-                          <div className="font-num font-bold">
-                            {num(remaining)} / {num(l.litres)} {p.unit}
-                          </div>
+                          {loadConfirmed ? (
+                            <div className="font-num font-bold">
+                              {num(remaining)} / {num(l.qty)} {p.unit}
+                            </div>
+                          ) : (
+                            <Input
+                              type="number"
+                              value={l.qty}
+                              onChange={(e) =>
+                                setLoad((xs) =>
+                                  xs.map((x) =>
+                                    x.productId === l.productId
+                                      ? { ...x, qty: Number(e.target.value) }
+                                      : x,
+                                  ),
+                                )
+                              }
+                              className="h-8 w-24 ml-auto text-right font-num"
+                            />
+                          )}
                           <div className="text-[10px] text-muted-foreground">
                             {t("Imeuzwa", "Sold")}: {num(sold)}
                           </div>
@@ -287,7 +416,7 @@ export function RouteScreen() {
                           className="h-full"
                           style={{
                             background: "linear-gradient(90deg, #1E7C3F, #8CC63F)",
-                            width: `${(remaining / l.litres) * 100}%`,
+                            width: `${l.qty > 0 ? (remaining / l.qty) * 100 : 0}%`,
                           }}
                         />
                       </div>
@@ -299,6 +428,19 @@ export function RouteScreen() {
                 <span>{t("Thamani jumla", "Total value")}</span>
                 <span className="font-num">{tzs(loadedValue)}</span>
               </div>
+              {!loadConfirmed && (
+                <Button
+                  className="mt-3 w-full text-white"
+                  style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+                  disabled={recordTransfer.isPending}
+                  onClick={confirmLoad}
+                >
+                  <Truck className="h-4 w-4 mr-1.5" />
+                  {recordTransfer.isPending
+                    ? t("Inarekodi…", "Recording…")
+                    : t("Thibitisha upakiaji", "Confirm load-out")}
+                </Button>
+              )}
             </div>
           </TabsContent>
 
@@ -315,7 +457,7 @@ export function RouteScreen() {
                     placeholder={t("Tafuta mteja…", "Search customer…")}
                   />
                 </div>
-                <Select value={customer} onValueChange={setCustomer}>
+                <Select value={customer || customers[0]?.id} onValueChange={setCustomer}>
                   <SelectTrigger className="h-9">
                     <SelectValue />
                   </SelectTrigger>
@@ -329,9 +471,10 @@ export function RouteScreen() {
                 </Select>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                {ROUTE_LOAD.map((l) => {
-                  const p = PRODUCTS.find((x) => x.id === l.productId)!;
-                  const remaining = Math.max(0, l.litres - (soldByProduct[l.productId] ?? 0));
+                {load.map((l) => {
+                  const p = productOf(l.productId);
+                  if (!p) return null;
+                  const remaining = Math.max(0, l.qty - (soldByProduct[l.productId] ?? 0));
                   return (
                     <button
                       key={l.productId}
@@ -340,9 +483,7 @@ export function RouteScreen() {
                       className={`rounded-xl border border-border bg-background p-3 text-left ${remaining === 0 ? "opacity-50" : "hover:border-[#2F9E44]"}`}
                     >
                       <div className="text-xs font-semibold">{p.name}</div>
-                      <div className="font-num text-sm font-bold mt-1">
-                        {num(PRICE_MATRIX[p.id].own)}
-                      </div>
+                      <div className="font-num text-sm font-bold mt-1">{num(priceOf(p.id))}</div>
                       <div className="text-[10px] text-muted-foreground mt-1">
                         {num(remaining)} {p.unit} {t("zinabakia", "left")}
                       </div>
@@ -371,7 +512,8 @@ export function RouteScreen() {
                     {t("Mkokoteni", "Cart")}
                   </div>
                   {cart.map((l) => {
-                    const p = PRODUCTS.find((x) => x.id === l.productId)!;
+                    const p = productOf(l.productId);
+                    if (!p) return null;
                     return (
                       <div key={l.productId} className="flex items-center gap-2">
                         <div className="flex-1 text-sm font-medium">{p.name}</div>
@@ -399,7 +541,7 @@ export function RouteScreen() {
                           <Plus className="h-3 w-3" />
                         </button>
                         <span className="font-num text-sm font-semibold w-20 text-right">
-                          {num(PRICE_MATRIX[l.productId].own * l.qty)}
+                          {num(priceOf(l.productId) * l.qty)}
                         </span>
                       </div>
                     );
@@ -411,12 +553,15 @@ export function RouteScreen() {
                 </div>
               )}
               <Button
-                disabled={cart.length === 0}
+                disabled={cart.length === 0 || completeSaleMut.isPending}
                 className="w-full h-11 text-white"
                 style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
                 onClick={completeSale}
               >
-                <Receipt className="h-4 w-4 mr-1.5" /> {t("Kamilisha mauzo", "Complete sale")}
+                <Receipt className="h-4 w-4 mr-1.5" />{" "}
+                {completeSaleMut.isPending
+                  ? t("Inahifadhi…", "Saving…")
+                  : t("Kamilisha mauzo", "Complete sale")}
               </Button>
             </div>
 
@@ -429,12 +574,18 @@ export function RouteScreen() {
                   {sales.slice(0, 5).map((s) => (
                     <li key={s.id} className="flex items-center justify-between py-2">
                       <div>
-                        <div className="font-medium">{s.customer}</div>
+                        <div className="font-medium">
+                          {s.customerName ?? t("Mteja wa kupita", "Walk-in")}
+                        </div>
                         <div className="text-xs text-muted-foreground">
-                          {s.at} · {s.payment}
+                          {new Date(s.at).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}{" "}
+                          · {s.payment}
                         </div>
                       </div>
-                      <div className="font-num font-semibold">{tzs(s.total)}</div>
+                      <div className="font-num font-semibold">{tzs(s.totalTZS)}</div>
                     </li>
                   ))}
                 </ul>
@@ -448,10 +599,11 @@ export function RouteScreen() {
                 <RotateCcw className="h-4 w-4" />
                 {t("Yaliyorudishwa", "Returned to plant")}
               </div>
-              {ROUTE_LOAD.map((l) => {
-                const p = PRODUCTS.find((x) => x.id === l.productId)!;
+              {load.map((l) => {
+                const p = productOf(l.productId);
+                if (!p) return null;
                 const sold = soldByProduct[l.productId] ?? 0;
-                const remaining = Math.max(0, l.litres - sold);
+                const remaining = Math.max(0, l.qty - sold);
                 return (
                   <div key={l.productId} className="rounded-xl bg-secondary/60 p-2.5">
                     <div className="flex items-center justify-between mb-2 text-sm">
@@ -487,13 +639,12 @@ export function RouteScreen() {
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() =>
-                  toast.success(
-                    t(`${totalReturned} units zimerekodi`, `${totalReturned} units saved`),
-                  )
-                }
+                disabled={recordReturn.isPending}
+                onClick={saveReturns}
               >
-                {t("Hifadhi", "Save returns")}
+                {recordReturn.isPending
+                  ? t("Inahifadhi…", "Saving…")
+                  : t("Hifadhi", "Save returns")}
               </Button>
             </div>
           </TabsContent>
@@ -545,10 +696,21 @@ export function RouteScreen() {
               <Button
                 className="w-full text-white"
                 style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
-                onClick={generateCashUp}
+                disabled={cashUp.isPending}
+                onClick={() => {
+                  const amount = deposit || expectedDeposit;
+                  if (amount <= 0) {
+                    toast.error(t("Hakuna cash ya kuhifadhi", "No cash to deposit yet"));
+                    return;
+                  }
+                  setDeposit(amount);
+                  cashUp.mutate(amount);
+                }}
               >
                 <Printer className="h-4 w-4 mr-1.5" />
-                {t("Tengeneza na chapisha", "Generate & print")}
+                {cashUp.isPending
+                  ? t("Inatengeneza…", "Generating…")
+                  : t("Tengeneza na chapisha", "Generate & print")}
               </Button>
               <AnimatePresence>
                 {deposit > 0 && (

@@ -1,6 +1,9 @@
 import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
-import { EXPENSES, TODAY, type Expense, type ExpenseCategory } from "@/mock/data";
+// BACKEND: data now flows through src/lib/data/finance (was @/mock/data).
+import type { ExpenseCategory } from "@/mock/data";
+import { useExpenses, useCreateExpense } from "@/lib/data/hooks/finance";
+import { todayISO } from "@/lib/data/dates";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { tzs, num } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -57,7 +60,6 @@ import {
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
-import { useSimulatedLoad } from "@/hooks/use-simulated-load";
 
 const CATEGORY_META: Record<
   ExpenseCategory,
@@ -75,8 +77,7 @@ const CATEGORY_META: Record<
 
 export function ExpensesScreen() {
   const { t, lang, can } = useApp();
-  const loading = useSimulatedLoad(350);
-  const [expenses, setExpenses] = useState<Expense[]>(EXPENSES);
+  const { data: expenses = [], isPending } = useExpenses();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<ExpenseCategory | "all">("all");
 
@@ -95,7 +96,8 @@ export function ExpensesScreen() {
   );
 
   const total = expenses.reduce((a, e) => a + e.amountTZS, 0);
-  const today = expenses.filter((e) => e.date === TODAY).reduce((a, e) => a + e.amountTZS, 0);
+  const todayIso = todayISO();
+  const today = expenses.filter((e) => e.date === todayIso).reduce((a, e) => a + e.amountTZS, 0);
   const byCategory = useMemo(() => {
     const map: Record<string, number> = {};
     for (const e of expenses) map[e.category] = (map[e.category] ?? 0) + e.amountTZS;
@@ -110,7 +112,7 @@ export function ExpensesScreen() {
     }));
   }, [expenses, lang]);
 
-  if (loading) {
+  if (isPending) {
     return (
       <AppShell title={t("Matumizi", "Expenses")}>
         <KPISkeleton />
@@ -135,7 +137,7 @@ export function ExpensesScreen() {
         <StatCard
           label={t("Leo", "Today")}
           value={tzs(today)}
-          sub={`${expenses.filter((e) => e.date === TODAY).length} ${t("rekodi", "entries")}`}
+          sub={`${expenses.filter((e) => e.date === todayIso).length} ${t("rekodi", "entries")}`}
           accent="red"
         />
         <StatCard
@@ -185,9 +187,7 @@ export function ExpensesScreen() {
                   </SelectContent>
                 </Select>
                 <ExportMenu formats={["csv", "excel"]} filename="expenses" />
-                {can("finance:write") && (
-                  <AddExpenseDialog onAdd={(e) => setExpenses((xs) => [e, ...xs])} />
-                )}
+                {can("finance:write") && <AddExpenseDialog />}
               </div>
             }
           >
@@ -320,10 +320,10 @@ export function ExpensesScreen() {
   );
 }
 
-function AddExpenseDialog({ onAdd }: { onAdd: (e: Expense) => void }) {
-  const { t, lang, user } = useApp();
+function AddExpenseDialog() {
+  const { t, lang } = useApp();
   const [open, setOpen] = useState(false);
-  const [date, setDate] = useState(TODAY);
+  const [date, setDate] = useState(todayISO());
   const [category, setCategory] = useState<ExpenseCategory>("fuel");
   const [vendor, setVendor] = useState("");
   const [description, setDescription] = useState("");
@@ -331,25 +331,24 @@ function AddExpenseDialog({ onAdd }: { onAdd: (e: Expense) => void }) {
   const [method, setMethod] = useState<"cash" | "mpesa" | "bank">("cash");
   const [ref, setRef] = useState("");
 
+  const create = useCreateExpense();
+
   const save = () => {
     if (!vendor.trim() || !amount) return;
-    onAdd({
-      id: `ex-${Date.now()}`,
-      date,
-      category,
-      vendor,
-      description,
-      amountTZS: amount,
-      method,
-      ref: ref || undefined,
-      recordedBy: user?.name ?? "Unknown",
-    });
-    toast.success(t("Matumizi yamerekodiwa", "Expense recorded"));
-    setOpen(false);
-    setVendor("");
-    setDescription("");
-    setAmount(0);
-    setRef("");
+    create.mutate(
+      { date, category, vendor, description, amountTZS: amount, method, ref: ref || undefined },
+      {
+        onSuccess: () => {
+          toast.success(t("Matumizi yamerekodiwa", "Expense recorded"));
+          setOpen(false);
+          setVendor("");
+          setDescription("");
+          setAmount(0);
+          setRef("");
+        },
+        onError: () => toast.error(t("Imeshindikana kurekodi", "Could not record expense")),
+      },
+    );
   };
 
   return (
@@ -441,10 +440,11 @@ function AddExpenseDialog({ onAdd }: { onAdd: (e: Expense) => void }) {
           </Button>
           <Button
             onClick={save}
+            disabled={create.isPending}
             className="text-white"
             style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
           >
-            {t("Hifadhi", "Save")}
+            {create.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -52,6 +52,7 @@ export interface StockMovement {
   unit: Unit;
   ref: string | null;
   reason?: string;
+  byName?: string;
 }
 
 export const stockKeys = {
@@ -71,6 +72,7 @@ interface MovementRow {
   unit: Unit;
   ref: string | null;
   meta: { reason?: string } | null;
+  profiles?: { name: string } | null;
 }
 
 function toMovement(r: MovementRow): StockMovement {
@@ -85,6 +87,7 @@ function toMovement(r: MovementRow): StockMovement {
     unit: r.unit,
     ref: r.ref,
     reason: r.meta?.reason,
+    byName: r.profiles?.name,
   };
 }
 
@@ -100,7 +103,7 @@ export const stockRepo = {
     const rows = unwrap(
       await supabase
         .from("movements")
-        .select("*")
+        .select("*, profiles(name)")
         .not("stock_item_id", "is", null)
         .order("at", { ascending: false })
         .limit(limit),
@@ -112,7 +115,7 @@ export const stockRepo = {
     const rows = unwrap(
       await supabase
         .from("movements")
-        .select("*")
+        .select("*, profiles(name)")
         .eq("stock_item_id", itemId)
         .order("at", { ascending: false })
         .limit(limit),

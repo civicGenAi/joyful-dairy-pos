@@ -1,7 +1,15 @@
 import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
-import { PRICE_MATRIX, PRODUCTS } from "@/mock/data";
-import type { PriceTier, Product, ProductCategory, Unit } from "@/mock/types";
+// BACKEND: data now flows through src/lib/data/products (was @/mock/data).
+import {
+  useProducts,
+  usePriceMatrix,
+  usePriceHistory,
+  useCreateProduct,
+  useSetProductActive,
+  useSetPrice,
+} from "@/lib/data/hooks/products";
+import type { PriceTier, ProductCategory, Unit } from "@/mock/types";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -25,9 +33,10 @@ import {
 } from "@/components/ui/dialog";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Save, Plus, History, Search } from "lucide-react";
+import { Save, Plus, History, Search, Tag } from "lucide-react";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
 
 const CATEGORIES: ProductCategory[] = [
   "fresh-milk",
@@ -39,12 +48,19 @@ const CATEGORIES: ProductCategory[] = [
   "butter",
 ];
 
+const TIERS: PriceTier[] = ["own", "bottle", "bulk"];
+
 export function ProductsScreen() {
   const { t } = useApp();
-  const [products, setProducts] = useState<Product[]>(PRODUCTS);
-  const [prices, setPrices] = useState(PRICE_MATRIX);
+  const { data: products = [], isPending, isError, refetch } = useProducts();
+  const { data: prices = {} } = usePriceMatrix();
+  const setActive = useSetProductActive();
+  const setPriceMut = useSetPrice();
   const [showInactive, setShowInactive] = useState(true);
   const [q, setQ] = useState("");
+  // Local edits overlay the server matrix until "Save" pushes them as new
+  // price-list entries (price history stays first-class).
+  const [edited, setEdited] = useState<Record<string, Partial<Record<PriceTier, number>>>>({});
 
   const visibleProducts = useMemo(
     () =>
@@ -58,11 +74,69 @@ export function ProductsScreen() {
     [products, showInactive, q],
   );
 
-  const setPrice = (pid: string, tier: PriceTier, v: number) =>
-    setPrices((p) => ({ ...p, [pid]: { ...p[pid], [tier]: v } }));
+  const priceOf = (pid: string, tier: PriceTier) => edited[pid]?.[tier] ?? prices[pid]?.[tier] ?? 0;
 
-  const toggleActive = (pid: string) =>
-    setProducts((xs) => xs.map((x) => (x.id === pid ? { ...x, active: !x.active } : x)));
+  const setPrice = (pid: string, tier: PriceTier, v: number) =>
+    setEdited((e) => ({ ...e, [pid]: { ...e[pid], [tier]: v } }));
+
+  const savePrices = async () => {
+    const changes: { pid: string; tier: PriceTier; oldValue: number; value: number }[] = [];
+    for (const [pid, tiers] of Object.entries(edited)) {
+      for (const [tier, value] of Object.entries(tiers) as [PriceTier, number][]) {
+        const oldValue = prices[pid]?.[tier] ?? 0;
+        if (value !== oldValue) changes.push({ pid, tier, oldValue, value });
+      }
+    }
+    if (changes.length === 0) {
+      toast(t("Hakuna mabadiliko ya bei", "No price changes to save"));
+      return;
+    }
+    try {
+      for (const c of changes) {
+        await setPriceMut.mutateAsync({
+          productId: c.pid,
+          productName: products.find((p) => p.id === c.pid)?.name ?? c.pid,
+          tier: c.tier,
+          oldValue: c.oldValue,
+          value: c.value,
+        });
+      }
+      setEdited({});
+      toast.success(t("Bei zimehifadhiwa", "Prices saved"));
+    } catch {
+      toast.error(t("Imeshindikana kuhifadhi bei", "Could not save prices"));
+    }
+  };
+
+  if (isPending) {
+    return (
+      <AppShell title={t("Bidhaa na Bei", "Products & pricing")}>
+        <KPISkeleton />
+        <div className="mt-5">
+          <SectionSkeleton>
+            <TableSkeleton rows={8} cols={6} />
+          </SectionSkeleton>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (isError) {
+    return (
+      <AppShell title={t("Bidhaa na Bei", "Products & pricing")}>
+        <EmptyState
+          icon={Tag}
+          title={t("Imeshindikana kupakia bidhaa", "Could not load products")}
+          description={t("Tafadhali jaribu tena.", "Please try again.")}
+          action={
+            <Button onClick={() => refetch()} variant="outline">
+              {t("Jaribu tena", "Retry")}
+            </Button>
+          }
+        />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title={t("Bidhaa na Bei", "Products & pricing")}>
@@ -111,12 +185,7 @@ export function ProductsScreen() {
                   {t("Onyesha zisizo hai", "Show inactive")}
                 </label>
                 <ExportMenu formats={["excel", "csv"]} filename="products" />
-                <AddProductDialog
-                  onAdd={(p) => {
-                    setProducts((xs) => [...xs, p]);
-                    setPrices((px) => ({ ...px, [p.id]: { own: 0, bottle: 0, bulk: 0 } }));
-                  }}
-                />
+                <AddProductDialog />
               </div>
             }
           >
@@ -153,7 +222,18 @@ export function ProductsScreen() {
                         {p.conversionNote ?? "·"}
                       </td>
                       <td className="py-2.5">
-                        <Switch checked={p.active} onCheckedChange={() => toggleActive(p.id)} />
+                        <Switch
+                          checked={p.active}
+                          onCheckedChange={(checked) =>
+                            setActive.mutate(
+                              { id: p.id, name: p.name, active: checked },
+                              {
+                                onError: () =>
+                                  toast.error(t("Imeshindikana kubadilisha", "Could not update")),
+                              },
+                            )
+                          }
+                        />
                       </td>
                     </tr>
                   ))}
@@ -171,10 +251,11 @@ export function ProductsScreen() {
                 size="sm"
                 className="text-white"
                 style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
-                onClick={() => toast.success(t("Bei zimehifadhiwa", "Prices saved"))}
+                disabled={setPriceMut.isPending}
+                onClick={savePrices}
               >
                 <Save className="h-3.5 w-3.5 mr-1.5" />
-                {t("Hifadhi", "Save")}
+                {setPriceMut.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
               </Button>
             }
           >
@@ -196,10 +277,10 @@ export function ProductsScreen() {
                         <td className="py-2.5 px-3 font-medium">
                           {p.name} <span className="text-xs text-muted-foreground">/{p.unit}</span>
                         </td>
-                        {(["own", "bottle", "bulk"] as PriceTier[]).map((tier) => (
+                        {TIERS.map((tier) => (
                           <td key={tier} className="py-1.5 px-3 text-right">
                             <Input
-                              value={prices[p.id]?.[tier] ?? 0}
+                              value={priceOf(p.id, tier)}
                               onChange={(e) => setPrice(p.id, tier, Number(e.target.value))}
                               className="h-8 w-28 ml-auto text-right font-num"
                               type="number"
@@ -221,77 +302,82 @@ export function ProductsScreen() {
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">
-          <SectionCard
-            title={t("Historia ya mabadiliko ya bei", "Recent price changes")}
-            action={<History className="h-4 w-4 text-muted-foreground" />}
-          >
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                  <th className="py-2 px-3">{t("Tarehe", "Date")}</th>
-                  <th>{t("Bidhaa", "Product")}</th>
-                  <th>{t("Bei", "Tier")}</th>
-                  <th className="text-right">{t("Zamani", "Was")}</th>
-                  <th className="text-right">{t("Sasa", "Now")}</th>
-                  <th>{t("Aliyebadilisha", "By")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  {
-                    d: "2026-05-22",
-                    p: "Fresh milk",
-                    tier: "own",
-                    was: 1400,
-                    now: 1500,
-                    by: "Joyce",
-                  },
-                  {
-                    d: "2026-05-18",
-                    p: "Mozzarella",
-                    tier: "bulk",
-                    was: 13000,
-                    now: 13500,
-                    by: "Joyce",
-                  },
-                  {
-                    d: "2026-05-10",
-                    p: "Ghee",
-                    tier: "bottle",
-                    was: 18500,
-                    now: 19000,
-                    by: "Asha",
-                  },
-                  {
-                    d: "2026-05-05",
-                    p: "Mtindi",
-                    tier: "bottle",
-                    was: 1800,
-                    now: 2000,
-                    by: "Joyce",
-                  },
-                ].map((row, i) => (
-                  <tr key={i} className="border-b border-border last:border-0">
-                    <td className="py-2.5 px-3 font-num text-xs text-muted-foreground">{row.d}</td>
-                    <td className="py-2.5 font-medium">{row.p}</td>
-                    <td className="py-2.5">
-                      <Pill tone="info">{row.tier}</Pill>
-                    </td>
-                    <td className="py-2.5 text-right font-num text-muted-foreground">{row.was}</td>
-                    <td className="py-2.5 text-right font-num font-semibold">{row.now}</td>
-                    <td className="py-2.5 text-xs text-muted-foreground">{row.by}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </SectionCard>
+          <PriceHistoryTab />
         </TabsContent>
       </Tabs>
     </AppShell>
   );
 }
 
-function AddProductDialog({ onAdd }: { onAdd: (p: Product) => void }) {
+function PriceHistoryTab() {
+  const { t } = useApp();
+  const { data: history = [] } = usePriceHistory();
+  const { data: products = [] } = useProducts();
+  const productName = (id: string) => products.find((p) => p.id === id)?.name ?? id;
+
+  // "Was" = the next-older entry for the same product + tier.
+  const rows = useMemo(
+    () =>
+      history.map((h) => {
+        const older = history.find(
+          (x) =>
+            x.productId === h.productId &&
+            x.tier === h.tier &&
+            (x.effectiveFrom < h.effectiveFrom ||
+              (x.effectiveFrom === h.effectiveFrom && x.id !== h.id && x.value !== h.value)),
+        );
+        return { ...h, was: older?.value ?? null };
+      }),
+    [history],
+  );
+
+  return (
+    <SectionCard
+      title={t("Historia ya mabadiliko ya bei", "Recent price changes")}
+      action={<History className="h-4 w-4 text-muted-foreground" />}
+    >
+      {rows.length === 0 ? (
+        <EmptyState
+          icon={History}
+          title={t("Hakuna historia ya bei bado", "No price history yet")}
+        />
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+              <th className="py-2 px-3">{t("Tarehe", "Date")}</th>
+              <th>{t("Bidhaa", "Product")}</th>
+              <th>{t("Bei", "Tier")}</th>
+              <th className="text-right">{t("Zamani", "Was")}</th>
+              <th className="text-right">{t("Sasa", "Now")}</th>
+              <th>{t("Aliyebadilisha", "By")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 30).map((row) => (
+              <tr key={row.id} className="border-b border-border last:border-0">
+                <td className="py-2.5 px-3 font-num text-xs text-muted-foreground">
+                  {row.effectiveFrom}
+                </td>
+                <td className="py-2.5 font-medium">{productName(row.productId)}</td>
+                <td className="py-2.5">
+                  <Pill tone="info">{row.tier}</Pill>
+                </td>
+                <td className="py-2.5 text-right font-num text-muted-foreground">
+                  {row.was ?? "·"}
+                </td>
+                <td className="py-2.5 text-right font-num font-semibold">{row.value}</td>
+                <td className="py-2.5 text-xs text-muted-foreground">{row.byName ?? "·"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </SectionCard>
+  );
+}
+
+function AddProductDialog() {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -299,6 +385,31 @@ function AddProductDialog({ onAdd }: { onAdd: (p: Product) => void }) {
   const [category, setCategory] = useState<ProductCategory>("yoghurt");
   const [unit, setUnit] = useState<Unit>("pcs");
   const [conversionNote, setConversionNote] = useState("");
+  const create = useCreateProduct();
+
+  const save = () => {
+    if (!name.trim()) return;
+    create.mutate(
+      {
+        name,
+        swName: swName || name,
+        category,
+        unit,
+        conversionNote: conversionNote || undefined,
+        prices: { own: 0, bottle: 0, bulk: 0 },
+      },
+      {
+        onSuccess: () => {
+          toast.success(t("Bidhaa imeongezwa", "Product added"));
+          setOpen(false);
+          setName("");
+          setSwName("");
+          setConversionNote("");
+        },
+        onError: () => toast.error(t("Imeshindikana kuongeza", "Could not add product")),
+      },
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -380,27 +491,12 @@ function AddProductDialog({ onAdd }: { onAdd: (p: Product) => void }) {
             {t("Ghairi", "Cancel")}
           </Button>
           <Button
-            onClick={() => {
-              if (!name.trim()) return;
-              onAdd({
-                id: `p-new-${Date.now()}`,
-                name,
-                swName: swName || name,
-                category,
-                unit,
-                conversionNote: conversionNote || undefined,
-                active: true,
-              });
-              toast.success(t("Bidhaa imeongezwa", "Product added"));
-              setOpen(false);
-              setName("");
-              setSwName("");
-              setConversionNote("");
-            }}
+            onClick={save}
+            disabled={create.isPending}
             className="text-white"
             style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
           >
-            {t("Hifadhi", "Save")}
+            {create.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>
