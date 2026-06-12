@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Reactive localStorage-backed state. Falls back to `initial` on the server
@@ -6,21 +6,30 @@ import { useCallback, useEffect, useState } from "react";
  * event so two tabs stay in step.
  */
 export function useLocalStorage<T>(key: string, initial: T) {
-  const read = (): T => {
-    if (typeof window === "undefined") return initial;
-    try {
-      const raw = window.localStorage.getItem(key);
-      if (raw === null) return initial;
-      return JSON.parse(raw) as T;
-    } catch {
-      return initial;
-    }
-  };
-
-  const [value, setValue] = useState<T>(read);
+  // Hydration safety: the server renders `initial`, so the first client
+  // render must too. The stored value is applied right after mount;
+  // reading it during the initial render causes hydration mismatches
+  // (e.g. server "sw" labels against a stored "en" language).
+  const [value, setValue] = useState<T>(initial);
+  const firstRun = useRef(true);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (raw !== null) setValue(JSON.parse(raw) as T);
+    } catch {
+      /* unreadable value, keep the default */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  useEffect(() => {
+    // Skip the mount run: it fires before the stored value lands and
+    // would overwrite storage with the default.
+    if (firstRun.current) {
+      firstRun.current = false;
+      return;
+    }
     try {
       window.localStorage.setItem(key, JSON.stringify(value));
     } catch {
