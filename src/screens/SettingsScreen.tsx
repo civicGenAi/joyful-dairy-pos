@@ -827,7 +827,24 @@ function AuditTrail() {
                 ))}
               </SelectContent>
             </Select>
-            <ExportMenu formats={["csv", "excel"]} filename="audit-trail" />
+            <ExportMenu
+              formats={["csv", "excel", "pdf"]}
+              filename="audit-trail"
+              data={() => ({
+                title: t("Kumbukumbu za matendo", "Audit trail"),
+                headers: ["Time", "Actor", "Role", "Action", "Module", "Details", "Device", "IP"],
+                rows: filtered.map((e) => [
+                  e.at,
+                  e.actor,
+                  e.actorRole,
+                  e.action,
+                  e.module,
+                  lang === "sw" ? e.summary.sw : e.summary.en,
+                  e.device ? deviceLabel(e.device) : "",
+                  e.ip ?? "",
+                ]),
+              })}
+            />
           </div>
         }
       >

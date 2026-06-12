@@ -163,7 +163,22 @@ export function CustomersScreen() {
               />
             </div>
             {can("customers:write") && <AddCustomerDialog />}
-            <ExportMenu formats={["excel", "csv"]} filename="customers" />
+            <ExportMenu
+              formats={["excel", "csv", "pdf"]}
+              filename="customers"
+              data={() => ({
+                title: t("Orodha ya wateja", "Customer list"),
+                headers: ["Name", "Phone", "Email", "Type", "Outstanding TZS", "Status"],
+                rows: filtered.map((c) => [
+                  c.name,
+                  c.phone,
+                  c.email ?? "",
+                  c.type,
+                  c.outstandingTZS,
+                  c.suspended ? "suspended" : c.status,
+                ]),
+              })}
+            />
           </div>
         }
       >

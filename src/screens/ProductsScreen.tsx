@@ -194,7 +194,33 @@ export function ProductsScreen() {
                   <Switch checked={showInactive} onCheckedChange={setShowInactive} />
                   {t("Onyesha zisizo hai", "Show inactive")}
                 </label>
-                <ExportMenu formats={["excel", "csv"]} filename="products" />
+                <ExportMenu
+                  formats={["excel", "csv", "pdf"]}
+                  filename="products"
+                  data={() => ({
+                    title: t("Katalogi ya bidhaa", "Product catalogue"),
+                    headers: [
+                      "Name",
+                      "Swahili",
+                      "Category",
+                      "Unit",
+                      "Own",
+                      "Bottle",
+                      "Bulk",
+                      "Active",
+                    ],
+                    rows: visibleProducts.map((p) => [
+                      p.name,
+                      p.swName,
+                      p.category,
+                      p.unit,
+                      prices[p.id]?.own ?? 0,
+                      prices[p.id]?.bottle ?? 0,
+                      prices[p.id]?.bulk ?? 0,
+                      p.active ? "yes" : "no",
+                    ]),
+                  })}
+                />
                 {canWrite && <AddProductDialog />}
               </div>
             }

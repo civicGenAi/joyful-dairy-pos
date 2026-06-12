@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Download, FileSpreadsheet, FileText, FileType2 } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/app/context";
+// BACKEND: real file exports (CSV / Excel / branded PDF), no demo blobs.
+import { exportCSV, exportExcel, exportPDF, type ExportData } from "@/lib/export";
 
 export type ExportFormat = "pdf" | "excel" | "csv";
 
@@ -26,28 +28,28 @@ const LABELS: Record<ExportFormat, { sw: string; en: string }> = {
 export function ExportMenu({
   formats,
   filename = "export",
+  data,
 }: {
   formats: ExportFormat[];
   filename?: string;
+  /** The rows to export; a function defers building until the click. */
+  data?: ExportData | (() => ExportData);
 }) {
   const { t } = useApp();
   const doExport = (f: ExportFormat) => {
-    const ext = f === "excel" ? "xlsx" : f;
-    const blob = new Blob(
-      [
-        `African Joy Dairy demo export\nFile: ${filename}.${ext}\nGenerated: ${new Date().toLocaleString()}\n`,
-      ],
-      { type: "text/plain" },
-    );
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${filename}.${ext}`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success(
-      t(`Imehamishwa kama ${f.toUpperCase()} (demo)`, `Exported as ${f.toUpperCase()} (demo)`),
-    );
+    const resolved = typeof data === "function" ? data() : data;
+    if (!resolved || resolved.rows.length === 0) {
+      toast.error(t("Hakuna data ya kuhamisha", "No data to export"));
+      return;
+    }
+    try {
+      if (f === "csv") exportCSV(resolved, filename);
+      else if (f === "excel") exportExcel(resolved, filename);
+      else exportPDF(resolved, filename);
+      toast.success(t(`Imehamishwa kama ${f.toUpperCase()}`, `Exported as ${f.toUpperCase()}`));
+    } catch {
+      toast.error(t("Imeshindikana kuhamisha", "Export failed"));
+    }
   };
 
   if (formats.length === 1) {

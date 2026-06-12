@@ -180,7 +180,32 @@ export function ReportsScreen() {
             <TabsTrigger value="schedule">{t("Ratiba", "Scheduled delivery")}</TabsTrigger>
           </TabsList>
           <div className="flex gap-2">
-            <ExportMenu formats={["pdf", "excel"]} filename="report" />
+            <ExportMenu
+              formats={["pdf", "excel", "csv"]}
+              filename={`report-${dailyDate}`}
+              data={() => ({
+                title: t("Ripoti ya kila siku", "Daily report"),
+                subtitle: dailyDate,
+                headers: [
+                  "Product",
+                  "Unit",
+                  "Opening",
+                  "Sold cash",
+                  "Sold credit",
+                  "Spoilt",
+                  "Closing",
+                ],
+                rows: reconRows.map((r) => [
+                  r.product,
+                  r.unit,
+                  r.opening,
+                  r.soldCash,
+                  r.soldCredit,
+                  r.spoilt,
+                  r.closing,
+                ]),
+              })}
+            />
           </div>
         </div>
 

@@ -59,6 +59,12 @@ export const financeRepo = {
 
 // --- Expenses ---------------------------------------------------------------
 
+export type ExpenseWithRefs = Expense & {
+  refNo?: string;
+  invoiceRef?: string;
+  attachmentUrl?: string;
+};
+
 interface ExpenseRow {
   id: string;
   date: string;
@@ -68,10 +74,13 @@ interface ExpenseRow {
   amount_tzs: number;
   method: "cash" | "mpesa" | "bank";
   ref: string | null;
+  ref_no?: string | null;
+  invoice_ref?: string | null;
+  attachment_url?: string | null;
   profiles?: { name: string } | null;
 }
 
-function toExpense(r: ExpenseRow): Expense {
+function toExpense(r: ExpenseRow): ExpenseWithRefs {
   return {
     id: r.id,
     date: r.date,
@@ -81,12 +90,15 @@ function toExpense(r: ExpenseRow): Expense {
     amountTZS: Number(r.amount_tzs),
     method: r.method,
     ref: r.ref ?? undefined,
+    refNo: r.ref_no ?? undefined,
+    invoiceRef: r.invoice_ref ?? undefined,
+    attachmentUrl: r.attachment_url ?? undefined,
     recordedBy: r.profiles?.name ?? "",
   };
 }
 
 export const expensesRepo = {
-  async list(limit = 100): Promise<Expense[]> {
+  async list(limit = 100): Promise<ExpenseWithRefs[]> {
     const rows = unwrap(
       await supabase
         .from("expenses")
@@ -106,6 +118,8 @@ export const expensesRepo = {
     amountTZS: number;
     method: "cash" | "mpesa" | "bank";
     ref?: string;
+    invoiceRef?: string;
+    attachmentUrl?: string;
   }): Promise<void> {
     const { data: me } = await supabase.auth.getUser();
     const { data: profile } = await supabase
@@ -124,6 +138,8 @@ export const expensesRepo = {
           amount_tzs: input.amountTZS,
           method: input.method,
           ref: input.ref ?? null,
+          invoice_ref: input.invoiceRef ?? null,
+          attachment_url: input.attachmentUrl ?? null,
           recorded_by: profile?.id ?? null,
         })
         .select("id"),
