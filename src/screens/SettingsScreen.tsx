@@ -2,7 +2,13 @@ import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
 // BACKEND: data now flows through src/lib/data/{settings,locations,audit};
 // only static UI config (ROLE_LABEL) and types still come from @/mock/data.
-import { ROLE_LABEL, type LocationKind, type AuditAction, type AuditModule } from "@/mock/data";
+import {
+  ROLE_LABEL,
+  type Location,
+  type LocationKind,
+  type AuditAction,
+  type AuditModule,
+} from "@/mock/data";
 import type { Role, User } from "@/mock/types";
 import {
   useUsers,
@@ -18,6 +24,7 @@ import {
 import {
   useLocations,
   useCreateLocation,
+  useUpdateLocation,
   useSetLocationActive,
   useDeleteLocation,
 } from "@/lib/data/hooks/locations";
@@ -310,6 +317,7 @@ export function SettingsScreen() {
                       />
                     </td>
                     <td className="py-2.5 text-right">
+                      <EditLocationDialog location={loc} />
                       <ConfirmDialog
                         destructive
                         title={t("Futa eneo?", "Delete location?")}
@@ -587,6 +595,86 @@ function AddUserDialog() {
             style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
           >
             {create.isPending ? t("Inasajili…", "Registering…") : t("Sajili", "Register")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditLocationDialog({ location }: { location: Location }) {
+  const { t } = useApp();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(location.name);
+  const [swName, setSwName] = useState(location.swName);
+  const [note, setNote] = useState(location.note ?? "");
+  const update = useUpdateLocation();
+
+  const save = () => {
+    if (!name.trim() || !swName.trim()) {
+      toast.error(t("Jaza jina kwa lugha zote", "Fill in both names"));
+      return;
+    }
+    update.mutate(
+      { id: location.id, name: name.trim(), swName: swName.trim(), note },
+      {
+        onSuccess: () => {
+          toast.success(t("Eneo limehifadhiwa", "Location saved"));
+          setOpen(false);
+        },
+        onError: () => toast.error(t("Imeshindikana kuhifadhi", "Could not save")),
+      },
+    );
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (o) {
+          setName(location.name);
+          setSwName(location.swName);
+          setNote(location.note ?? "");
+        }
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 text-muted-foreground"
+          title={t("Hariri", "Edit")}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {t("Hariri eneo", "Edit location")}: {location.name}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-3">
+          <div className="grid gap-1.5">
+            <Label>{t("Jina (Kiingereza)", "Name (English)")}</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>{t("Jina (Kiswahili)", "Name (Swahili)")}</Label>
+            <Input value={swName} onChange={(e) => setSwName(e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>{t("Maelezo (hiari)", "Notes (optional)")}</Label>
+            <Input value={note} onChange={(e) => setNote(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            {t("Ghairi", "Cancel")}
+          </Button>
+          <Button onClick={save} disabled={update.isPending}>
+            {update.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>

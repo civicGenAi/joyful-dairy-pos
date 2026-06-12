@@ -59,6 +59,22 @@ export const locationsRepo = {
     return toLocation(row);
   },
 
+  async update(input: { id: string; name: string; swName: string; note?: string }): Promise<void> {
+    unwrap(
+      await supabase
+        .from("locations")
+        .update({ name: input.name, sw_name: input.swName, note: input.note ?? null })
+        .eq("id", input.id)
+        .select("id"),
+    );
+    await recordAudit(
+      "edit",
+      "settings",
+      `Amehariri eneo (${input.name})`,
+      `Edited location (${input.name})`,
+    );
+  },
+
   async setActive(id: string, name: string, active: boolean): Promise<void> {
     unwrap(await supabase.from("locations").update({ active }).eq("id", id).select("id"));
     await recordAudit(

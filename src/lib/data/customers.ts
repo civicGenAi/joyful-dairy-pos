@@ -16,6 +16,7 @@ interface CustomerRow {
   status: "active" | "overdue" | "ok";
   reminders_enabled?: boolean;
   suspended?: boolean;
+  next_due_date?: string | null;
 }
 
 function toCustomer(r: CustomerRow): Customer {
@@ -30,6 +31,7 @@ function toCustomer(r: CustomerRow): Customer {
     status: r.status,
     remindersEnabled: r.reminders_enabled ?? true,
     suspended: r.suspended ?? false,
+    nextDueDate: r.next_due_date ?? undefined,
   };
 }
 
@@ -117,6 +119,7 @@ export const customersRepo = {
     phone: string;
     email?: string;
     type: CustomerType;
+    nextDueDate?: string;
   }): Promise<Customer> {
     const row = unwrap(
       await supabase
@@ -126,6 +129,7 @@ export const customersRepo = {
           phone: input.phone,
           email: input.email ?? "",
           type: input.type,
+          next_due_date: input.nextDueDate || null,
         })
         .select("*")
         .single(),
@@ -146,6 +150,7 @@ export const customersRepo = {
     email?: string;
     type: CustomerType;
     remindersEnabled?: boolean;
+    nextDueDate?: string;
   }): Promise<void> {
     unwrap(
       await supabase
@@ -156,6 +161,7 @@ export const customersRepo = {
           email: input.email ?? "",
           type: input.type,
           reminders_enabled: input.remindersEnabled ?? true,
+          next_due_date: input.nextDueDate || null,
         })
         .eq("id", input.id)
         .select("id"),

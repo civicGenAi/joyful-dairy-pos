@@ -80,7 +80,9 @@ export function FinanceScreen() {
   const { data: cycle } = useCycleSummary();
   const { data: locks = [] } = useDayLocks();
   const [depositQ, setDepositQ] = useState("");
+  const [receiptsOnly, setReceiptsOnly] = useState(false);
   const filteredDeposits = deposits.filter((d) => {
+    if (receiptsOnly && !d.attachmentUrl) return false;
     if (!depositQ.trim()) return true;
     const needle = depositQ.toLowerCase();
     return (
@@ -361,6 +363,14 @@ export function FinanceScreen() {
                     placeholder={t("Tafuta rejea…", "Search reference…")}
                   />
                 </div>
+                <button
+                  onClick={() => setReceiptsOnly((v) => !v)}
+                  className={`inline-flex h-8 items-center gap-1 rounded-lg border px-2.5 text-xs font-semibold ${receiptsOnly ? "border-[#1E7C3F] bg-[#1E7C3F]/10 text-[#1E7C3F]" : "border-border text-muted-foreground hover:bg-accent"}`}
+                  title={t("Zenye risiti zilizopakiwa tu", "Only deposits with uploaded slips")}
+                >
+                  <Paperclip className="h-3 w-3" />
+                  {t("Zenye risiti", "With receipts")}
+                </button>
                 <ExportMenu
                   formats={["csv", "excel", "pdf"]}
                   filename={`deposits-${today}`}
@@ -381,8 +391,15 @@ export function FinanceScreen() {
               </div>
             }
           >
-            {deposits.length === 0 ? (
-              <EmptyState icon={Receipt} title={t("Hakuna amana bado", "No deposits yet")} />
+            {filteredDeposits.length === 0 ? (
+              <EmptyState
+                icon={Receipt}
+                title={
+                  receiptsOnly
+                    ? t("Hakuna amana zenye risiti", "No deposits with uploaded slips")
+                    : t("Hakuna amana bado", "No deposits yet")
+                }
+              />
             ) : (
               <table className="w-full text-sm">
                 <thead>

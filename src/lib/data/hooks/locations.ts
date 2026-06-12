@@ -15,6 +15,14 @@ export function useCreateLocation() {
   });
 }
 
+export function useUpdateLocation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: locationsRepo.update,
+    onSuccess: () => qc.invalidateQueries({ queryKey: locationKeys.all }),
+  });
+}
+
 export function useSetLocationActive() {
   const qc = useQueryClient();
   return useMutation({
