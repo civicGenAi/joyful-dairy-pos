@@ -50,8 +50,20 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "African Joy Dairy, Operations" },
       { name: "description", content: "Operations and POS for African Joy Dairy, Arusha." },
+      // Internal system: keep it out of every search engine, archive and snippet.
+      {
+        name: "robots",
+        content: "noindex, nofollow, noarchive, nosnippet, noimageindex, nocache",
+      },
+      { name: "googlebot", content: "noindex, nofollow" },
+      { name: "referrer", content: "no-referrer" },
     ],
     links: [
+      { rel: "icon", href: "/favicon_io/favicon.ico", sizes: "any" },
+      { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon_io/favicon-32x32.png" },
+      { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon_io/favicon-16x16.png" },
+      { rel: "apple-touch-icon", href: "/favicon_io/apple-touch-icon.png" },
+      { rel: "manifest", href: "/favicon_io/site.webmanifest" },
       { rel: "stylesheet", href: appCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
