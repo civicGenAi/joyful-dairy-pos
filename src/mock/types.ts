@@ -64,6 +64,8 @@ export interface Customer {
   status: "active" | "overdue" | "ok";
   remindersEnabled?: boolean;
   suspended?: boolean;
+  /** Manual payment due date driving the 5-day + day-of email reminders. */
+  nextDueDate?: string;
   monthlyActivity?: CustomerActivity[];
   deposits?: { id: string; date: string; amountTZS: number; ref: string }[];
 }
@@ -85,6 +87,8 @@ export interface CollectionEntry {
   session: "morning" | "evening";
   litres: number;
   point: "field-a" | "main";
+  /** Real source of truth; `point` is a legacy alias for the two seed points. */
+  locationId?: string;
   qualityNote?: string;
 }
 

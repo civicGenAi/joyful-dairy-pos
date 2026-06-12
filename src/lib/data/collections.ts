@@ -30,6 +30,7 @@ function toEntry(r: CollectionRow): CollectionWithFarmer {
     session: r.session,
     litres: Number(r.litres),
     point: r.location_id === "loc-field-a" ? "field-a" : "main",
+    locationId: r.location_id,
     qualityNote: r.quality_note ?? undefined,
     farmerName: r.farmers?.name,
     createdAt: r.created_at,
@@ -86,7 +87,8 @@ export const collectionsRepo = {
     date: string;
     session: "morning" | "evening";
     litres: number;
-    point: "field-a" | "main";
+    /** Any active collection-point or plant location id. */
+    locationId: string;
     qualityNote?: string;
   }): Promise<void> {
     const { error } = await supabase.rpc("record_collection", {
@@ -94,7 +96,7 @@ export const collectionsRepo = {
       p_date: input.date,
       p_session: input.session,
       p_litres: input.litres,
-      p_location_id: input.point === "field-a" ? "loc-field-a" : "loc-main",
+      p_location_id: input.locationId,
       p_quality_note: input.qualityNote ?? null,
     });
     if (error) throw new Error(error.message);

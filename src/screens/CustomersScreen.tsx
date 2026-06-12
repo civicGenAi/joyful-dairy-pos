@@ -245,6 +245,11 @@ export function CustomersScreen() {
                         </td>
                         <td className="py-2.5 px-3 text-muted-foreground text-xs">
                           {c.lastActivity}
+                          {c.nextDueDate && (
+                            <div className="text-[10px] text-[#8a5a00]">
+                              {t("Malipo", "Due")}: {c.nextDueDate}
+                            </div>
+                          )}
                         </td>
                         <td className="py-2.5 px-3">
                           {c.suspended ? (
@@ -635,12 +640,13 @@ function AddCustomerDialog() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [type, setType] = useState<CustomerType>("cash");
+  const [dueDate, setDueDate] = useState("");
   const create = useCreateCustomer();
 
   const save = () => {
     if (!name.trim()) return;
     create.mutate(
-      { name, phone, email, type },
+      { name, phone, email, type, nextDueDate: dueDate || undefined },
       {
         onSuccess: () => {
           toast.success(t("Mteja amesajiliwa", "Customer registered"));
@@ -707,6 +713,18 @@ function AddCustomerDialog() {
               </Select>
             </div>
           </div>
+          {type !== "cash" && (
+            <div className="grid gap-1.5">
+              <Label>{t("Tarehe ya malipo (kikumbusho)", "Payment due date (reminder)")}</Label>
+              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+              <div className="text-[11px] text-muted-foreground">
+                {t(
+                  "Barua pepe itatumwa siku 5 kabla na siku yenyewe ya malipo.",
+                  "An email goes out 5 days before this date and again on the day itself.",
+                )}
+              </div>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
@@ -734,6 +752,7 @@ function CustomerActions({ c }: { c: Customer }) {
   const [email, setEmail] = useState(c.email ?? "");
   const [type, setType] = useState<CustomerType>(c.type);
   const [reminders, setReminders] = useState(c.remindersEnabled ?? true);
+  const [dueDate, setDueDate] = useState(c.nextDueDate ?? "");
   const update = useUpdateCustomer();
   const remove = useDeleteCustomer();
   const suspend = useSetCustomerSuspended();
@@ -742,7 +761,15 @@ function CustomerActions({ c }: { c: Customer }) {
 
   const saveEdit = () => {
     update.mutate(
-      { id: c.id, name, phone, email, type, remindersEnabled: reminders },
+      {
+        id: c.id,
+        name,
+        phone,
+        email,
+        type,
+        remindersEnabled: reminders,
+        nextDueDate: dueDate || undefined,
+      },
       {
         onSuccess: () => {
           toast.success(t("Mteja amehifadhiwa", "Customer saved"));
@@ -887,18 +914,30 @@ function CustomerActions({ c }: { c: Customer }) {
               />
             </div>
             {type !== "cash" && (
-              <label className="flex items-center justify-between rounded-xl border border-border p-3 text-sm">
-                <span>
-                  {t("Vikumbusho vya deni otomatiki", "Automatic balance reminders")}
-                  <span className="block text-xs text-muted-foreground">
+              <>
+                <div className="grid gap-1.5">
+                  <Label>{t("Tarehe ya malipo (kikumbusho)", "Payment due date (reminder)")}</Label>
+                  <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                  <div className="text-[11px] text-muted-foreground">
                     {t(
-                      "Barua pepe; WhatsApp na SMS zinakuja",
-                      "Email; WhatsApp and SMS coming soon",
+                      "Barua pepe itatumwa siku 5 kabla na siku yenyewe ya malipo.",
+                      "An email goes out 5 days before this date and again on the day itself.",
                     )}
+                  </div>
+                </div>
+                <label className="flex items-center justify-between rounded-xl border border-border p-3 text-sm">
+                  <span>
+                    {t("Vikumbusho vya deni otomatiki", "Automatic balance reminders")}
+                    <span className="block text-xs text-muted-foreground">
+                      {t(
+                        "Barua pepe; WhatsApp na SMS zinakuja",
+                        "Email; WhatsApp and SMS coming soon",
+                      )}
+                    </span>
                   </span>
-                </span>
-                <Switch checked={reminders} onCheckedChange={setReminders} />
-              </label>
+                  <Switch checked={reminders} onCheckedChange={setReminders} />
+                </label>
+              </>
             )}
           </div>
           <DialogFooter>

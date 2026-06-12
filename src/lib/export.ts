@@ -78,7 +78,8 @@ export function exportPDF(data: ExportData, filename: string) {
  * Used by the print routes' "Download PDF" button.
  */
 export async function exportElementPDF(element: HTMLElement, filename: string) {
-  const { default: html2canvas } = await import("html2canvas");
+  // html2canvas-pro: supports the oklch() colors Tailwind v4 emits.
+  const { default: html2canvas } = await import("html2canvas-pro");
   const canvas = await html2canvas(element, {
     scale: 2,
     useCORS: true,

@@ -154,10 +154,18 @@ export const stockRepo = {
     if (error) throw new Error(error.message);
   },
 
-  async recordReturn(input: { stockItemId: string; qty: number }): Promise<void> {
+  async recordReturn(input: {
+    stockItemId: string;
+    qty: number;
+    locationId?: string;
+    /** Required when a driver overrides the computed return quantity. */
+    note?: string;
+  }): Promise<void> {
     const { error } = await supabase.rpc("record_return", {
       p_stock_item_id: input.stockItemId,
       p_qty: input.qty,
+      p_location_id: input.locationId ?? null,
+      p_note: input.note ?? null,
     });
     if (error) throw new Error(error.message);
   },

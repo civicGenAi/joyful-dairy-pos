@@ -14,6 +14,7 @@ import {
   useReviewAdjustment,
 } from "@/lib/data/hooks/farmers";
 import { useRecordCollection } from "@/lib/data/hooks/collections";
+import { useLocations } from "@/lib/data/hooks/locations";
 import { useQuery } from "@tanstack/react-query";
 import { collectionKeys, collectionsRepo } from "@/lib/data/collections";
 import { todayISO, dateLabel, currentSession } from "@/lib/data/dates";
@@ -355,7 +356,7 @@ export function FarmersScreen() {
 }
 
 function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
-  const { t } = useApp();
+  const { t, lang } = useApp();
   const [open, setOpen] = useState(false);
   const [farmerId, setFarmerId] = useState<string>("");
   const [date, setDate] = useState(todayISO());
@@ -363,7 +364,13 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
   const [session, setSession] = useState<"morning" | "evening">(currentSession());
   const sessionMismatch = date === todayISO() && session !== currentSession();
   const [litres, setLitres] = useState(32);
-  const [point, setPoint] = useState<"field-a" | "main">("field-a");
+  // Intake points come from the locations table: every active collection
+  // point or plant, managed from the Collection points screen or Settings.
+  const { data: locations = [] } = useLocations();
+  const points = locations.filter(
+    (l) => l.active && (l.kind === "collection-point" || l.kind === "plant"),
+  );
+  const [locationId, setLocationId] = useState("");
   const [note, setNote] = useState("");
   const record = useRecordCollection();
 
@@ -371,7 +378,14 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
     const fid = farmerId || farmers[0]?.id;
     if (!fid || litres <= 0) return;
     record.mutate(
-      { farmerId: fid, date, session, litres, point, qualityNote: note || undefined },
+      {
+        farmerId: fid,
+        date,
+        session,
+        litres,
+        locationId: locationId || points[0]?.id || "loc-main",
+        qualityNote: note || undefined,
+      },
       {
         onSuccess: () => {
           toast.success(t("Ukusanyaji umerekodiwa", "Collection recorded"));
@@ -452,17 +466,16 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
             </div>
             <div className="grid gap-1.5">
               <Label>{t("Pointi", "Point")}</Label>
-              <Select value={point} onValueChange={(v) => setPoint(v as typeof point)}>
+              <Select value={locationId || points[0]?.id} onValueChange={setLocationId}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="field-a">
-                    {t("Pointi A, Olasiti", "Point A, Olasiti")}
-                  </SelectItem>
-                  <SelectItem value="main">
-                    {t("Kiwandani, Arusha", "Main plant, Arusha")}
-                  </SelectItem>
+                  {points.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {lang === "sw" ? l.swName : l.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

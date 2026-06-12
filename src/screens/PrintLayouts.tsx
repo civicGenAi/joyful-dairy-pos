@@ -17,7 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { L, num, tzs } from "@/lib/format";
 import { exportElementPDF } from "@/lib/export";
 import { useRef, useState } from "react";
-import { ArrowLeft, Printer, Download } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import { Link, useParams, useSearch } from "@tanstack/react-router";
 import { useApp } from "@/app/context";
 
@@ -64,20 +64,12 @@ function PrintShell({
             <Button
               onClick={downloadPDF}
               size="sm"
-              variant="outline"
               disabled={downloading}
-              className="text-xs"
+              className="text-xs text-white"
+              style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
             >
               <Download className="h-3.5 w-3.5 mr-1.5" />
               {downloading ? t("Inapakua…", "Downloading…") : t("Pakua PDF", "Download PDF")}
-            </Button>
-            <Button
-              onClick={() => window.print()}
-              size="sm"
-              className="text-white"
-              style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
-            >
-              <Printer className="h-3.5 w-3.5 mr-1.5" /> {t("Chapisha", "Print")}
             </Button>
           </div>
         </div>
