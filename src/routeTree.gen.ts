@@ -23,6 +23,7 @@ import { Route as PosRouteImport } from './routes/pos'
 import { Route as OfflineRouteImport } from './routes/offline'
 import { Route as MaintenanceRouteImport } from './routes/maintenance'
 import { Route as HelpRouteImport } from './routes/help'
+import { Route as HealthRouteImport } from './routes/health'
 import { Route as FinanceRouteImport } from './routes/finance'
 import { Route as FarmersRouteImport } from './routes/farmers'
 import { Route as ExpensesRouteImport } from './routes/expenses'
@@ -107,6 +108,11 @@ const MaintenanceRoute = MaintenanceRouteImport.update({
 const HelpRoute = HelpRouteImport.update({
   id: '/help',
   path: '/help',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HealthRoute = HealthRouteImport.update({
+  id: '/health',
+  path: '/health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FinanceRoute = FinanceRouteImport.update({
@@ -195,6 +201,7 @@ export interface FileRoutesByFullPath {
   '/expenses': typeof ExpensesRoute
   '/farmers': typeof FarmersRoute
   '/finance': typeof FinanceRoute
+  '/health': typeof HealthRoute
   '/help': typeof HelpRoute
   '/maintenance': typeof MaintenanceRoute
   '/offline': typeof OfflineRoute
@@ -226,6 +233,7 @@ export interface FileRoutesByTo {
   '/expenses': typeof ExpensesRoute
   '/farmers': typeof FarmersRoute
   '/finance': typeof FinanceRoute
+  '/health': typeof HealthRoute
   '/help': typeof HelpRoute
   '/maintenance': typeof MaintenanceRoute
   '/offline': typeof OfflineRoute
@@ -258,6 +266,7 @@ export interface FileRoutesById {
   '/expenses': typeof ExpensesRoute
   '/farmers': typeof FarmersRoute
   '/finance': typeof FinanceRoute
+  '/health': typeof HealthRoute
   '/help': typeof HelpRoute
   '/maintenance': typeof MaintenanceRoute
   '/offline': typeof OfflineRoute
@@ -291,6 +300,7 @@ export interface FileRouteTypes {
     | '/expenses'
     | '/farmers'
     | '/finance'
+    | '/health'
     | '/help'
     | '/maintenance'
     | '/offline'
@@ -322,6 +332,7 @@ export interface FileRouteTypes {
     | '/expenses'
     | '/farmers'
     | '/finance'
+    | '/health'
     | '/help'
     | '/maintenance'
     | '/offline'
@@ -353,6 +364,7 @@ export interface FileRouteTypes {
     | '/expenses'
     | '/farmers'
     | '/finance'
+    | '/health'
     | '/help'
     | '/maintenance'
     | '/offline'
@@ -385,6 +397,7 @@ export interface RootRouteChildren {
   ExpensesRoute: typeof ExpensesRoute
   FarmersRoute: typeof FarmersRoute
   FinanceRoute: typeof FinanceRoute
+  HealthRoute: typeof HealthRoute
   HelpRoute: typeof HelpRoute
   MaintenanceRoute: typeof MaintenanceRoute
   OfflineRoute: typeof OfflineRoute
@@ -507,6 +520,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HelpRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/health': {
+      id: '/health'
+      path: '/health'
+      fullPath: '/health'
+      preLoaderRoute: typeof HealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/finance': {
       id: '/finance'
       path: '/finance'
@@ -625,6 +645,7 @@ const rootRouteChildren: RootRouteChildren = {
   ExpensesRoute: ExpensesRoute,
   FarmersRoute: FarmersRoute,
   FinanceRoute: FinanceRoute,
+  HealthRoute: HealthRoute,
   HelpRoute: HelpRoute,
   MaintenanceRoute: MaintenanceRoute,
   OfflineRoute: OfflineRoute,
