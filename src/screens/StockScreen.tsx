@@ -184,7 +184,24 @@ export function StockScreen() {
               }
               action={
                 <div className="flex gap-2">
-                  <ExportMenu formats={["csv", "excel"]} filename={`stock-${thisTab}`} />
+                  <ExportMenu
+                    formats={["csv", "excel", "pdf"]}
+                    filename={`stock-${thisTab}`}
+                    data={() => ({
+                      title: t("Stock", "Stock"),
+                      headers: ["Item", "Swahili", "On hand", "Unit", "Reorder", "Status"],
+                      rows: items
+                        .filter((s) => s.category === thisTab)
+                        .map((s) => [
+                          s.name,
+                          s.swName ?? "",
+                          s.onHand,
+                          s.unit,
+                          s.reorder,
+                          s.onHand <= 0 ? "out" : s.onHand < s.reorder ? "low" : "ok",
+                        ]),
+                    })}
+                  />
                   {writable && <AdjustDialog items={items.filter((s) => s.category === thisTab)} />}
                   {writable && (
                     <ReceiveDialog items={items.filter((s) => s.category === thisTab)} />
@@ -344,7 +361,25 @@ export function StockScreen() {
         <TabsContent value="movements" className="mt-4">
           <SectionCard
             title={t("Daftari la harakati za stock", "Stock movements log")}
-            action={<ExportMenu formats={["csv"]} filename={`stock-movements-${todayISO()}`} />}
+            action={
+              <ExportMenu
+                formats={["csv", "excel", "pdf"]}
+                filename={`stock-movements-${todayISO()}`}
+                data={() => ({
+                  title: t("Harakati za stock", "Stock movements"),
+                  headers: ["Date", "Item", "Kind", "Qty", "Unit", "Reason", "By"],
+                  rows: movements.map((m) => [
+                    m.date,
+                    itemName(m.stockItemId),
+                    m.kind,
+                    m.qty,
+                    m.unit,
+                    m.reason ?? "",
+                    m.byName ?? "",
+                  ]),
+                })}
+              />
+            }
           >
             {movements.length === 0 ? (
               <EmptyState title={t("Hakuna harakati bado", "No movements yet")} />

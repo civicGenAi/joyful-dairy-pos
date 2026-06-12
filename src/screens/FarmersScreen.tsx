@@ -162,7 +162,31 @@ export function FarmersScreen() {
                 <SelectItem value="paid">{t("Wamelipwa", "Paid")}</SelectItem>
               </SelectContent>
             </Select>
-            <ExportMenu formats={["excel", "csv", "pdf"]} filename="farmers" />
+            <ExportMenu
+              formats={["excel", "csv", "pdf"]}
+              filename="farmers"
+              data={() => ({
+                title: t("Orodha ya wafugaji", "Farmer list"),
+                headers: [
+                  "Name",
+                  "Phone",
+                  "Village",
+                  "Litres this cycle",
+                  "Rate TZS/L",
+                  "Balance TZS",
+                  "Status",
+                ],
+                rows: filtered.map((f) => [
+                  f.name,
+                  f.phone,
+                  f.village,
+                  f.litresThisCycle,
+                  f.ratePerL,
+                  f.currentBalanceTZS,
+                  f.status,
+                ]),
+              })}
+            />
             {canWrite && <AddFarmerDialog />}
             {can("collection:write") && <RecordCollectionDialog farmers={farmers} />}
           </div>

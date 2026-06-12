@@ -170,7 +170,40 @@ export function ReconciliationScreen() {
         title={t("Sawazisho la kila bidhaa", "Per-product reconciliation")}
         action={
           <div className="flex gap-2">
-            <ExportMenu formats={["pdf"]} filename={`day-reconciliation-${today}`} />
+            <ExportMenu
+              formats={["pdf", "excel", "csv"]}
+              filename={`day-reconciliation-${today}`}
+              data={() => ({
+                title: t("Sawazisho la siku", "Day reconciliation"),
+                subtitle: today,
+                headers: [
+                  "Product",
+                  "Unit",
+                  "Opening",
+                  "Collected",
+                  "Produced",
+                  "Sold cash",
+                  "Sold credit",
+                  "Separated",
+                  "Spoilt",
+                  "Returned",
+                  "Closing",
+                ],
+                rows: rows.map((r) => [
+                  r.product,
+                  r.unit,
+                  r.opening,
+                  r.collected,
+                  r.produced,
+                  r.soldCash,
+                  r.soldCredit,
+                  r.separated,
+                  r.spoilt,
+                  r.returned,
+                  closingOf(r),
+                ]),
+              })}
+            />
             <Button asChild variant="outline" size="sm" className="h-8 text-xs">
               <Link to="/report/day-close/$date" params={{ date: today }}>
                 <FileText className="h-3.5 w-3.5 mr-1.5" />

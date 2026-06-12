@@ -15,7 +15,9 @@ import { collectionKeys, collectionsRepo } from "@/lib/data/collections";
 import { dateLabel, todayISO } from "@/lib/data/dates";
 import { useQuery } from "@tanstack/react-query";
 import { L, num, tzs } from "@/lib/format";
-import { ArrowLeft, Printer } from "lucide-react";
+import { exportElementPDF } from "@/lib/export";
+import { useRef, useState } from "react";
+import { ArrowLeft, Printer, Download } from "lucide-react";
 import { Link, useParams, useSearch } from "@tanstack/react-router";
 import { useApp } from "@/app/context";
 
@@ -32,29 +34,59 @@ function PrintShell({
 }) {
   const { t } = useApp();
   const { data: company } = useCompany();
+  const docRef = useRef<HTMLDivElement>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  // Real PDF file of the document, not the browser print dialog.
+  const downloadPDF = async () => {
+    if (!docRef.current) return;
+    setDownloading(true);
+    try {
+      const name = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${(subtitle ?? "").split(" ")[0] || Date.now()}`;
+      await exportElementPDF(docRef.current, name);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="no-print sticky top-0 z-10 border-b border-border bg-card">
-        <div className="mx-auto max-w-3xl flex items-center justify-between px-5 py-3">
+        <div className="mx-auto max-w-3xl flex items-center justify-between gap-2 px-5 py-3">
           <Link
             to={backTo}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" /> {t("Rudi", "Back")}
           </Link>
-          <div className="text-sm font-semibold">{title}</div>
-          <Button
-            onClick={() => window.print()}
-            size="sm"
-            className="text-white"
-            style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
-          >
-            <Printer className="h-3.5 w-3.5 mr-1.5" /> {t("Chapisha", "Print")}
-          </Button>
+          <div className="text-sm font-semibold truncate">{title}</div>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={downloadPDF}
+              size="sm"
+              variant="outline"
+              disabled={downloading}
+              className="text-xs"
+            >
+              <Download className="h-3.5 w-3.5 mr-1.5" />
+              {downloading ? t("Inapakua…", "Downloading…") : t("Pakua PDF", "Download PDF")}
+            </Button>
+            <Button
+              onClick={() => window.print()}
+              size="sm"
+              className="text-white"
+              style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+            >
+              <Printer className="h-3.5 w-3.5 mr-1.5" /> {t("Chapisha", "Print")}
+            </Button>
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-3xl px-5 py-8 print:p-0 print:max-w-none">
-        <div className="rounded-2xl bg-card border border-border p-8 print:border-0 print:shadow-none print:rounded-none">
+        <div
+          ref={docRef}
+          className="rounded-2xl bg-card border border-border p-8 print:border-0 print:shadow-none print:rounded-none"
+        >
           <div className="flex items-center justify-between border-b border-border pb-5 mb-6">
             <JoyLogo size={48} />
             <div className="text-right text-xs text-muted-foreground">

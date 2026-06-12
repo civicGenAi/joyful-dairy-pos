@@ -3,6 +3,7 @@ import { useApp } from "@/app/context";
 // BACKEND: data now flows through src/lib/data/finance (was @/mock/data).
 import type { ExpenseCategory } from "@/mock/data";
 import { useExpenses, useCreateExpense } from "@/lib/data/hooks/finance";
+import { uploadHardCopy } from "@/lib/data/uploads";
 import { todayISO } from "@/lib/data/dates";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { tzs, num } from "@/lib/format";
@@ -56,6 +57,7 @@ import {
   Truck,
   Briefcase,
   HelpCircle,
+  Paperclip,
 } from "lucide-react";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -87,7 +89,8 @@ export function ExpensesScreen() {
         if (cat !== "all" && e.category !== cat) return false;
         if (q) {
           const needle = q.toLowerCase();
-          const text = `${e.vendor} ${e.description} ${e.ref ?? ""}`.toLowerCase();
+          const text =
+            `${e.vendor} ${e.description} ${e.ref ?? ""} ${e.refNo ?? ""} ${e.invoiceRef ?? ""}`.toLowerCase();
           if (!text.includes(needle)) return false;
         }
         return true;
@@ -186,7 +189,33 @@ export function ExpensesScreen() {
                     ))}
                   </SelectContent>
                 </Select>
-                <ExportMenu formats={["csv", "excel"]} filename="expenses" />
+                <ExportMenu
+                  formats={["csv", "excel", "pdf"]}
+                  filename="expenses"
+                  data={() => ({
+                    title: t("Matumizi", "Expenses"),
+                    headers: [
+                      "Ref",
+                      "Date",
+                      "Category",
+                      "Vendor",
+                      "Description",
+                      "Invoice",
+                      "Method",
+                      "Amount TZS",
+                    ],
+                    rows: filtered.map((e) => [
+                      e.refNo ?? "",
+                      e.date,
+                      e.category,
+                      e.vendor,
+                      e.description,
+                      e.invoiceRef ?? "",
+                      e.method,
+                      e.amountTZS,
+                    ]),
+                  })}
+                />
                 {can("finance:write") && <AddExpenseDialog />}
               </div>
             }
@@ -233,7 +262,26 @@ export function ExpensesScreen() {
                         <td className="py-2.5 font-medium">{e.vendor}</td>
                         <td className="py-2.5 text-xs text-muted-foreground">
                           {e.description}
-                          {e.ref && <div className="font-num text-[10px]">{e.ref}</div>}
+                          <div className="font-num text-[10px] flex items-center gap-1.5 flex-wrap">
+                            {e.refNo && <span className="text-[#1E7C3F]">{e.refNo}</span>}
+                            {e.invoiceRef && (
+                              <span>
+                                {t("Ankara", "Inv")}: {e.invoiceRef}
+                              </span>
+                            )}
+                            {e.ref && <span>{e.ref}</span>}
+                            {e.attachmentUrl && (
+                              <a
+                                href={e.attachmentUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                title={t("Nakala ngumu", "Hard copy")}
+                                className="text-[#1E7C3F] hover:opacity-70"
+                              >
+                                <Paperclip className="h-3 w-3 inline" />
+                              </a>
+                            )}
+                          </div>
                         </td>
                         <td className="py-2.5">
                           <span className="inline-flex items-center gap-1 text-xs capitalize">
@@ -329,26 +377,48 @@ function AddExpenseDialog() {
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState(0);
   const [method, setMethod] = useState<"cash" | "mpesa" | "bank">("cash");
-  const [ref, setRef] = useState("");
+  const [invoiceRef, setInvoiceRef] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const create = useCreateExpense();
 
-  const save = () => {
+  const save = async () => {
     if (!vendor.trim() || !amount) return;
-    create.mutate(
-      { date, category, vendor, description, amountTZS: amount, method, ref: ref || undefined },
-      {
-        onSuccess: () => {
-          toast.success(t("Matumizi yamerekodiwa", "Expense recorded"));
-          setOpen(false);
-          setVendor("");
-          setDescription("");
-          setAmount(0);
-          setRef("");
+    setSaving(true);
+    try {
+      let attachmentUrl: string | undefined;
+      if (file) attachmentUrl = await uploadHardCopy(file, "expense");
+      // The system reference (AJD-EXP-date-number) is assigned automatically.
+      create.mutate(
+        {
+          date,
+          category,
+          vendor,
+          description,
+          amountTZS: amount,
+          method,
+          invoiceRef: invoiceRef || undefined,
+          attachmentUrl,
         },
-        onError: () => toast.error(t("Imeshindikana kurekodi", "Could not record expense")),
-      },
-    );
+        {
+          onSuccess: () => {
+            toast.success(t("Matumizi yamerekodiwa", "Expense recorded"));
+            setOpen(false);
+            setVendor("");
+            setDescription("");
+            setAmount(0);
+            setInvoiceRef("");
+            setFile(null);
+          },
+          onError: () => toast.error(t("Imeshindikana kurekodi", "Could not record expense")),
+          onSettled: () => setSaving(false),
+        },
+      );
+    } catch {
+      toast.error(t("Imeshindikana kupakia nakala", "Could not upload the hard copy"));
+      setSaving(false);
+    }
   };
 
   return (
@@ -429,9 +499,31 @@ function AddExpenseDialog() {
               </Select>
             </div>
             <div className="grid gap-1.5">
-              <Label>{t("Rejea", "Ref")}</Label>
-              <Input value={ref} onChange={(e) => setRef(e.target.value)} placeholder="INV-…" />
+              <Label>{t("Rejea ya ankara (hiari)", "Invoice ref (optional)")}</Label>
+              <Input
+                value={invoiceRef}
+                onChange={(e) => setInvoiceRef(e.target.value)}
+                placeholder="INV-2034"
+              />
             </div>
+          </div>
+          <div className="grid gap-1.5">
+            <Label>
+              {t("Nakala ya ankara (hiari, picha au PDF)", "Invoice copy (optional, photo or PDF)")}
+            </Label>
+            <Input
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="text-xs"
+            />
+            {file && <div className="text-[11px] text-muted-foreground">{file.name}</div>}
+          </div>
+          <div className="rounded-xl bg-secondary/60 px-3 py-2.5 text-[11px] text-muted-foreground">
+            {t(
+              "Rejea ya mfumo (AJD-EXP-tarehe-namba) itatengenezwa otomatiki na inaonekana kwenye orodha.",
+              "A system reference (AJD-EXP-date-number) is assigned automatically and shown in the list.",
+            )}
           </div>
         </div>
         <DialogFooter>
@@ -440,11 +532,11 @@ function AddExpenseDialog() {
           </Button>
           <Button
             onClick={save}
-            disabled={create.isPending}
+            disabled={saving || create.isPending}
             className="text-white"
             style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
           >
-            {create.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
+            {saving || create.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>

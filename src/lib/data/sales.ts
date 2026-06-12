@@ -143,6 +143,7 @@ export interface DepositRecord {
   amountTZS: number;
   ref: string | null;
   note: string | null;
+  attachmentUrl: string | null;
 }
 
 export const depositKeys = {
@@ -161,6 +162,7 @@ interface DepositRow {
   amount_tzs: number;
   ref: string | null;
   note: string | null;
+  attachment_url?: string | null;
   customers?: { name: string } | null;
 }
 
@@ -176,6 +178,7 @@ function toDeposit(r: DepositRow): DepositRecord {
     amountTZS: Number(r.amount_tzs),
     ref: r.ref,
     note: r.note,
+    attachmentUrl: r.attachment_url ?? null,
   };
 }
 
@@ -198,7 +201,10 @@ export const depositsRepo = {
     return toDeposit(row);
   },
 
-  /** Generic deposit slip (route cash-up, counter banking, other income). */
+  /**
+   * Generic deposit slip (route cash-up, counter banking, other income).
+   * The reference is system-generated (AJD-DEP-YYMMDD-seq) unless supplied.
+   */
   async record(input: {
     source: DepositRecord["source"];
     method: DepositRecord["method"];
@@ -206,6 +212,7 @@ export const depositsRepo = {
     customerId?: string;
     ref?: string;
     note?: string;
+    attachmentUrl?: string;
   }): Promise<void> {
     const { error } = await supabase.rpc("record_deposit", {
       p_source: input.source,
@@ -214,6 +221,7 @@ export const depositsRepo = {
       p_customer_id: input.customerId ?? null,
       p_ref: input.ref ?? null,
       p_note: input.note ?? null,
+      p_attachment_url: input.attachmentUrl ?? null,
     });
     if (error) throw new Error(error.message);
   },

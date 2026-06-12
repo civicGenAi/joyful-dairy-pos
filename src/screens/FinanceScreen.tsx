@@ -7,6 +7,7 @@ import { useDeposits, useRecordDeposit } from "@/lib/data/hooks/sales";
 import { useCashPosition, useInitiatePayouts } from "@/lib/data/hooks/finance";
 import { useDayLocks, useConfirmDay } from "@/lib/data/hooks/recon";
 import { todayISO, dateLabel } from "@/lib/data/dates";
+import { uploadHardCopy } from "@/lib/data/uploads";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { tzs, num } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,8 @@ import {
   Banknote,
   Smartphone,
   ArrowUpRight,
+  Paperclip,
+  Search,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -76,6 +79,18 @@ export function FinanceScreen() {
   const { data: cash } = useCashPosition(today);
   const { data: cycle } = useCycleSummary();
   const { data: locks = [] } = useDayLocks();
+  const [depositQ, setDepositQ] = useState("");
+  const filteredDeposits = deposits.filter((d) => {
+    if (!depositQ.trim()) return true;
+    const needle = depositQ.toLowerCase();
+    return (
+      d.id.toLowerCase().includes(needle) ||
+      (d.ref ?? "").toLowerCase().includes(needle) ||
+      (d.customerName ?? "").toLowerCase().includes(needle) ||
+      (d.note ?? "").toLowerCase().includes(needle) ||
+      d.source.toLowerCase().includes(needle)
+    );
+  });
   const confirmDay = useConfirmDay();
   const canConfirm = useApp().can("dayclose:confirm");
   const canDeposit = useApp().can("deposit:write");
@@ -164,7 +179,20 @@ export function FinanceScreen() {
             <SectionCard
               title={t("Muhtasari wa madeni", "Receivables summary")}
               className="lg:col-span-2"
-              action={<ExportMenu formats={["excel", "csv"]} filename="receivables" />}
+              action={
+                <ExportMenu
+                  formats={["excel", "csv", "pdf"]}
+                  filename="receivables"
+                  data={() => ({
+                    title: t("Madeni ya wateja", "Customer receivables"),
+                    headers: ["Customer", "Type", "Outstanding TZS", "Status"],
+                    rows: customers
+                      .filter((c) => c.outstandingTZS > 0)
+                      .sort((a, b) => b.outstandingTZS - a.outstandingTZS)
+                      .map((c) => [c.name, c.type, c.outstandingTZS, c.status]),
+                  })}
+                />
+              }
             >
               <table className="w-full text-sm">
                 <thead>
@@ -323,8 +351,32 @@ export function FinanceScreen() {
           <SectionCard
             title={t("Amana zilizopokelewa", "Deposits & receipts log")}
             action={
-              <div className="flex gap-2">
-                <ExportMenu formats={["csv", "excel"]} filename={`deposits-${today}`} />
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    value={depositQ}
+                    onChange={(e) => setDepositQ(e.target.value)}
+                    className="h-8 w-48 pl-8 text-xs"
+                    placeholder={t("Tafuta rejea…", "Search reference…")}
+                  />
+                </div>
+                <ExportMenu
+                  formats={["csv", "excel", "pdf"]}
+                  filename={`deposits-${today}`}
+                  data={() => ({
+                    title: t("Amana na risiti", "Deposits & receipts"),
+                    headers: ["Date", "Reference", "Source", "Type", "Method", "Amount TZS"],
+                    rows: filteredDeposits.map((d) => [
+                      d.date,
+                      d.ref ?? d.id,
+                      d.customerName ?? d.note ?? "",
+                      d.source,
+                      d.method,
+                      d.amountTZS,
+                    ]),
+                  })}
+                />
                 {canDeposit && <RecordReceiptDialog />}
               </div>
             }
@@ -345,7 +397,7 @@ export function FinanceScreen() {
                   </tr>
                 </thead>
                 <tbody>
-                  {deposits.map((d) => (
+                  {filteredDeposits.map((d) => (
                     <tr key={d.id} className="border-b border-border last:border-0">
                       <td className="py-2.5 px-3 font-num text-xs text-muted-foreground">
                         {d.date} ·{" "}
@@ -354,7 +406,22 @@ export function FinanceScreen() {
                           minute: "2-digit",
                         })}
                       </td>
-                      <td className="py-2.5 font-num text-xs">{d.ref ?? d.id}</td>
+                      <td className="py-2.5 font-num text-xs">
+                        <div className="inline-flex items-center gap-1">
+                          {d.ref ?? d.id}
+                          {d.attachmentUrl && (
+                            <a
+                              href={d.attachmentUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={t("Nakala ngumu", "Hard copy")}
+                              className="text-[#1E7C3F] hover:opacity-70"
+                            >
+                              <Paperclip className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+                      </td>
                       <td className="py-2.5 font-medium">
                         {d.customerName ?? d.note ?? t("Nyingine", "Other")}
                       </td>
@@ -541,22 +608,34 @@ function RecordReceiptDialog() {
   const [source, setSource] = useState<"customer" | "route" | "pos" | "other">("customer");
   const [amount, setAmount] = useState(100000);
   const [method, setMethod] = useState<"cash" | "mpesa" | "bank">("mpesa");
-  const [ref, setRef] = useState(`RCT-${Date.now().toString().slice(-4)}`);
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
   const record = useRecordDeposit();
 
-  const save = () => {
+  const save = async () => {
     if (amount <= 0) return;
-    record.mutate(
-      { source, method, amountTZS: amount, ref, note: src || undefined },
-      {
-        onSuccess: () => {
-          toast.success(t("Imerekodiwa", "Recorded"));
-          setOpen(false);
-          setSrc("");
+    setSaving(true);
+    try {
+      let attachmentUrl: string | undefined;
+      if (file) attachmentUrl = await uploadHardCopy(file, "deposit");
+      // Reference is generated by the system: AJD-DEP-YYMMDD-sequence.
+      record.mutate(
+        { source, method, amountTZS: amount, note: src || undefined, attachmentUrl },
+        {
+          onSuccess: () => {
+            toast.success(t("Imerekodiwa", "Recorded"));
+            setOpen(false);
+            setSrc("");
+            setFile(null);
+          },
+          onError: () => toast.error(t("Imeshindikana kurekodi", "Could not record receipt")),
+          onSettled: () => setSaving(false),
         },
-        onError: () => toast.error(t("Imeshindikana kurekodi", "Could not record receipt")),
-      },
-    );
+      );
+    } catch {
+      toast.error(t("Imeshindikana kupakia nakala", "Could not upload the hard copy"));
+      setSaving(false);
+    }
   };
 
   return (
@@ -576,11 +655,13 @@ function RecordReceiptDialog() {
           <DialogTitle>{t("Rekodi risiti / amana", "Record receipt / deposit")}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3">
+          <div className="rounded-xl bg-secondary/60 px-3 py-2.5 text-[11px] text-muted-foreground">
+            {t(
+              "Rejea itatengenezwa na mfumo (AJD-DEP-tarehe-namba) ili iwe rahisi kufuatilia.",
+              "The reference is generated by the system (AJD-DEP-date-number) so it is easy to trace.",
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
-              <Label>{t("Rejea", "Reference")}</Label>
-              <Input value={ref} onChange={(e) => setRef(e.target.value)} />
-            </div>
             <div className="grid gap-1.5">
               <Label>{t("Aina", "Type")}</Label>
               <Select value={source} onValueChange={(v) => setSource(v as typeof source)}>
@@ -629,13 +710,25 @@ function RecordReceiptDialog() {
               </Select>
             </div>
           </div>
+          <div className="grid gap-1.5">
+            <Label>
+              {t("Nakala ngumu (hiari, picha au PDF)", "Hard copy (optional, photo or PDF)")}
+            </Label>
+            <Input
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="text-xs"
+            />
+            {file && <div className="text-[11px] text-muted-foreground">{file.name}</div>}
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
-          <Button onClick={save} disabled={record.isPending}>
-            {record.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
+          <Button onClick={save} disabled={saving || record.isPending}>
+            {saving || record.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>
