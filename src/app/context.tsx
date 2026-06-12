@@ -5,6 +5,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage";
 // BACKEND: auth now flows through Supabase (src/lib/data/auth.ts), not @/mock/data.
 import { authRepo } from "@/lib/data/auth";
 import { supabase } from "@/lib/api/client";
+import { startIdleLogout, clearActivityMarker, installInspectGuard } from "@/lib/security";
 
 type Lang = "sw" | "en";
 type Theme = "light" | "dark" | "system";
@@ -27,7 +28,14 @@ interface AppCtx {
   theme: Theme;
   /** The resolved theme after applying the `system` setting. */
   resolvedTheme: "light" | "dark";
-  login: (email: string, password: string) => Promise<User>;
+  /**
+   * Stage 1 of sign-in: password only. Returns the TOTP factor id when the
+   * account needs the OTP step. The user is NOT considered signed in until
+   * completeLogin() runs (after OTP and the session-limit gate).
+   */
+  login: (email: string, password: string) => Promise<{ mfaFactorId: string | null }>;
+  /** Final stage of sign-in: loads the profile and unlocks the app. */
+  completeLogin: () => Promise<User>;
   logout: () => void;
   /** Re-fetches the signed-in profile (after avatar or name changes). */
   refreshUser: () => Promise<void>;
@@ -76,6 +84,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // 30-minute idle auto-logout: any activity in any tab resets the timer.
+  // On timeout we sign out and hard-reload to the login page so every cache,
+  // timer and in-memory state is reset cleanly.
+  useEffect(() => {
+    if (!user) return;
+    const stop = startIdleLogout(() => {
+      void authRepo
+        .signOut()
+        .catch(() => {})
+        .finally(() => {
+          clearActivityMarker();
+          window.location.assign("/");
+        });
+    });
+    return stop;
+  }, [user]);
+
+  // Internal-system lockdown (production builds only).
+  useEffect(() => installInspectGuard(), []);
+
   // Track the OS-level preference so `theme: "system"` stays in step live.
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
@@ -115,14 +143,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       lang,
       theme,
       resolvedTheme,
-      login: async (email: string, password: string) => {
-        const u = await authRepo.signIn(email, password);
+      login: (email: string, password: string) => authRepo.signInPassword(email, password),
+      completeLogin: async () => {
+        const u = await authRepo.completeSignIn();
         setUser(u);
         setViewAs(u.roles[0]);
         return u;
       },
       logout: () => {
         void authRepo.signOut();
+        clearActivityMarker();
         setUser(null);
       },
       refreshUser: async () => {

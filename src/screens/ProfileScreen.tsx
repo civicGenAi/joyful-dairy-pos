@@ -15,6 +15,14 @@ import {
   useSignOutOtherDevices,
 } from "@/lib/data/hooks/profile";
 import { generateStrongPassword, passwordStrength, deviceLabel } from "@/lib/data/profile";
+import {
+  mfaRepo,
+  mfaKeys,
+  generateRecoveryCodes,
+  downloadRecoveryCodes,
+  type EnrollStart,
+} from "@/lib/data/mfa";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ROLE_LABEL } from "@/mock/data";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -29,6 +37,7 @@ import {
   MonitorSmartphone,
   LogOut,
   Save,
+  Download,
 } from "lucide-react";
 
 export function ProfileScreen() {
@@ -311,7 +320,91 @@ function ChangePasswordCard() {
 }
 
 function TwoFactorCard() {
-  const { t } = useApp();
+  const { t, user } = useApp();
+  const qc = useQueryClient();
+  const { data: status, isPending } = useQuery({
+    queryKey: mfaKeys.status(),
+    queryFn: mfaRepo.status,
+  });
+
+  // Enrolment wizard state.
+  const [enroll, setEnroll] = useState<EnrollStart | null>(null);
+  const [otp, setOtp] = useState("");
+  const [busy, setBusy] = useState(false);
+  // Generated before verify; hashes are stored server-side on success and the
+  // plain codes shown exactly once for download.
+  const [codes, setCodes] = useState<string[]>([]);
+  const [showCodes, setShowCodes] = useState(false);
+  const [downloaded, setDownloaded] = useState(false);
+
+  const refresh = () => qc.invalidateQueries({ queryKey: mfaKeys.status() });
+
+  const start = async () => {
+    setBusy(true);
+    try {
+      setEnroll(await mfaRepo.enrollStart());
+      setOtp("");
+    } catch {
+      toast.error(t("Imeshindikana kuanza usanidi", "Could not start the setup"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cancel = async () => {
+    if (enroll) await mfaRepo.enrollCancel(enroll.factorId).catch(() => {});
+    setEnroll(null);
+    setOtp("");
+  };
+
+  const verify = async () => {
+    if (!enroll) return;
+    setBusy(true);
+    try {
+      const fresh = generateRecoveryCodes();
+      await mfaRepo.enrollVerify(enroll.factorId, otp.trim(), fresh);
+      setCodes(fresh);
+      setShowCodes(true);
+      setDownloaded(false);
+      setEnroll(null);
+      setOtp("");
+      refresh();
+      toast.success(t("2FA imewashwa", "2FA is now enabled"));
+    } catch {
+      toast.error(t("Namba ya OTP si sahihi", "The OTP code is incorrect"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const regenerate = async () => {
+    setBusy(true);
+    try {
+      const fresh = generateRecoveryCodes();
+      await mfaRepo.regenerateRecoveryCodes(fresh);
+      setCodes(fresh);
+      setShowCodes(true);
+      setDownloaded(false);
+      toast.success(t("Namba mpya za uokoaji zimetengenezwa", "New recovery codes generated"));
+    } catch {
+      toast.error(t("Imeshindikana", "Could not generate codes"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const disable = async () => {
+    if (!status?.factorId) return;
+    try {
+      await mfaRepo.disable(status.factorId);
+      setShowCodes(false);
+      refresh();
+      toast.success(t("2FA imezimwa", "2FA disabled"));
+    } catch {
+      toast.error(t("Imeshindikana kuzima 2FA", "Could not disable 2FA"));
+    }
+  };
+
   return (
     <SectionCard
       title={
@@ -320,24 +413,169 @@ function TwoFactorCard() {
           {t("Uthibitisho wa hatua mbili (2FA)", "Two-factor authentication (2FA)")}
         </span>
       }
+      action={status?.enabled && <Pill tone="success">{t("Imewashwa", "Enabled")}</Pill>}
     >
-      <div className="flex items-center gap-3 rounded-xl border border-dashed border-border p-4">
-        <span className="grid h-10 w-10 place-items-center rounded-xl bg-secondary">
-          <Smartphone className="h-5 w-5 text-[#1E7C3F]" />
-        </span>
-        <div className="flex-1">
-          <div className="font-medium text-sm">
-            {t("Programu ya uthibitisho", "Authenticator app")}
-          </div>
+      {isPending ? (
+        <div className="py-6 text-center text-sm text-muted-foreground">
+          {t("Inapakia…", "Loading…")}
+        </div>
+      ) : showCodes ? (
+        /* One-time recovery codes view, right after enable / regenerate. */
+        <div className="space-y-3">
           <div className="text-xs text-muted-foreground">
             {t(
-              "Itasanidiwa hivi karibuni kwa usalama zaidi wa akaunti yako.",
-              "Coming soon for extra account security.",
+              "Hifadhi namba hizi mahali salama. Kila moja inaweza kuweka 2FA upya mara moja ukipoteza simu yako. Zinaonyeshwa mara hii moja tu.",
+              "Store these codes somewhere safe. Each one can reset 2FA once if you lose your phone. They are shown only this once.",
             )}
           </div>
+          <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-border bg-secondary/40 p-3 font-mono text-xs">
+            {codes.map((c) => (
+              <div key={c}>{c}</div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              className="h-8 text-xs bg-[#1E7C3F] hover:bg-[#14532D] text-white"
+              onClick={() => {
+                downloadRecoveryCodes(codes, user?.email ?? "");
+                setDownloaded(true);
+              }}
+            >
+              <Download className="h-3.5 w-3.5 mr-1.5" />
+              {t("Pakua namba (.txt)", "Download codes (.txt)")}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs"
+              disabled={!downloaded}
+              onClick={() => setShowCodes(false)}
+            >
+              {downloaded
+                ? t("Nimezihifadhi", "I have saved them")
+                : t("Pakua kwanza", "Download first")}
+            </Button>
+          </div>
         </div>
-        <Pill tone="slate">{t("Inakuja", "Coming soon")}</Pill>
-      </div>
+      ) : enroll ? (
+        /* Enrolment wizard: scan or type the secret, then confirm a code. */
+        <div className="space-y-3">
+          <div className="flex flex-col items-center gap-2 rounded-xl border border-border p-4">
+            <img
+              src={enroll.qrCode}
+              alt="2FA QR code"
+              className="h-40 w-40 rounded-lg bg-white p-1"
+            />
+            <div className="text-[11px] text-muted-foreground text-center">
+              {t(
+                "Skani kwa programu ya uthibitisho, au andika ufunguo huu:",
+                "Scan with your authenticator app, or type this key manually:",
+              )}
+            </div>
+            <code className="rounded-md bg-secondary px-2 py-1 font-mono text-[11px] break-all select-all">
+              {enroll.secret}
+            </code>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {t("Namba ya tarakimu 6", "6-digit code")}
+            </Label>
+            <Input
+              value={otp}
+              inputMode="numeric"
+              maxLength={6}
+              autoComplete="one-time-code"
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+              className="h-10 font-mono tracking-[0.3em]"
+              placeholder="000000"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              disabled={busy || otp.length !== 6}
+              onClick={verify}
+              className="h-8 text-xs bg-[#1E7C3F] hover:bg-[#14532D] text-white"
+            >
+              {busy
+                ? t("Inathibitisha…", "Verifying…")
+                : t("Thibitisha na uwashe", "Verify & enable")}
+            </Button>
+            <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => void cancel()}>
+              {t("Ghairi", "Cancel")}
+            </Button>
+          </div>
+        </div>
+      ) : status?.enabled ? (
+        /* Enabled state: regenerate codes or turn off. */
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 rounded-xl border border-border p-4">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#1E7C3F]/10">
+              <Smartphone className="h-5 w-5 text-[#1E7C3F]" />
+            </span>
+            <div className="flex-1 text-xs text-muted-foreground">
+              {t(
+                "Kila unapoingia utaombwa namba ya OTP kutoka kwenye programu yako ya uthibitisho.",
+                "Every sign-in asks for an OTP code from your authenticator app.",
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs"
+              disabled={busy}
+              onClick={regenerate}
+            >
+              <Download className="h-3.5 w-3.5 mr-1.5" />
+              {t("Namba mpya za uokoaji", "New recovery codes")}
+            </Button>
+            <ConfirmDialog
+              destructive
+              title={t("Zima 2FA?", "Disable 2FA?")}
+              description={t(
+                "Akaunti yako italindwa na nenosiri pekee.",
+                "Your account will be protected by the password only.",
+              )}
+              confirmLabel={t("Zima", "Disable")}
+              onConfirm={() => void disable()}
+              trigger={
+                <Button size="sm" variant="ghost" className="h-8 text-xs text-[#E11B22]">
+                  {t("Zima 2FA", "Disable 2FA")}
+                </Button>
+              }
+            />
+          </div>
+        </div>
+      ) : (
+        /* Disabled state: offer to enable. */
+        <div className="flex items-center gap-3 rounded-xl border border-dashed border-border p-4">
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-secondary">
+            <Smartphone className="h-5 w-5 text-[#1E7C3F]" />
+          </span>
+          <div className="flex-1">
+            <div className="font-medium text-sm">
+              {t("Programu ya uthibitisho", "Authenticator app")}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {t(
+                "Ongeza hatua ya pili ya usalama: OTP kutoka Google Authenticator, Authy au nyingine.",
+                "Add a second security step: an OTP from Google Authenticator, Authy or similar.",
+              )}
+            </div>
+          </div>
+          <Button
+            size="sm"
+            disabled={busy}
+            onClick={start}
+            className="h-8 text-xs bg-[#1E7C3F] hover:bg-[#14532D] text-white"
+          >
+            {busy ? t("Inaanza…", "Starting…") : t("Washa", "Enable")}
+          </Button>
+        </div>
+      )}
     </SectionCard>
   );
 }
