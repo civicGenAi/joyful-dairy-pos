@@ -18,6 +18,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
@@ -95,6 +96,15 @@ function eatToday(offsetDays = 0): string {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
+    const body = await req.json().catch(() => ({}));
+
+    // Health-console probe: confirms deployment and configuration, sends nothing.
+    if (body.mode === "ping") {
+      return new Response(JSON.stringify({ ok: true, hasResendKey: !!RESEND_API_KEY }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY secret is not set");
 
     const admin = createClient(
@@ -102,7 +112,6 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const body = await req.json().catch(() => ({}));
     const dueMode = body.mode === "due";
 
     if (!dueMode) {

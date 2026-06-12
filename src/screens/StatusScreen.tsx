@@ -319,35 +319,47 @@ export function StatusScreen() {
     }
 
     // --- 5. Email service (the send-reminder edge function) ---------------
+    // A ping invoke, not a raw OPTIONS fetch: cross-origin OPTIONS responses
+    // are unreadable in strict browsers even when the function is healthy.
     try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-reminder`, {
-        method: "OPTIONS",
+      const { data, error } = await supabase.functions.invoke("send-reminder", {
+        body: { mode: "ping" },
       });
+      if (error) throw error;
+      const hasKey = (data as { hasResendKey?: boolean })?.hasResendKey === true;
       add({
         id: "fn",
         group: "services",
         name: t("Huduma ya barua pepe (send-reminder)", "Email service (send-reminder)"),
-        status: res.ok ? "ok" : "fail",
-        detail: res.ok
-          ? t("Imefikiwa", "Reachable")
-          : t(`Jibu ${res.status}`, `Responded ${res.status}`),
-        hint: !res.ok
+        status: hasKey ? "ok" : "warn",
+        detail: hasKey
+          ? t("Imetumwa na ina ufunguo wa Resend", "Deployed, Resend key configured")
+          : t(
+              "Imetumwa lakini RESEND_API_KEY haijawekwa",
+              "Deployed but RESEND_API_KEY is not set",
+            ),
+        hint: !hasKey
           ? t(
-              "Itume: supabase functions deploy send-reminder --no-verify-jwt; angalia RESEND_API_KEY",
-              "Deploy it: supabase functions deploy send-reminder --no-verify-jwt; check RESEND_API_KEY",
+              "Weka: supabase secrets set RESEND_API_KEY=...",
+              "Set it: supabase secrets set RESEND_API_KEY=...",
             )
           : undefined,
       });
-    } catch {
+    } catch (e) {
+      // An HTTP error still proves the function is deployed; it is just an
+      // older version without the ping mode.
+      const deployed = (e as { name?: string })?.name === "FunctionsHttpError";
       add({
         id: "fn",
         group: "services",
         name: t("Huduma ya barua pepe (send-reminder)", "Email service (send-reminder)"),
-        status: "fail",
-        detail: t("Haijafikika", "Unreachable"),
+        status: deployed ? "warn" : "fail",
+        detail: deployed
+          ? t("Imetumwa, toleo la zamani", "Deployed, but an older version")
+          : t("Haijafikika au haijatumwa", "Unreachable or not deployed"),
         hint: t(
-          "Function haijatumwa bado au mtandao umezuiliwa",
-          "Function not deployed yet, or the network blocks it",
+          "Itume upya: supabase functions deploy send-reminder --no-verify-jwt",
+          "Redeploy: supabase functions deploy send-reminder --no-verify-jwt",
         ),
       });
     }
