@@ -8,6 +8,9 @@ import {
   useStockMove,
   useRecordSpoilage,
   useSetReorder,
+  useCreateStockItem,
+  useUpdateStockItem,
+  useSetStockItemActive,
 } from "@/lib/data/hooks/stock";
 import { todayISO } from "@/lib/data/dates";
 import type { StockItem } from "@/mock/types";
@@ -35,7 +38,9 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { num } from "@/lib/format";
-import { AlertTriangle, PackagePlus, Pencil, Plus, Boxes, Truck, Factory } from "lucide-react";
+import { AlertTriangle, PackagePlus, Pencil, Plus, Boxes, Truck, Factory, Ban } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import type { Unit } from "@/mock/types";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ExportMenu } from "@/components/ui/ExportMenu";
@@ -206,6 +211,9 @@ export function StockScreen() {
                   {writable && (
                     <ReceiveDialog items={items.filter((s) => s.category === thisTab)} />
                   )}
+                  {writable && thisTab === "consumable" && (
+                    <StoreItemDialog category="consumable" />
+                  )}
                 </div>
               }
             >
@@ -281,19 +289,32 @@ export function StockScreen() {
                             )}
                           </td>
                           <td className="py-2.5 px-3">
-                            <Pill tone={tone}>
-                              {tone === "danger"
-                                ? t("Imeisha", "Out")
-                                : tone === "warning"
-                                  ? t("Chini", "Low")
-                                  : "OK"}
-                            </Pill>
+                            {s.active === false ? (
+                              <Pill tone="slate">{t("Imesimamishwa", "Suspended")}</Pill>
+                            ) : (
+                              <Pill tone={tone}>
+                                {tone === "danger"
+                                  ? t("Imeisha", "Out")
+                                  : tone === "warning"
+                                    ? t("Chini", "Low")
+                                    : "OK"}
+                              </Pill>
+                            )}
                           </td>
                           <td className="py-2.5 px-3 text-xs text-muted-foreground">
                             {s.lastMovement}
                           </td>
-                          <td className="py-2.5 px-3 text-right">
-                            <Button size="sm" variant="ghost" className="h-7 text-xs">
+                          <td
+                            className="py-2.5 px-3 text-right whitespace-nowrap"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {writable && thisTab === "consumable" && <ItemRowActions item={s} />}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs"
+                              onClick={() => setViewingId(s.id)}
+                            >
                               {t("Tazama", "View")}
                             </Button>
                           </td>
@@ -310,7 +331,14 @@ export function StockScreen() {
         <TabsContent value="raw" className="mt-4">
           <SectionCard
             title={t("Maziwa ghafi na malighafi", "Raw milk and intermediates")}
-            action={writable && <SendToProductionDialog rawItems={rawItems} />}
+            action={
+              writable && (
+                <div className="flex gap-2">
+                  <SendToProductionDialog rawItems={rawItems} />
+                  <StoreItemDialog category="raw" />
+                </div>
+              )
+            }
           >
             {rawItems.length === 0 ? (
               <EmptyState icon={Boxes} title={t("Hakuna malighafi bado", "No raw stock yet")} />
@@ -323,6 +351,7 @@ export function StockScreen() {
                     <th className="text-right px-3">{t("Kiwango cha chini", "Reorder")}</th>
                     <th className="px-3">{t("Hali", "Status")}</th>
                     <th className="px-3">{t("Harakati", "Last move")}</th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
@@ -330,7 +359,12 @@ export function StockScreen() {
                     const tone = statusOf(s);
                     return (
                       <tr key={s.id} className="border-b border-border last:border-0">
-                        <td className="py-2.5 px-3 font-medium">{s.name}</td>
+                        <td className="py-2.5 px-3 font-medium">
+                          {s.name}
+                          {s.swName && (
+                            <span className="text-xs text-muted-foreground ml-1">/ {s.swName}</span>
+                          )}
+                        </td>
                         <td className="py-2.5 px-3 text-right font-num font-semibold">
                           {num(s.onHand)} {s.unit}
                         </td>
@@ -338,16 +372,23 @@ export function StockScreen() {
                           {num(s.reorder)} {s.unit}
                         </td>
                         <td className="py-2.5 px-3">
-                          <Pill tone={tone}>
-                            {tone === "danger"
-                              ? t("Imeisha", "Out")
-                              : tone === "warning"
-                                ? t("Chini", "Low")
-                                : "OK"}
-                          </Pill>
+                          {s.active === false ? (
+                            <Pill tone="slate">{t("Imesimamishwa", "Suspended")}</Pill>
+                          ) : (
+                            <Pill tone={tone}>
+                              {tone === "danger"
+                                ? t("Imeisha", "Out")
+                                : tone === "warning"
+                                  ? t("Chini", "Low")
+                                  : "OK"}
+                            </Pill>
+                          )}
                         </td>
                         <td className="py-2.5 px-3 text-xs text-muted-foreground">
                           {s.lastMovement}
+                        </td>
+                        <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                          {writable && <ItemRowActions item={s} />}
                         </td>
                       </tr>
                     );
@@ -437,8 +478,192 @@ export function StockScreen() {
   );
 }
 
-function ReceiveDialog({ items }: { items: StockItem[] }) {
+/** Add or edit a raw / consumable store item. */
+function StoreItemDialog({ category, item }: { category: "raw" | "consumable"; item?: StockItem }) {
   const { t } = useApp();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(item?.name ?? "");
+  const [swName, setSwName] = useState(item?.swName ?? "");
+  const [unit, setUnit] = useState<Unit>(item?.unit ?? (category === "raw" ? "L" : "pcs"));
+  const [reorder, setReorder] = useState(item?.reorder ?? 0);
+  const create = useCreateStockItem();
+  const update = useUpdateStockItem();
+  const busy = create.isPending || update.isPending;
+
+  const save = () => {
+    if (!name.trim()) {
+      toast.error(t("Jaza jina la bidhaa", "Fill in the item name"));
+      return;
+    }
+    const done = {
+      onSuccess: () => {
+        toast.success(
+          item ? t("Bidhaa imehifadhiwa", "Item saved") : t("Bidhaa imeongezwa", "Item added"),
+        );
+        setOpen(false);
+      },
+      onError: () => toast.error(t("Imeshindikana kuhifadhi", "Could not save the item")),
+    };
+    if (item) {
+      update.mutate(
+        { id: item.id, name: name.trim(), swName: swName.trim() || undefined, unit, reorder },
+        done,
+      );
+    } else {
+      create.mutate(
+        { name: name.trim(), swName: swName.trim() || undefined, category, unit, reorder },
+        done,
+      );
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (o) {
+          setName(item?.name ?? "");
+          setSwName(item?.swName ?? "");
+          setUnit(item?.unit ?? (category === "raw" ? "L" : "pcs"));
+          setReorder(item?.reorder ?? 0);
+        }
+      }}
+    >
+      <DialogTrigger asChild>
+        {item ? (
+          <Button size="icon" variant="ghost" className="h-7 w-7" title={t("Hariri", "Edit")}>
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+        ) : (
+          <Button size="sm" variant="outline" className="h-8 text-xs">
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            {category === "raw"
+              ? t("Ongeza malighafi", "Add raw item")
+              : t("Ongeza kifaa", "Add item")}
+          </Button>
+        )}
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {item
+              ? `${t("Hariri bidhaa", "Edit item")}: ${item.name}`
+              : category === "raw"
+                ? t("Ongeza malighafi", "Add a raw stock item")
+                : t("Ongeza kifaa cha ghala", "Add a consumable store item")}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-3">
+          <div className="grid gap-1.5">
+            <Label>{t("Jina (Kiingereza)", "Name (English)")}</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>{t("Jina (Kiswahili, hiari)", "Name (Swahili, optional)")}</Label>
+            <Input value={swName} onChange={(e) => setSwName(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>{t("Kipimo", "Unit")}</Label>
+              <Select value={unit} onValueChange={(v) => setUnit(v as Unit)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="L">L</SelectItem>
+                  <SelectItem value="kg">kg</SelectItem>
+                  <SelectItem value="pcs">pcs</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{t("Kiwango cha chini (reorder)", "Reorder level")}</Label>
+              <Input
+                type="number"
+                min={0}
+                value={reorder}
+                onChange={(e) => setReorder(Number(e.target.value))}
+              />
+            </div>
+          </div>
+          <div className="rounded-lg bg-secondary/60 px-3 py-2 text-[11px] text-muted-foreground">
+            {t(
+              "Idadi inayopatikana inabadilika kupitia kupokea, kutoa na kurekebisha; haiandikwi moja kwa moja.",
+              "On-hand changes only through receive, issue and adjust movements; it is never typed directly.",
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            {t("Ghairi", "Cancel")}
+          </Button>
+          <Button onClick={save} disabled={busy}>
+            {busy ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Edit + suspend controls for a raw / consumable item row. */
+function ItemRowActions({ item }: { item: StockItem }) {
+  const { t } = useApp();
+  const setActive = useSetStockItemActive();
+  if (item.category === "finished") return null;
+  return (
+    <>
+      <StoreItemDialog category={item.category} item={item} />
+      <ConfirmDialog
+        title={
+          item.active === false
+            ? t("Rudisha bidhaa hii?", "Reactivate this item?")
+            : t("Simamisha bidhaa hii?", "Suspend this item?")
+        }
+        description={
+          item.active === false
+            ? t("Itaonekana tena kwenye fomu za stock.", "It will appear in stock forms again.")
+            : t(
+                "Itafichwa kwenye fomu; historia yake inabaki kamili.",
+                "It is hidden from forms; its history stays intact.",
+              )
+        }
+        confirmLabel={
+          item.active === false ? t("Rudisha", "Reactivate") : t("Simamisha", "Suspend")
+        }
+        onConfirm={() =>
+          setActive.mutate(
+            { id: item.id, name: item.name, active: item.active === false },
+            {
+              onSuccess: () =>
+                toast.success(
+                  item.active === false
+                    ? t("Bidhaa imerudishwa", "Item reactivated")
+                    : t("Bidhaa imesimamishwa", "Item suspended"),
+                ),
+              onError: () => toast.error(t("Imeshindikana", "Could not update the item")),
+            },
+          )
+        }
+        trigger={
+          <Button
+            size="icon"
+            variant="ghost"
+            className={`h-7 w-7 ${item.active === false ? "text-[#1E7C3F]" : "text-muted-foreground"}`}
+            title={item.active === false ? t("Rudisha", "Reactivate") : t("Simamisha", "Suspend")}
+          >
+            <Ban className="h-3.5 w-3.5" />
+          </Button>
+        }
+      />
+    </>
+  );
+}
+
+function ReceiveDialog({ items: allItems }: { items: StockItem[] }) {
+  const { t } = useApp();
+  const items = allItems.filter((i) => i.active !== false);
   const [open, setOpen] = useState(false);
   const [itemId, setItemId] = useState(items[0]?.id);
   const [qty, setQty] = useState(50);
@@ -537,8 +762,9 @@ function ReceiveDialog({ items }: { items: StockItem[] }) {
   );
 }
 
-function AdjustDialog({ items }: { items: StockItem[] }) {
+function AdjustDialog({ items: allItems }: { items: StockItem[] }) {
   const { t } = useApp();
+  const items = allItems.filter((i) => i.active !== false);
   const [open, setOpen] = useState(false);
   const [itemId, setItemId] = useState(items[0]?.id);
   const [delta, setDelta] = useState(-1);
@@ -651,8 +877,9 @@ function AdjustDialog({ items }: { items: StockItem[] }) {
   );
 }
 
-function SendToProductionDialog({ rawItems }: { rawItems: StockItem[] }) {
+function SendToProductionDialog({ rawItems: allRaw }: { rawItems: StockItem[] }) {
   const { t } = useApp();
+  const rawItems = allRaw.filter((i) => i.active !== false);
   const [open, setOpen] = useState(false);
   const [litres, setLitres] = useState(60);
   const move = useStockMove();

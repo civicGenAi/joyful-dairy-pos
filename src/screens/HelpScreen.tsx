@@ -112,6 +112,191 @@ const SECTIONS: {
   },
 ];
 
+/**
+ * The step-by-step user guide. Bilingual; rendered as accordions so each
+ * role finds its daily flow without scrolling through everything.
+ */
+const GUIDE: {
+  id: string;
+  title: { sw: string; en: string };
+  steps: { sw: string; en: string }[];
+}[] = [
+  {
+    id: "signin",
+    title: { sw: "Kuingia na usalama wa akaunti", en: "Signing in & account security" },
+    steps: [
+      {
+        sw: "Ingia kwa barua pepe na nenosiri ulilopewa na admin. Ukiwasha 2FA, utaombwa namba ya tarakimu 6 kutoka programu yako ya uthibitisho kila unapoingia.",
+        en: "Sign in with the email and password your admin gave you. If you enabled 2FA, every sign-in also asks for the 6-digit code from your authenticator app.",
+      },
+      {
+        sw: "Akaunti inaruhusu vifaa 2 tu kwa wakati mmoja. Kifaa cha tatu kitakuomba utoe kimojawapo kabla ya kuendelea.",
+        en: "An account allows only 2 active devices. A third device asks you to sign one of the others out before continuing.",
+      },
+      {
+        sw: "Mfumo ukikaa dakika 30 bila kutumika unakutoa wenyewe; ingia tena.",
+        en: "After 30 minutes of inactivity the system signs you out automatically; just sign in again.",
+      },
+      {
+        sw: "Ukipoteza simu yenye 2FA, tumia mojawapo ya namba za uokoaji ulizopakua; itazima 2FA ili uingie na kuiwasha upya.",
+        en: "If you lose your 2FA phone, use one of the recovery codes you downloaded; it resets 2FA so you can sign in and re-enable it.",
+      },
+    ],
+  },
+  {
+    id: "intake",
+    title: { sw: "Kukusanya maziwa (Wafugaji)", en: "Daily milk intake (Farmers)" },
+    steps: [
+      {
+        sw: "Wafugaji > Rekodi ukusanyaji: chagua mfugaji, kipindi (asubuhi/jioni), litre na pointi. Mfumo unakataa kipindi kisicholingana na saa halisi.",
+        en: "Farmers > Record collection: pick the farmer, session (morning/evening), litres and point. The system rejects a session that does not match the real clock.",
+      },
+      {
+        sw: "Salio la mfugaji linaongezeka lenyewe: litre x bei yake. Halibadilishwi kwa mkono; marekebisho yanaombwa na kuidhinishwa na admin.",
+        en: "The farmer balance grows automatically: litres x their rate. It is never typed by hand; adjustments are requested and approved by an admin.",
+      },
+      {
+        sw: "Pointi za ukusanyaji zinaongezwa, kuhaririwa na kusimamishwa kwenye skrini ya Pointi (au Mipangilio > Maeneo, ni orodha ileile).",
+        en: "Collection points are added, edited and suspended on the Collection points screen (or Settings > Locations, it is the same list).",
+      },
+    ],
+  },
+  {
+    id: "van",
+    title: { sw: "Siku ya gari la njia (Dereva)", en: "The van day (Driver)" },
+    steps: [
+      {
+        sw: "Pakia: ondoa tiki bidhaa usizonazo, jaza idadi za ulizonazo, thibitisha. Zisizochaguliwa zinaondolewa kwenye siku yako.",
+        en: "Load: untick products you do not have, fill quantities for what you do, confirm. Unselected products disappear from your day.",
+      },
+      {
+        sw: "Uza: chagua mteja, gusa bidhaa, chagua malipo (cash, mkopo, M-Pesa). Unaweza kubadili mpangilio wa bidhaa (gridi au orodha).",
+        en: "Sell: pick the customer, tap products, choose payment (cash, credit, M-Pesa). You can switch the product layout (grid or list).",
+      },
+      {
+        sw: "Marejesho yanahesabiwa otomatiki (kilichopakiwa kasoro kilichouzwa). Ukibadilisha namba lazima utoe sababu.",
+        en: "Returns are computed automatically (loaded minus sold). Changing a number requires a reason.",
+      },
+      {
+        sw: "Fungasa: weka cash benki, pakia picha ya risiti ya benki (ni lazima kwa cash), kisha tengeneza risiti ya amana.",
+        en: "Cash-up: bank the cash, upload the deposit-slip photo (mandatory for cash), then generate the deposit receipt.",
+      },
+    ],
+  },
+  {
+    id: "customers",
+    title: { sw: "Wateja, mikopo na vikumbusho", en: "Customers, credit & reminders" },
+    steps: [
+      {
+        sw: "Aina tatu: Cash, Mkopo (kila mauzo peke yake) na Mkopo wa mwezi. Wateja wa mkopo wanaweza kuwekewa barua pepe na tarehe ya malipo.",
+        en: "Three types: Cash, Per-sale credit and Monthly credit. Credit customers can have an email and a payment due date.",
+      },
+      {
+        sw: "Tarehe ya malipo ikiwekwa, mfumo unatuma barua pepe siku 5 kabla na siku yenyewe, saa 7 asubuhi (EAT), bila kuingilia mtu.",
+        en: "With a due date set, the system emails the customer 5 days before and on the day itself, at 07:00 EAT, automatically.",
+      },
+      {
+        sw: "Amana ya mteja inapunguza deni lake mara moja; risiti inapata namba ya mfumo (AJD-DEP-tarehe-namba).",
+        en: "A customer deposit reduces their balance immediately; the receipt gets a system reference (AJD-DEP-date-number).",
+      },
+    ],
+  },
+  {
+    id: "stock",
+    title: { sw: "Stock, ghala na kiwango cha kuagiza", en: "Stock, store & the reorder level" },
+    steps: [
+      {
+        sw: "Kiwango cha kuagiza (reorder): idadi ya chini kabla ya kuagiza upya. Bidhaa ikifikia au kushuka chini yake, inaonekana 'Chini' na inaingia kwenye arifa.",
+        en: "Reorder level: the minimum before you restock. When an item reaches or drops below it, it shows 'Low' and appears in the alerts.",
+      },
+      {
+        sw: "Idadi inayopatikana haibadilishwi kwa mkono kamwe; inabadilika kupitia kupokea, kutoa, kurekebisha, mauzo na marejesho (daftari moja la harakati).",
+        en: "On-hand is never typed directly; it changes only through receive, issue, adjust, sales and returns (one movements ledger).",
+      },
+      {
+        sw: "Malighafi na vifaa vya ghala vinaongezwa, kuhaririwa na kusimamishwa kwenye skrini ya Stock. Kusimamisha kunaficha bidhaa bila kufuta historia.",
+        en: "Raw and consumable items are added, edited and suspended on the Stock screen. Suspending hides an item without deleting its history.",
+      },
+    ],
+  },
+  {
+    id: "production",
+    title: { sw: "Uzalishaji na kufunga siku", en: "Production & day close" },
+    steps: [
+      {
+        sw: "Rekodi kila batch: bidhaa, litre za maziwa ghafi zilizotumika na pato. Yield inahesabiwa na kufuatiliwa kwenye grafu.",
+        en: "Record every batch: the product, raw litres used and the output. Yield is computed and tracked on the chart.",
+      },
+      {
+        sw: "'Mpango wa kuzalisha leo' ni mapendekezo ya uwiano wa kiwanda (mfano Mozzarella: 244 L = 20 kg); 'Stock sasa' ni idadi halisi.",
+        en: "'To produce today' shows the plant's standard ratios (e.g. Mozzarella: 244 L = 20 kg); 'Now' is the live stock figure.",
+      },
+      {
+        sw: "Mwisho wa siku, Production Manager anafunga siku kwenye Ulinganisho: maziwa yaliyoingia lazima yalingane na yaliyotoka (mauzo + uzalishaji + yaliyoharibika + yaliyobaki).",
+        en: "At day end the Production Manager locks the day in Reconciliation: milk in must equal milk out (sales + production + spoilage + closing).",
+      },
+    ],
+  },
+  {
+    id: "finance",
+    title: { sw: "Fedha: amana, matumizi na malipo", en: "Finance: deposits, expenses & payouts" },
+    steps: [
+      {
+        sw: "Kila amana na matumizi yanapata namba ya mfumo inayofuatilika: AJD-DEP-tarehe-namba au AJD-EXP-tarehe-namba. Tafuta kwa namba hiyo wakati wowote.",
+        en: "Every deposit and expense gets a traceable system reference: AJD-DEP-date-number or AJD-EXP-date-number. Search by it any time.",
+      },
+      {
+        sw: "Nakala ngumu (risiti za benki, ankara) zinapakiwa na kuonekana kwa alama ya kibanio; chuja 'Zenye risiti' kuona zote.",
+        en: "Hard copies (bank slips, invoices) are uploaded and shown with a paperclip; filter 'With receipts' to review them all.",
+      },
+      {
+        sw: "Malipo ya wafugaji yanafanyika kwa mzunguko; kulipa kunafuta salio na kuanzisha mzunguko mpya, kila hatua ikirekodiwa.",
+        en: "Farmer payouts run per cycle; paying clears balances and opens the next cycle, with every step audited.",
+      },
+    ],
+  },
+  {
+    id: "admin",
+    title: { sw: "Kazi za Admin", en: "Admin tasks" },
+    steps: [
+      {
+        sw: "Mipangilio > Watumiaji: unda watumiaji kwa majukumu yao, simamisha/rudisha, badilisha nenosiri, futa. Kadri ya ruhusa, ndivyo tabo zinavyoonekana.",
+        en: "Settings > Users: create users with their roles, suspend/reinstate, change passwords, delete. Permissions decide which tabs each user sees.",
+      },
+      {
+        sw: "Idhinisha maombi ya marekebisho ya salio kwenye skrini ya Wafugaji.",
+        en: "Approve balance-adjustment requests on the Farmers screen.",
+      },
+      {
+        sw: "Daftari la ukaguzi (Mipangilio > Ukaguzi) linaonyesha kila tendo: nani, lini, kifaa gani na IP gani.",
+        en: "The audit trail (Settings > Audit) shows every action: who, when, on which device and IP.",
+      },
+    ],
+  },
+  {
+    id: "trouble",
+    title: { sw: "Hitilafu za kawaida na afya ya mfumo", en: "Troubleshooting & system health" },
+    steps: [
+      {
+        sw: "Kitu kikionekana hakifanyi kazi, fungua ukurasa wa Afya ya mfumo (/status). Unakagua hifadhidata, huduma za barua pepe, hifadhi ya mafaili na uadilifu wa data, na kukuambia pa kuangalia.",
+        en: "If something seems broken, open the System health page (/status). It probes the database, email service, file storage and data integrity, and tells you where to look.",
+      },
+      {
+        sw: "'Kipindi hakilingani': unajaribu kurekodi asubuhi wakati ni jioni (au kinyume). 'Siku imefungwa': siku ilishafungwa kwenye Ulinganisho.",
+        en: "'Session mismatch': you are recording morning during the evening (or vice versa). 'Day locked': that day was already closed in Reconciliation.",
+      },
+      {
+        sw: "'Mteja ana deni lililochelewa': mkopo umezuiliwa hadi alipe au admin abadilishe hali yake.",
+        en: "'Customer is overdue': further credit is blocked until they pay or an admin clears the status.",
+      },
+      {
+        sw: "Barua pepe hazitoki? Hakikisha send-reminder imetumwa (deploy) na RESEND_API_KEY imewekwa; ukurasa wa /status unaonyesha hali yake.",
+        en: "Emails not going out? Make sure send-reminder is deployed and RESEND_API_KEY is set; the /status page shows its state.",
+      },
+    ],
+  },
+];
+
 const SHORTCUTS: { keys: string[]; sw: string; en: string }[] = [
   { keys: ["⌘", "K"], sw: "Fungua menyu ya amri", en: "Open command palette" },
   { keys: ["/"], sw: "Fungua menyu ya amri (haraka)", en: "Open command palette (fast)" },
@@ -158,6 +343,44 @@ export function HelpScreen() {
             </p>
           </div>
         </div>
+      </div>
+
+      <div className="mb-4">
+        <SectionCard
+          title={
+            <span className="inline-flex items-center gap-1.5">
+              <BookOpen className="h-4 w-4" /> {t("Mwongozo wa watumiaji", "User guide")}
+            </span>
+          }
+        >
+          <div className="grid gap-2">
+            {GUIDE.map((g) => (
+              <details key={g.id} className="group rounded-xl border border-border bg-card">
+                <summary className="flex cursor-pointer items-center justify-between px-4 py-3 text-sm font-semibold list-none">
+                  {lang === "sw" ? g.title.sw : g.title.en}
+                  <span className="text-muted-foreground transition-transform group-open:rotate-90">
+                    ›
+                  </span>
+                </summary>
+                <ol className="px-4 pb-4 space-y-2">
+                  {g.steps.map((step, i) => (
+                    <li key={i} className="flex gap-2.5 text-sm">
+                      <span
+                        className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white mt-0.5"
+                        style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+                      >
+                        {i + 1}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {lang === "sw" ? step.sw : step.en}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            ))}
+          </div>
+        </SectionCard>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-3 sm:gap-4">

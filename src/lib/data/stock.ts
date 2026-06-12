@@ -14,6 +14,7 @@ interface StockRow {
   on_hand: number;
   reorder: number;
   last_movement_at: string | null;
+  active?: boolean;
 }
 
 function ago(at: string | null, lang: "sw" | "en" = "en"): string {
@@ -38,6 +39,7 @@ function toItem(r: StockRow): StockItem {
     onHand: Number(r.on_hand),
     reorder: Number(r.reorder),
     lastMovement: ago(r.last_movement_at),
+    active: r.active ?? true,
   };
 }
 
@@ -168,6 +170,43 @@ export const stockRepo = {
       p_note: input.note ?? null,
     });
     if (error) throw new Error(error.message);
+  },
+
+  async updateItem(input: {
+    id: string;
+    name: string;
+    swName?: string;
+    unit: Unit;
+    reorder: number;
+  }): Promise<void> {
+    unwrap(
+      await supabase
+        .from("stock_items")
+        .update({
+          name: input.name,
+          sw_name: input.swName ?? null,
+          unit: input.unit,
+          reorder: input.reorder,
+        })
+        .eq("id", input.id)
+        .select("id"),
+    );
+    await recordAudit(
+      "edit",
+      "stock",
+      `Amehariri bidhaa ghalani (${input.name})`,
+      `Edited a store item (${input.name})`,
+    );
+  },
+
+  async setItemActive(id: string, name: string, active: boolean): Promise<void> {
+    unwrap(await supabase.from("stock_items").update({ active }).eq("id", id).select("id"));
+    await recordAudit(
+      "edit",
+      "stock",
+      active ? `Amerudisha bidhaa ghalani (${name})` : `Amesimamisha bidhaa ghalani (${name})`,
+      active ? `Reactivated store item (${name})` : `Suspended store item (${name})`,
+    );
   },
 
   async setReorder(id: string, name: string, reorder: number): Promise<void> {
