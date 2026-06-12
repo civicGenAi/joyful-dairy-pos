@@ -102,6 +102,8 @@ export interface StockItem {
   onHand: number;
   reorder: number;
   lastMovement: string;
+  /** Suspended items keep their history but disappear from forms. */
+  active?: boolean;
 }
 
 export interface Alert {

@@ -54,19 +54,36 @@ export function useRecordReturn() {
   return useStockInvalidatingMutation(stockRepo.recordReturn);
 }
 
+export function useCreateStockItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: stockRepo.createItem,
+    onSuccess: () => qc.invalidateQueries({ queryKey: stockKeys.all }),
+  });
+}
+
+export function useUpdateStockItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: stockRepo.updateItem,
+    onSuccess: () => qc.invalidateQueries({ queryKey: stockKeys.all }),
+  });
+}
+
+export function useSetStockItemActive() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name, active }: { id: string; name: string; active: boolean }) =>
+      stockRepo.setItemActive(id, name, active),
+    onSuccess: () => qc.invalidateQueries({ queryKey: stockKeys.all }),
+  });
+}
+
 export function useSetReorder() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, name, reorder }: { id: string; name: string; reorder: number }) =>
       stockRepo.setReorder(id, name, reorder),
-    onSuccess: () => qc.invalidateQueries({ queryKey: stockKeys.all }),
-  });
-}
-
-export function useCreateStockItem() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: stockRepo.createItem,
     onSuccess: () => qc.invalidateQueries({ queryKey: stockKeys.all }),
   });
 }
