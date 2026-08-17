@@ -29,7 +29,7 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   Plus,
@@ -43,6 +43,8 @@ import {
   Pause,
   CheckCircle2,
   Ban,
+  Search,
+  Delete,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { motion } from "framer-motion";
@@ -68,6 +70,12 @@ interface CartLine {
   qty: number;
   tier: PriceTier;
 }
+
+const TIER_LABEL: Record<PriceTier, { sw: string; en: string }> = {
+  own: { sw: "Chombo cha mteja", en: "Own container" },
+  bottle: { sw: "Chupa", en: "With bottle" },
+  bulk: { sw: "Jumla", en: "Bulk" },
+};
 
 export function POSScreen() {
   const { t, lang, user } = useApp();
@@ -97,8 +105,37 @@ export function POSScreen() {
   const [receipt, setReceipt] = useState<null | Sale>(null);
   const [voiding, setVoiding] = useState<Sale | null>(null);
   const [voidReason, setVoidReason] = useState("");
+  // Search finds a product across every category, once at least two
+  // letters are typed, so a cashier never has to hunt through the tabs.
+  const [productQuery, setProductQuery] = useState("");
+  // Long-pressing a tile opens a keypad to set an exact quantity (bulk
+  // sales like 20L), a plain tap keeps adding one unit at a time. Carries
+  // its own tier so editing an existing cart line always targets that
+  // line, not whatever the tier selector currently shows.
+  const [qtyPrompt, setQtyPrompt] = useState<{ product: Product; tier: PriceTier } | null>(null);
+  const pressTimer = useRef<number | null>(null);
+  const longPressFired = useRef(false);
 
-  const products = allProducts.filter((p) => p.category === cat && p.active);
+  const startPress = (p: Product) => {
+    if (isOut(p.id)) return;
+    longPressFired.current = false;
+    pressTimer.current = window.setTimeout(() => {
+      longPressFired.current = true;
+      setQtyPrompt({ product: p, tier });
+    }, 450);
+  };
+  const endPress = () => {
+    if (pressTimer.current !== null) {
+      window.clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  };
+
+  const productQueryNorm = productQuery.trim().toLowerCase();
+  const products =
+    productQueryNorm.length >= 2
+      ? allProducts.filter((p) => p.active && p.name.toLowerCase().includes(productQueryNorm))
+      : allProducts.filter((p) => p.category === cat && p.active);
   const priceOf = (pid: string, tr: PriceTier) => priceMatrix[pid]?.[tr] ?? 0;
   const finishedStock = (pid: string) =>
     stock.find((s) => s.productId === pid && s.category === "finished");
@@ -108,6 +145,8 @@ export function POSScreen() {
     const s = finishedStock(pid);
     return s ? s.onHand > 0 && s.onHand < s.reorder : false;
   };
+  const cartQtyOf = (pid: string, forTier: PriceTier = tier) =>
+    cart.filter((l) => l.productId === pid && l.tier === forTier).reduce((a, l) => a + l.qty, 0);
 
   const selectedCustomer = customer === "walkin" ? null : customers.find((c) => c.id === customer);
   const isCreditBlocked = pay === "credit" && selectedCustomer?.status === "overdue";
@@ -121,6 +160,21 @@ export function POSScreen() {
       const ex = c.find((x) => x.productId === pid && x.tier === tier);
       if (ex) return c.map((x) => (x === ex ? { ...x, qty: x.qty + 1 } : x));
       return [...c, { productId: pid, qty: 1, tier }];
+    });
+  };
+  // From the quantity keypad: sets the line to an exact amount rather than
+  // adding on top, so retyping a number always means "this is the total".
+  // Targets a specific tier (the line being edited), not necessarily
+  // whatever the tier selector currently shows.
+  const setExactQty = (pid: string, qty: number, forTier: PriceTier) => {
+    if (qty <= 0) {
+      setCart((c) => c.filter((x) => !(x.productId === pid && x.tier === forTier)));
+      return;
+    }
+    setCart((c) => {
+      const ex = c.find((x) => x.productId === pid && x.tier === forTier);
+      if (ex) return c.map((x) => (x === ex ? { ...x, qty } : x));
+      return [...c, { productId: pid, qty, tier: forTier }];
     });
   };
   const total = cart.reduce((a, l) => a + priceOf(l.productId, l.tier) * l.qty, 0);
@@ -239,49 +293,108 @@ export function POSScreen() {
         <TabsContent value="pos" className="mt-4">
           <div className="grid lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 rounded-2xl border border-border bg-card shadow-card overflow-hidden">
-              <div className="px-4 py-3 border-b border-border flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap gap-1.5">
-                  {CATS.map((c) => (
+              {/* Step 1: price tier. Its own full-width row, impossible to
+                  miss or leave on the wrong setting by accident. */}
+              <div className="px-4 pt-3 pb-2 border-b border-border">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
+                  {t("Bei ya kuuza", "Selling at")}
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(
+                    [
+                      { id: "own", sw: "Chombo cha mteja", en: "Own container" },
+                      { id: "bottle", sw: "Pamoja na chupa", en: "With bottle" },
+                      { id: "bulk", sw: "Jumla / dazani", en: "Bulk / dozen" },
+                    ] as const
+                  ).map((tr) => (
                     <button
-                      key={c.id}
-                      onClick={() => setCat(c.id)}
-                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${cat === c.id ? "text-white shadow-card" : "bg-secondary text-foreground hover:bg-accent"}`}
-                      style={cat === c.id ? { background: c.color } : undefined}
+                      key={tr.id}
+                      onClick={() => setTier(tr.id)}
+                      className={`rounded-lg py-2 text-xs font-bold transition-all ${
+                        tier === tr.id
+                          ? "bg-[#1E7C3F] text-white shadow-card"
+                          : "bg-secondary text-foreground hover:bg-accent"
+                      }`}
                     >
-                      {lang === "sw" ? c.label.sw : c.label.en}
+                      {t(tr.sw, tr.en)}
                     </button>
                   ))}
                 </div>
-                <Select value={tier} onValueChange={(v) => setTier(v as PriceTier)}>
-                  <SelectTrigger className="h-8 w-44 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="own">{t("Chombo cha mteja", "Own container")}</SelectItem>
-                    <SelectItem value="bottle">{t("Pamoja na chupa", "With bottle")}</SelectItem>
-                    <SelectItem value="bulk">
-                      {t("Bei ya jumla / dozeni", "Bulk / dozen")}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+              </div>
+
+              {/* Step 2: find the product, by category or by typing. */}
+              <div className="px-4 py-2.5 border-b border-border flex flex-wrap items-center gap-2">
+                <div className="relative flex-1 min-w-[160px]">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={productQuery}
+                    onChange={(e) => setProductQuery(e.target.value)}
+                    placeholder={t("Tafuta bidhaa, herufi 2+…", "Search products, 2+ letters…")}
+                    className="h-8 pl-8 text-xs"
+                  />
+                </div>
+                {productQueryNorm.length < 2 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {CATS.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => setCat(c.id)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${cat === c.id ? "text-white shadow-card" : "bg-secondary text-foreground hover:bg-accent"}`}
+                        style={cat === c.id ? { background: c.color } : undefined}
+                      >
+                        {lang === "sw" ? c.label.sw : c.label.en}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="px-4 pt-2 text-[11px] text-muted-foreground">
+                {t(
+                  "Bonyeza kuongeza 1, shikilia kuweka idadi kamili (mf. lita 20)",
+                  "Tap to add 1, press and hold to enter an exact quantity (e.g. 20L)",
+                )}
               </div>
               <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+                {products.length === 0 && (
+                  <div className="col-span-full py-10 text-center text-sm text-muted-foreground">
+                    {productQueryNorm.length >= 2
+                      ? t("Hakuna bidhaa inayolingana", "No matching product")
+                      : t("Hakuna bidhaa katika kundi hili", "No products in this category")}
+                  </div>
+                )}
                 {products.map((p) => {
                   const out = isOut(p.id);
                   const low = isLow(p.id);
                   const onHand = stockOf(p.id);
+                  const inCart = cartQtyOf(p.id);
+                  const catColor = CATS.find((c) => c.id === p.category)?.color ?? "#1E7C3F";
                   return (
                     <motion.button
                       key={p.id}
                       whileTap={out ? undefined : { scale: 0.97 }}
                       disabled={out}
-                      onClick={() => add(p.id)}
+                      onClick={() => {
+                        if (longPressFired.current) {
+                          longPressFired.current = false;
+                          return;
+                        }
+                        add(p.id);
+                      }}
+                      onPointerDown={() => startPress(p)}
+                      onPointerUp={endPress}
+                      onPointerLeave={endPress}
+                      onContextMenu={(e) => e.preventDefault()}
                       className={`text-left rounded-xl border bg-background p-3 transition relative ${out ? "border-border opacity-50 cursor-not-allowed" : "border-border hover:border-[#2F9E44] hover:shadow-card"}`}
                     >
+                      {inCart > 0 && (
+                        <span className="absolute -top-2 -right-2 z-10 grid h-6 min-w-6 place-items-center rounded-full bg-[#1E7C3F] px-1 text-xs font-bold text-white shadow-card">
+                          {num(inCart)}
+                        </span>
+                      )}
                       <div
                         className="aspect-[16/9] rounded-lg mb-2 relative overflow-hidden"
                         style={{
-                          background: `linear-gradient(135deg, ${CATS.find((c) => c.id === cat)?.color}30, ${CATS.find((c) => c.id === cat)?.color}10)`,
+                          background: `linear-gradient(135deg, ${catColor}30, ${catColor}10)`,
                         }}
                       >
                         <div className="absolute inset-0 grid place-items-center text-3xl">
@@ -321,6 +434,9 @@ export function POSScreen() {
                 )}
               </div>
               <div className="p-3 border-b border-border space-y-2">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  {t("Mteja na malipo", "Customer & payment")}
+                </div>
                 <Select value={customer} onValueChange={setCustomer}>
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder={t("Mteja", "Customer")} />
@@ -401,7 +517,7 @@ export function POSScreen() {
                         <div className="min-w-0">
                           <div className="font-medium text-sm truncate">{p.name}</div>
                           <div className="text-[11px] text-muted-foreground">
-                            {l.tier} · {num(priceOf(p.id, l.tier))}/{p.unit}
+                            {TIER_LABEL[l.tier][lang]} · {num(priceOf(p.id, l.tier))}/{p.unit}
                           </div>
                         </div>
                         <button
@@ -420,22 +536,29 @@ export function POSScreen() {
                               ),
                             )
                           }
-                          className="rounded-md bg-background p-1"
+                          className="grid h-7 w-7 place-items-center rounded-md bg-background hover:bg-accent active:scale-95 transition-all"
                         >
-                          <Minus className="h-3 w-3" />
+                          <Minus className="h-3.5 w-3.5" />
                         </button>
-                        <span className="font-num w-8 text-center text-sm font-semibold">
-                          {l.qty}
-                        </span>
+                        <button
+                          onClick={() => {
+                            const prod = allProducts.find((x) => x.id === l.productId);
+                            if (prod) setQtyPrompt({ product: prod, tier: l.tier });
+                          }}
+                          className="font-num w-12 text-center text-sm font-bold hover:underline"
+                          title={t("Bonyeza kubadilisha idadi", "Tap to change quantity")}
+                        >
+                          {num(l.qty)}
+                        </button>
                         <button
                           onClick={() =>
                             setCart((c) =>
                               c.map((x, k) => (k === i ? { ...x, qty: x.qty + 1 } : x)),
                             )
                           }
-                          className="rounded-md bg-background p-1"
+                          className="grid h-7 w-7 place-items-center rounded-md bg-background hover:bg-accent active:scale-95 transition-all"
                         >
-                          <Plus className="h-3 w-3" />
+                          <Plus className="h-3.5 w-3.5" />
                         </button>
                         <span className="ml-auto font-num font-bold text-sm">
                           {tzs(priceOf(l.productId, l.tier) * l.qty)}
@@ -450,7 +573,7 @@ export function POSScreen() {
                   <span>{t("Bidhaa", "Items")}</span>
                   <span className="font-num">{itemCount}</span>
                 </div>
-                <div className="flex justify-between text-lg font-bold">
+                <div className="flex justify-between text-xl font-extrabold">
                   <span>{t("Jumla", "Total")}</span>
                   <span className="font-num">{tzs(total)}</span>
                 </div>
@@ -460,6 +583,7 @@ export function POSScreen() {
                     disabled={!cart.length}
                     onClick={park}
                     title={t("Weka pembeni", "Park")}
+                    className="h-12 w-12"
                   >
                     <Pause className="h-4 w-4" />
                   </Button>
@@ -472,7 +596,7 @@ export function POSScreen() {
                       (pay === "mpesa" && !mpesaReceipt)
                     }
                     onClick={completeSale}
-                    className="flex-1 h-11 text-white"
+                    className="flex-1 h-12 text-base font-extrabold text-white shadow-card transition-transform active:scale-[0.98]"
                     style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
                   >
                     {uploadingReceipt
@@ -763,7 +887,119 @@ export function POSScreen() {
           </Button>
         </DialogContent>
       </Dialog>
+
+      <QuantityKeypadDialog
+        product={qtyPrompt?.product ?? null}
+        unit={qtyPrompt?.product.unit}
+        initialQty={qtyPrompt ? cartQtyOf(qtyPrompt.product.id, qtyPrompt.tier) : 0}
+        priceEach={qtyPrompt ? priceOf(qtyPrompt.product.id, qtyPrompt.tier) : 0}
+        onClose={() => setQtyPrompt(null)}
+        onConfirm={(qty) => {
+          if (qtyPrompt) setExactQty(qtyPrompt.product.id, qty, qtyPrompt.tier);
+          setQtyPrompt(null);
+        }}
+      />
     </AppShell>
+  );
+}
+
+function QuantityKeypadDialog({
+  product,
+  unit,
+  initialQty,
+  priceEach,
+  onClose,
+  onConfirm,
+}: {
+  product: Product | null;
+  unit?: string;
+  initialQty: number;
+  priceEach: number;
+  onClose: () => void;
+  onConfirm: (qty: number) => void;
+}) {
+  const { t } = useApp();
+  const [value, setValue] = useState("");
+
+  // Re-seed the display each time a new product is opened, blank if it
+  // wasn't in the cart yet, otherwise its current quantity so retyping
+  // just corrects the total.
+  const key = product?.id ?? "";
+  const [seededFor, setSeededFor] = useState("");
+  if (product && seededFor !== key) {
+    setSeededFor(key);
+    setValue(initialQty > 0 ? String(initialQty) : "");
+  }
+
+  const press = (d: string) => {
+    if (d === "." && value.includes(".")) return;
+    if (value.length >= 7) return;
+    setValue((v) => (v === "0" && d !== "." ? d : v + d));
+  };
+  const backspace = () => setValue((v) => v.slice(0, -1));
+  const qty = Number(value) || 0;
+  const lineTotal = qty * priceEach;
+
+  return (
+    <Dialog open={!!product} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-xs">
+        <DialogHeader>
+          <DialogTitle className="text-base">{product?.name}</DialogTitle>
+        </DialogHeader>
+        <div className="rounded-xl bg-secondary/60 p-4 text-center">
+          <div className="font-num text-4xl font-extrabold tabular-nums">
+            {value || "0"}
+            <span className="ml-1.5 text-lg font-semibold text-muted-foreground">{unit}</span>
+          </div>
+          {qty > 0 && (
+            <div className="mt-1 font-num text-sm font-semibold text-[#1E7C3F]">
+              {tzs(lineTotal)}
+            </div>
+          )}
+        </div>
+        <div className="flex gap-1.5">
+          {[1, 5, 10, 20, 50].map((n) => (
+            <button
+              key={n}
+              onClick={() => setValue(String(n))}
+              className="flex-1 rounded-lg bg-secondary py-1.5 text-xs font-bold hover:bg-accent"
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-3 gap-1.5">
+          {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0"].map((d) => (
+            <button
+              key={d}
+              onClick={() => press(d)}
+              className="rounded-lg bg-background border border-border py-3 text-lg font-bold hover:bg-accent active:scale-95 transition-all"
+            >
+              {d}
+            </button>
+          ))}
+          <button
+            onClick={backspace}
+            className="grid place-items-center rounded-lg bg-background border border-border py-3 hover:bg-accent active:scale-95 transition-all"
+          >
+            <Delete className="h-5 w-5" />
+          </button>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            {t("Ghairi", "Cancel")}
+          </Button>
+          <Button
+            disabled={qty <= 0}
+            onClick={() => onConfirm(qty)}
+            className="text-white font-bold"
+            style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+          >
+            {initialQty > 0 ? t("Sasisha", "Update") : t("Ongeza", "Add")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
