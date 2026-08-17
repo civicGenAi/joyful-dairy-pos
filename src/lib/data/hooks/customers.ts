@@ -31,6 +31,14 @@ export function useCustomerDeposits(id: string | null) {
   });
 }
 
+export function useCustomerBalanceBefore(id: string | null, beforeDate: string | null) {
+  return useQuery({
+    queryKey: [...customerKeys.byId(id ?? ""), "balanceBefore", beforeDate ?? ""],
+    queryFn: () => customersRepo.balanceBefore(id!, beforeDate!),
+    enabled: !!id && !!beforeDate,
+  });
+}
+
 export function useCreateCustomer() {
   const qc = useQueryClient();
   return useMutation({

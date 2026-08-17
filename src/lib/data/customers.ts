@@ -51,9 +51,10 @@ export const customerKeys = {
 };
 
 export const customersRepo = {
+  // A hard cap, not real pagination, see the same note in farmers.ts.
   async list(): Promise<Customer[]> {
     const rows = unwrap(
-      await supabase.from("customers").select("*").order("name"),
+      await supabase.from("customers").select("*").is("deleted_at", null).order("name").limit(2000),
     ) as CustomerRow[];
     return rows.map(toCustomer);
   },
@@ -96,6 +97,19 @@ export const customersRepo = {
         paid: r.sales.payment !== "credit",
       }))
       .sort((a, b) => (a.date < b.date ? 1 : -1));
+  },
+
+  /** True running balance as of the start of a given date, computed
+   *  server-side from the full ledger. Used as a monthly statement's
+   *  opening balance so a debt carried from an earlier month doesn't
+   *  silently disappear. */
+  async balanceBefore(customerId: string, beforeDate: string): Promise<number> {
+    const { data, error } = await supabase.rpc("customer_balance_before", {
+      p_customer_id: customerId,
+      p_before_date: beforeDate,
+    });
+    if (error) throw new Error(error.message);
+    return Number(data ?? 0);
   },
 
   async deposits(customerId: string): Promise<CustomerDeposit[]> {
@@ -174,8 +188,16 @@ export const customersRepo = {
     );
   },
 
+  /** Soft delete: past receipts and statements for this customer stay
+   *  attributed instead of going anonymous. Restore from Settings -> Trash. */
   async remove(id: string, name: string): Promise<void> {
-    unwrap(await supabase.from("customers").delete().eq("id", id).select("id"));
+    unwrap(
+      await supabase
+        .from("customers")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", id)
+        .select("id"),
+    );
     await recordAudit(
       "delete",
       "customers",

@@ -2,14 +2,21 @@
 
 > Claude Code loads this file automatically at the start of every session.
 > If you are a fresh AI session, read this whole file, then read
-> `mdfiles/00-BACKEND_BRIEF.md` before anything else.
+> `mdfiles/05-DATA_CONTRACTS.md` for current backend state before anything
+> else (`00-BACKEND_BRIEF.md` is the pre-backend handover doc, useful for UI
+> history but not a live task list).
 
 ---
 
 ## What this project is
 
 **African Joy Dairy POS**, a milk-cooperative operations system for a Tanzanian
-dairy. The frontend is **complete and polished**. There is **no backend**.
+dairy. The frontend is **complete and polished**. The backend is **Supabase,
+already wired**: repositories, react-query hooks, RLS, and the domain RPCs
+described in `mdfiles/05-DATA_CONTRACTS.md` are all in place and in use.
+Treat `05-DATA_CONTRACTS.md` as the current source of truth for backend
+state; `00-BACKEND_BRIEF.md` describes the pre-backend handover and is
+historical context, not a live task list.
 
 The codebase is built on **TanStack Start + TanStack Router + Vite + React 19
 + Tailwind v4 + shadcn/ui + framer-motion + recharts + react-query**. Keep
@@ -20,16 +27,18 @@ framework, even if older docs suggest otherwise.
 
 ## Where to read things, in order
 
-1. `mdfiles/00-BACKEND_BRIEF.md` — **canonical onboarding doc**. Has the rules of the road, entity catalog, capability matrix, demo accounts, file map, and the exact list of deliverables for Phase E (the backend). Always read this first.
-2. `mdfiles/01-PROJECT_MAP.md` — what's in the codebase, route by route.
-3. `mdfiles/02-GAPS.md` — gap analysis from the UI phase. Mostly closed; useful for context.
-4. `mdfiles/03-SUGGESTIONS.md` — Phase D suggestions (most shipped).
-5. `mdfiles/04-HANDBACK.md` — Phase A→C rollup with route inventory.
-6. `mdfiles/05-DATA_CONTRACTS.md` — produced by you during Phase E.
+1. `mdfiles/05-DATA_CONTRACTS.md` — **canonical, current**. Backend architecture, entity/table catalog, screen → query/mutation mapping, error codes, and the live "Known gaps / follow-ups" list. Read this first.
+2. `mdfiles/00-BACKEND_BRIEF.md` — pre-backend handover brief. Rules of the road, capability matrix, demo accounts, file map. Historical for the "your job is to build Phase E" framing, still accurate for everything else.
+3. `mdfiles/01-PROJECT_MAP.md` — what's in the codebase, route by route.
+4. `mdfiles/02-GAPS.md` — gap analysis from the UI phase. Mostly closed; useful for context.
+5. `mdfiles/03-SUGGESTIONS.md` — Phase D suggestions (most shipped).
+6. `mdfiles/04-HANDBACK.md` — Phase A→C rollup with route inventory.
 
 The product brief is whatever the user pasted on session start. Treat
-`00-BACKEND_BRIEF.md` as the more current source if there's any conflict
-(e.g. the original brief says "react-router-dom" but we use TanStack).
+`05-DATA_CONTRACTS.md` as the more current source if there's any conflict
+with any of the above (e.g. the original brief says "react-router-dom" but
+we use TanStack, and the earlier docs say there's no backend when there now
+is one).
 
 ---
 
@@ -60,16 +69,19 @@ bun run lint      # must show 0 errors
 
 ## What's left to build
 
-**Phase E** — the backend. Everything you need to know is in
-`mdfiles/00-BACKEND_BRIEF.md` §3 ("Your job"). Output for Phase E:
+Phase E (backend wiring) is done: repositories, hooks, the typed API client,
+`// BACKEND:` seams, audit-log-on-every-write, and `05-DATA_CONTRACTS.md` all
+exist. `src/hooks/use-simulated-load.ts` is already deleted; every screen's
+skeleton comes from `useQuery().isPending`. See `05-DATA_CONTRACTS.md` §8
+("Known gaps / follow-ups") for what's still genuinely open, currently:
 
-1. `src/lib/data/<entity>.ts` repositories
-2. `src/lib/data/hooks/<entity>.ts` react-query wrappers
-3. `// BACKEND:` comment seams at every former mock-import site
-4. `src/lib/api/client.ts` typed fetch wrapper
-5. `mdfiles/05-DATA_CONTRACTS.md` mapping screens → entities/queries/mutations
-6. Delete `src/hooks/use-simulated-load.ts` after every screen uses real queries
-7. Wire `recordAudit()` through every mutation so the existing Audit tab stays live
+1. Report scheduling (WhatsApp/Email/SMS) is a UI preview with no edge
+   function or provider behind it.
+2. The offline sales queue covers van sales only, not transfers/returns/
+   cash-up made while offline, and there's no asset-level service worker.
+3. `overdueDays`, `spoilagePctWarn` and `dayCloseNagHours` are configurable
+   in Settings → Alert thresholds but don't drive any alert yet.
+4. The day-unbalanced alert only ever checks yesterday.
 
 ## Quick reference
 

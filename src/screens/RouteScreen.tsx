@@ -28,6 +28,7 @@ import { depositsRepo } from "@/lib/data/sales";
 import { uploadHardCopy } from "@/lib/data/uploads";
 import { todayISO } from "@/lib/data/dates";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { salesQueue, newClientRef } from "@/lib/offline/salesQueue";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { tzs, num } from "@/lib/format";
 import { useEffect, useMemo, useState } from "react";
@@ -92,12 +93,24 @@ export function RouteScreen() {
   const saveVanLoad = useSaveVanLoad();
 
   const [tab, setTab] = useState("plan");
-  const [online, setOnline] = useState(true);
+  // Reflects the real connection, not just a demo label: seeded from
+  // navigator.onLine and kept live via the online/offline window events.
+  // The pill stays clickable too, so a driver can still rehearse the
+  // offline flow on a connected phone.
+  const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const [session, setSession] = useState<"morning" | "evening">("morning");
-  const [cart, setCart] = useState<CartLine[]>([]);
+  // Autosaved draft: an in-progress sale survives an accidental refresh or
+  // app switch instead of vanishing before it's even submitted.
+  const [cart, setCart] = useLocalStorage<CartLine[]>(`ajd:van:cart:${user?.id ?? "anon"}`, []);
+  const [queuedCount, setQueuedCount] = useState(0);
   const [customer, setCustomer] = useState<string>("");
   const [customerQ, setCustomerQ] = useState("");
   const [payment, setPayment] = useState<"cash" | "credit" | "mpesa">("cash");
+  // Mpesa's single source of truth: a photo of the confirmation. Only
+  // required while online, there's no connection to upload it with while
+  // offline, the queued sale just syncs without one.
+  const [mpesaReceipt, setMpesaReceipt] = useState<File | null>(null);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
   // Driver-chosen layout for the product picker on the Sell tab.
   const [sellStyle, setSellStyle] = useLocalStorage<"grid" | "list">("ajd:van-sell-style", "grid");
   const [deposit, setDeposit] = useState(0);
@@ -220,26 +233,125 @@ export function RouteScreen() {
       return [...c, { productId: pid, qty: 1 }];
     });
 
-  const completeSale = () => {
+  const refreshQueuedCount = () => {
+    if (user) setQueuedCount(salesQueue.list(user.id).length);
+  };
+
+  // Replays whatever is sitting in the offline queue, in order, stopping at
+  // the first real failure (a still-dead connection fails the same way
+  // every time, no point burning through the rest as individual errors).
+  // Each queued sale carries the clientRef it was first queued with, so a
+  // sale that actually reached the server before a dropped response just
+  // returns the existing receipt instead of being recorded twice.
+  const flushQueue = async () => {
+    if (!user) return;
+    const before = salesQueue.list(user.id).length;
+    if (before === 0) return;
+    const result = await salesQueue.flush(user.id);
+    refreshQueuedCount();
+    if (result.synced > 0) {
+      qc.invalidateQueries({ queryKey: ["sales"] });
+      qc.invalidateQueries({ queryKey: ["stock"] });
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["finance"] });
+      toast.success(
+        t(
+          `Mauzo ${result.synced} yaliyosubiri yamesawazishwa`,
+          `${result.synced} queued sale(s) synced`,
+        ),
+      );
+    }
+    if (result.error) {
+      toast.error(
+        t(
+          `Mauzo ${result.remaining} bado yanasubiri, itajaribu tena`,
+          `${result.remaining} sale(s) still queued, will retry`,
+        ),
+      );
+    }
+  };
+
+  // Real reconnects trigger a flush regardless of what the manual pill says,
+  // and the manual pill flipping back to "online" does too.
+  useEffect(() => {
+    refreshQueuedCount();
+    const handleOnline = () => {
+      setOnline(true);
+      void flushQueue();
+    };
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (online) void flushQueue();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online]);
+
+  const completeSale = async () => {
     if (!cart.length) return;
+    // Offline: no connection to upload a receipt with, the queued sale
+    // just syncs without one, there's no way around that. Online: require it,
+    // same as the counter.
+    if (online && payment === "mpesa" && !mpesaReceipt) {
+      toast.error(t("Pakia picha ya risiti ya M-Pesa", "Upload a photo of the M-Pesa receipt"));
+      return;
+    }
     const cid = customer || customers[0]?.id;
+    let receiptUrl: string | undefined;
+    if (online && payment === "mpesa" && mpesaReceipt) {
+      setUploadingReceipt(true);
+      try {
+        receiptUrl = await uploadHardCopy(mpesaReceipt, "sale");
+      } catch {
+        toast.error(t("Imeshindikana kupakia risiti", "Could not upload the receipt"));
+        setUploadingReceipt(false);
+        return;
+      }
+      setUploadingReceipt(false);
+    }
+    const saleInput = {
+      channel: "route" as const,
+      payment,
+      tier: "own" as const,
+      lines: cart.map((l) => ({
+        productId: l.productId,
+        qty: l.qty,
+        unitPrice: priceOf(l.productId),
+      })),
+      customerId: cid,
+      locationId: "loc-van1",
+      customerName: customers.find((c) => c.id === cid)?.name,
+      receiptUrl,
+    };
+
+    if (!online) {
+      // No connection: keep the sale on-device instead of letting the
+      // request just fail. It syncs automatically the moment `online` flips.
+      if (user) {
+        salesQueue.enqueue(user.id, {
+          clientRef: newClientRef(),
+          queuedAt: new Date().toISOString(),
+          input: saleInput,
+        });
+        refreshQueuedCount();
+      }
+      toast.success(
+        t("Mauzo yamehifadhiwa, itasawazishwa", "Sale saved, will sync when back online"),
+      );
+      setCart([]);
+      setMpesaReceipt(null);
+      return;
+    }
+
     completeSaleMut.mutate(
-      {
-        channel: "route",
-        payment,
-        tier: "own",
-        lines: cart.map((l) => ({
-          productId: l.productId,
-          qty: l.qty,
-          unitPrice: priceOf(l.productId),
-        })),
-        customerId: cid,
-        locationId: "loc-van1",
-      },
+      { ...saleInput, clientRef: newClientRef() },
       {
         onSuccess: () => {
           toast.success(t("Mauzo yamehifadhiwa", "Sale recorded"));
           setCart([]);
+          setMpesaReceipt(null);
         },
         onError: (e) =>
           toast.error(
@@ -349,6 +461,17 @@ export function RouteScreen() {
               {online ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
               {online ? t("Imewasiliana", "Online") : t("Hakuna mtandao", "Offline")}
             </button>
+            {queuedCount > 0 && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-[#E5A100]/15 px-2 py-1 text-[10px] font-semibold text-[#8a5a00]"
+                title={t(
+                  `Mauzo ${queuedCount} yanasubiri kusawazishwa`,
+                  `${queuedCount} sale(s) waiting to sync`,
+                )}
+              >
+                {queuedCount} {t("inasubiri", "pending")}
+              </span>
+            )}
             <button
               onClick={() => {
                 logout();
@@ -715,6 +838,35 @@ export function RouteScreen() {
                 </Select>
               </div>
 
+              {payment === "mpesa" && (
+                <div className="grid gap-1.5">
+                  <Label>{t("Picha ya risiti ya M-Pesa", "Photo of the M-Pesa receipt")}</Label>
+                  {online ? (
+                    <>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={(e) => setMpesaReceipt(e.target.files?.[0] ?? null)}
+                        className="text-xs"
+                      />
+                      {mpesaReceipt && (
+                        <div className="text-[11px] text-muted-foreground truncate">
+                          {mpesaReceipt.name}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="rounded-lg bg-secondary/60 px-3 py-2 text-[11px] text-muted-foreground">
+                      {t(
+                        "Hakuna mtandao, risiti itaongezwa ukirudi online.",
+                        "No connection, add the receipt once you're back online.",
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {cart.length === 0 ? null : (
                 <div className="rounded-xl bg-secondary/60 p-3 space-y-2">
                   <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -762,15 +914,22 @@ export function RouteScreen() {
                 </div>
               )}
               <Button
-                disabled={cart.length === 0 || completeSaleMut.isPending}
+                disabled={
+                  cart.length === 0 ||
+                  completeSaleMut.isPending ||
+                  uploadingReceipt ||
+                  (online && payment === "mpesa" && !mpesaReceipt)
+                }
                 className="w-full h-11 text-white"
                 style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
-                onClick={completeSale}
+                onClick={() => void completeSale()}
               >
                 <Receipt className="h-4 w-4 mr-1.5" />{" "}
-                {completeSaleMut.isPending
-                  ? t("Inahifadhi…", "Saving…")
-                  : t("Kamilisha mauzo", "Complete sale")}
+                {uploadingReceipt
+                  ? t("Inapakia risiti…", "Uploading receipt…")
+                  : completeSaleMut.isPending
+                    ? t("Inahifadhi…", "Saving…")
+                    : t("Kamilisha mauzo", "Complete sale")}
               </Button>
             </div>
 

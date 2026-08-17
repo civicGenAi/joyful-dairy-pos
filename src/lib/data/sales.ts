@@ -22,6 +22,9 @@ export interface Sale {
   totalTZS: number;
   soldByName?: string;
   lines?: SaleLine[];
+  /** Scanned receipt (the Mpesa confirmation screenshot), the single
+   *  source of truth for a mobile-money sale. */
+  receiptUrl?: string | null;
 }
 
 export interface SaleLine {
@@ -44,6 +47,7 @@ interface SaleRow {
   tier: PriceTier;
   total_tzs: number;
   voided: boolean;
+  receipt_url?: string | null;
   profiles?: { name: string } | null;
   sale_lines?: SaleLineRow[];
 }
@@ -69,6 +73,7 @@ function toSale(r: SaleRow): Sale {
     tier: r.tier,
     totalTZS: Number(r.total_tzs),
     soldByName: r.profiles?.name,
+    receiptUrl: r.receipt_url,
     lines: r.sale_lines?.map((l) => ({
       id: l.id,
       productId: l.product_id,
@@ -87,7 +92,11 @@ export const saleKeys = {
 };
 
 export const salesRepo = {
-  /** Completes a sale via the transactional RPC and returns the receipt id. */
+  /** Completes a sale via the transactional RPC and returns the receipt id.
+   *  `clientRef` makes the call idempotent: retrying with the same ref after
+   *  a dropped connection returns the sale already recorded by the first
+   *  attempt instead of creating a duplicate. The offline sales queue
+   *  (src/lib/offline/salesQueue.ts) relies on this to replay safely. */
   async complete(input: {
     channel: "counter" | "route";
     payment: Sale["payment"];
@@ -95,6 +104,10 @@ export const salesRepo = {
     lines: SaleLineInput[];
     customerId?: string;
     locationId?: string;
+    clientRef?: string;
+    /** Scanned receipt URL, so a mobile-money sale carries the actual
+     *  confirmation photo instead of just the "mpesa" tag. */
+    receiptUrl?: string;
   }): Promise<Sale> {
     const { data, error } = await supabase.rpc("complete_sale", {
       p_channel: input.channel,
@@ -107,6 +120,8 @@ export const salesRepo = {
       })),
       p_customer_id: input.customerId ?? null,
       p_location_id: input.locationId ?? null,
+      p_client_ref: input.clientRef ?? null,
+      p_receipt_url: input.receiptUrl ?? null,
     });
     if (error) throw new Error(error.message);
     return toSale(data as SaleRow);
@@ -129,6 +144,17 @@ export const salesRepo = {
       await supabase.from("sales").select("*, sale_lines(*), profiles(name)").eq("id", id).single(),
     ) as SaleRow;
     return toSale(row);
+  },
+
+  /** Voids a receipt: reverses its stock movements and any credit balance
+   *  it created, via the transactional RPC. Only possible on an unlocked day. */
+  async void(input: { saleId: string; reason?: string }): Promise<Sale> {
+    const { data, error } = await supabase.rpc("void_sale", {
+      p_sale_id: input.saleId,
+      p_reason: input.reason ?? null,
+    });
+    if (error) throw new Error(error.message);
+    return toSale(data as SaleRow);
   },
 };
 

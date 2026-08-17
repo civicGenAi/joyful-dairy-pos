@@ -8,6 +8,8 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, X, LogOut } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { prefetchForRoute } from "@/lib/data/prefetch";
 
 interface Props {
   collapsed: boolean;
@@ -112,6 +114,7 @@ function SidebarBody({
   onNavigate?: () => void;
   extraTopRight?: React.ReactNode;
 }) {
+  const qc = useQueryClient();
   return (
     <>
       <div
@@ -164,6 +167,7 @@ function SidebarBody({
                     <Link
                       to={it.to}
                       onClick={onNavigate}
+                      onMouseEnter={() => prefetchForRoute(qc, it.to)}
                       title={collapsed ? (lang === "sw" ? it.sw : it.label) : undefined}
                       className={cn(
                         "relative flex items-center rounded-xl text-sm font-medium transition-all",

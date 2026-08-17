@@ -4,7 +4,7 @@ import { useApp } from "@/app/context";
 import { useProducts, usePriceMatrix } from "@/lib/data/hooks/products";
 import { useCustomers } from "@/lib/data/hooks/customers";
 import { useStock } from "@/lib/data/hooks/stock";
-import { useSalesByDate, useCompleteSale } from "@/lib/data/hooks/sales";
+import { useSalesByDate, useCompleteSale, useVoidSale } from "@/lib/data/hooks/sales";
 import { todayISO } from "@/lib/data/dates";
 import type { Sale } from "@/lib/data/sales";
 import type { PriceTier, ProductCategory } from "@/mock/types";
@@ -42,11 +42,16 @@ import {
   History,
   Pause,
   CheckCircle2,
+  Ban,
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { motion } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
 import type { Customer, PriceMatrix, Product } from "@/mock/types";
+import { useLocalStorage } from "@/hooks/use-local-storage";
+import { DayLockBanner } from "@/components/shell/DayLockBanner";
+import { uploadHardCopy } from "@/lib/data/uploads";
 
 const CATS: { id: ProductCategory; label: { sw: string; en: string }; color: string }[] = [
   { id: "fresh-milk", label: { sw: "Maziwa Fresh", en: "Fresh milk" }, color: "#1E7C3F" },
@@ -75,14 +80,23 @@ export function POSScreen() {
   const { data: stock = [] } = useStock();
   const { data: shift = [] } = useSalesByDate(today, "counter");
   const completeSaleMut = useCompleteSale();
+  const voidSaleMut = useVoidSale();
 
   const [cat, setCat] = useState<ProductCategory>("fresh-milk");
   const [tier, setTier] = useState<PriceTier>("own");
-  const [cart, setCart] = useState<CartLine[]>([]);
+  // Autosaved draft: a cart in progress survives an accidental refresh,
+  // tab close or crash instead of vanishing. Cleared on a completed sale.
+  const [cart, setCart] = useLocalStorage<CartLine[]>(`ajd:pos:cart:${user?.id ?? "anon"}`, []);
   const [parked, setParked] = useState<CartLine[][]>([]);
   const [customer, setCustomer] = useState("walkin");
   const [pay, setPay] = useState("cash");
+  // Mpesa's single source of truth: a photo of the confirmation, not a
+  // typed code, since there's nothing to check a typed code against.
+  const [mpesaReceipt, setMpesaReceipt] = useState<File | null>(null);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [receipt, setReceipt] = useState<null | Sale>(null);
+  const [voiding, setVoiding] = useState<Sale | null>(null);
+  const [voidReason, setVoidReason] = useState("");
 
   const products = allProducts.filter((p) => p.category === cat && p.active);
   const priceOf = (pid: string, tr: PriceTier) => priceMatrix[pid]?.[tr] ?? 0;
@@ -112,10 +126,26 @@ export function POSScreen() {
   const total = cart.reduce((a, l) => a + priceOf(l.productId, l.tier) * l.qty, 0);
   const itemCount = cart.reduce((a, l) => a + l.qty, 0);
 
-  const completeSale = () => {
+  const completeSale = async () => {
     if (isCreditBlocked) {
       toast.error(t("Mteja amefungiwa mkopo (amechelewa)", "Customer is on credit hold (overdue)"));
       return;
+    }
+    if (pay === "mpesa" && !mpesaReceipt) {
+      toast.error(t("Pakia picha ya risiti ya M-Pesa", "Upload a photo of the M-Pesa receipt"));
+      return;
+    }
+    let receiptUrl: string | undefined;
+    if (pay === "mpesa" && mpesaReceipt) {
+      setUploadingReceipt(true);
+      try {
+        receiptUrl = await uploadHardCopy(mpesaReceipt, "sale");
+      } catch {
+        toast.error(t("Imeshindikana kupakia risiti", "Could not upload the receipt"));
+        setUploadingReceipt(false);
+        return;
+      }
+      setUploadingReceipt(false);
     }
     completeSaleMut.mutate(
       {
@@ -129,12 +159,14 @@ export function POSScreen() {
         })),
         customerId: customer === "walkin" ? undefined : customer,
         locationId: "loc-main",
+        receiptUrl,
       },
       {
         onSuccess: (sale) => {
           setReceipt(sale);
           toast.success(t("Mauzo yamehifadhiwa", "Sale completed"));
           setCart([]);
+          setMpesaReceipt(null);
         },
         onError: (e) =>
           toast.error(
@@ -183,6 +215,7 @@ export function POSScreen() {
 
   return (
     <AppShell title={t("Mauzo ya Kaunta", "Counter POS")}>
+      <DayLockBanner />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <StatCard
           label={t("Mapato kipindi changu", "My shift revenue")}
@@ -325,6 +358,25 @@ export function POSScreen() {
                     <SelectItem value="stock">{t("Utoaji wa stock", "Stock issue")}</SelectItem>
                   </SelectContent>
                 </Select>
+                {pay === "mpesa" && (
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">
+                      {t("Picha ya risiti ya M-Pesa", "Photo of the M-Pesa receipt")}
+                    </Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={(e) => setMpesaReceipt(e.target.files?.[0] ?? null)}
+                      className="h-9 text-xs"
+                    />
+                    {mpesaReceipt && (
+                      <div className="text-[11px] text-muted-foreground truncate">
+                        {mpesaReceipt.name}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {isCreditBlocked && (
                   <div className="rounded-lg bg-[#E11B22]/10 text-[#E11B22] px-2 py-1.5 text-[11px] flex items-center gap-1.5">
                     <AlertTriangle className="h-3 w-3" />
@@ -412,14 +464,22 @@ export function POSScreen() {
                     <Pause className="h-4 w-4" />
                   </Button>
                   <Button
-                    disabled={cart.length === 0 || isCreditBlocked || completeSaleMut.isPending}
+                    disabled={
+                      cart.length === 0 ||
+                      isCreditBlocked ||
+                      completeSaleMut.isPending ||
+                      uploadingReceipt ||
+                      (pay === "mpesa" && !mpesaReceipt)
+                    }
                     onClick={completeSale}
                     className="flex-1 h-11 text-white"
                     style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
                   >
-                    {completeSaleMut.isPending
-                      ? t("Inakamilisha…", "Completing…")
-                      : t("Kamilisha mauzo", "Complete sale")}
+                    {uploadingReceipt
+                      ? t("Inapakia risiti…", "Uploading receipt…")
+                      : completeSaleMut.isPending
+                        ? t("Inakamilisha…", "Completing…")
+                        : t("Kamilisha mauzo", "Complete sale")}
                   </Button>
                 </div>
               </div>
@@ -566,6 +626,18 @@ export function POSScreen() {
                           <Printer className="h-3.5 w-3.5 mr-1" />
                           {t("Chapisha", "Print")}
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-muted-foreground hover:text-[#E11B22]"
+                          onClick={() => {
+                            setVoiding(s);
+                            setVoidReason("");
+                          }}
+                        >
+                          <Ban className="h-3.5 w-3.5 mr-1" />
+                          {t("Batilisha", "Void")}
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -575,6 +647,65 @@ export function POSScreen() {
           </SectionCard>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!voiding} onOpenChange={(o) => !o && setVoiding(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("Batilisha risiti?", "Void this receipt?")}</DialogTitle>
+          </DialogHeader>
+          {voiding && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {t(
+                  `Risiti ${voiding.id} (${tzs(voiding.totalTZS)}) itabatilishwa, stock itarudi na deni la mteja (kama lipo) litapunguzwa. Haiwezi kutenduliwa.`,
+                  `Receipt ${voiding.id} (${tzs(voiding.totalTZS)}) will be voided, stock is put back and any credit balance it created is reversed. This cannot be undone.`,
+                )}
+              </p>
+              <div>
+                <Label>{t("Sababu (hiari)", "Reason (optional)")}</Label>
+                <Textarea
+                  value={voidReason}
+                  onChange={(e) => setVoidReason(e.target.value)}
+                  placeholder={t("mf. Bidhaa mbaya iliingizwa", "e.g. wrong item rung up")}
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVoiding(null)}>
+              {t("Ghairi", "Cancel")}
+            </Button>
+            <Button
+              className="bg-[#E11B22] text-white hover:bg-[#c41319]"
+              disabled={voidSaleMut.isPending}
+              onClick={() => {
+                if (!voiding) return;
+                voidSaleMut.mutate(
+                  { saleId: voiding.id, reason: voidReason || undefined },
+                  {
+                    onSuccess: () => {
+                      toast.success(t("Risiti imebatilishwa", "Receipt voided"));
+                      setVoiding(null);
+                    },
+                    onError: (e) =>
+                      toast.error(
+                        e.message.includes("day-locked")
+                          ? t("Siku hii imefungwa", "This day is locked")
+                          : e.message.includes("already-voided")
+                            ? t("Tayari imebatilishwa", "Already voided")
+                            : t("Imeshindikana kubatilisha", "Could not void the receipt"),
+                      ),
+                  },
+                );
+              }}
+            >
+              <Ban className="h-3.5 w-3.5 mr-1.5" />
+              {t("Batilisha", "Void")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!receipt} onOpenChange={() => setReceipt(null)}>
         <DialogContent>

@@ -7,8 +7,9 @@ import {
   useCustomer,
   useCustomerActivities,
   useCustomerDeposits,
+  useCustomerBalanceBefore,
 } from "@/lib/data/hooks/customers";
-import { useFarmer, useCycleSummary } from "@/lib/data/hooks/farmers";
+import { useFarmer, useCycleSummary, useFarmerMonthlySummary } from "@/lib/data/hooks/farmers";
 import { useDayLock, useReconForDate } from "@/lib/data/hooks/recon";
 import { useCompany } from "@/lib/data/hooks/settings";
 import { collectionKeys, collectionsRepo } from "@/lib/data/collections";
@@ -221,10 +222,18 @@ export function CustomerStatementPrintScreen() {
   const search = useSearch({ from: "/statement/customer/$id" }) as { month?: string };
   const month =
     search.month ?? new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  // "1 May 2026" parses reliably to the first of that month, giving the
+  // date customer_balance_before() needs to compute what was actually
+  // owed walking into this month, instead of assuming it was always zero.
+  const monthStartDate = new Date(`1 ${month}`);
+  const monthStartIso = Number.isNaN(monthStartDate.getTime())
+    ? null
+    : `${monthStartDate.getFullYear()}-${String(monthStartDate.getMonth() + 1).padStart(2, "0")}-01`;
   const { data: c, isPending } = useCustomer(id);
   const { data: activities = [] } = useCustomerActivities(id);
   const { data: deposits = [] } = useCustomerDeposits(id);
   const { data: products = [] } = useProducts();
+  const { data: balanceBefore = 0 } = useCustomerBalanceBefore(id, monthStartIso);
 
   if (isPending)
     return (
@@ -248,7 +257,10 @@ export function CustomerStatementPrintScreen() {
 
   const takings = shown.reduce((a, x) => a + x.amountTZS, 0);
   const depositTotal = shownDeposits.reduce((a, x) => a + x.amountTZS, 0);
-  const opening = 0;
+  // Only apply a real opening balance when actually showing one specific
+  // month; the "no activity this month" fallback already shows the whole
+  // history, where 0 is the correct starting point.
+  const opening = monthActivities.length ? balanceBefore : 0;
   const closing = opening + takings - depositTotal;
 
   return (
@@ -326,15 +338,31 @@ export function CustomerStatementPrintScreen() {
 
 // ---- Farmer statement -------------------------------------------------------
 
+const STATUS_LABEL: Record<string, { sw: string; en: string }> = {
+  paid: { sw: "Imelipwa", en: "Paid" },
+  partial: { sw: "Sehemu", en: "Partial" },
+  unpaid: { sw: "Haijalipwa", en: "Unpaid" },
+  none: { sw: "Hakuna", en: "None" },
+};
+
 export function FarmerStatementPrintScreen() {
   const { t } = useApp();
   const { id } = useParams({ from: "/statement/farmer/$id" });
+  const search = useSearch({ from: "/statement/farmer/$id" }) as { month?: string };
+  const monthStart = search.month ?? `${todayISO().slice(0, 8)}01`;
+  const monthEnd = new Date(
+    new Date(`${monthStart}T00:00:00`).getFullYear(),
+    new Date(`${monthStart}T00:00:00`).getMonth() + 1,
+    0,
+  )
+    .toISOString()
+    .slice(0, 10);
   const { data: f, isPending } = useFarmer(id);
-  const { data: cycle } = useCycleSummary();
-  const cycleStart = cycle?.startDate ?? todayISO();
+  const { data: monthly = [] } = useFarmerMonthlySummary(id, 24);
+  const thisMonth = monthly.find((m) => m.month === monthStart);
   const { data: collections = [] } = useQuery({
-    queryKey: collectionKeys.byFarmer(id, cycleStart),
-    queryFn: () => collectionsRepo.listByFarmer(id, cycleStart),
+    queryKey: [...collectionKeys.byFarmer(id, monthStart), monthEnd],
+    queryFn: () => collectionsRepo.listByFarmer(id, monthStart, monthEnd),
   });
 
   if (isPending)
@@ -350,25 +378,22 @@ export function FarmerStatementPrintScreen() {
       </PrintShell>
     );
 
-  const total = collections.reduce((a, d) => a + d.litres, 0);
-  const earnings = total * f.ratePerL;
-  const cycleLabel = cycle
-    ? `${dateLabel(cycle.startDate)} - ${dateLabel(cycle.endDate)}`
-    : t("Mzunguko wa sasa", "Current cycle");
+  const total = thisMonth?.litres ?? collections.reduce((a, d) => a + d.litres, 0);
+  const earnings = thisMonth?.earnedTZS ?? total * f.ratePerL;
+  const paid = thisMonth?.paidTZS ?? 0;
+  const status = thisMonth?.status ?? "none";
+  const monthLabel = new Date(`${monthStart}T00:00:00`).toLocaleDateString("en-GB", {
+    month: "long",
+    year: "numeric",
+  });
 
   return (
     <PrintShell
       backTo="/farmers"
       title={t("Statimenti ya mfugaji", "Farmer statement")}
-      subtitle={`${f.name} · ${f.village} · ${t("Mzunguko", "Cycle")} ${cycleLabel}`}
+      subtitle={`${f.name} · ${f.village} · ${monthLabel}`}
     >
-      <div className="grid grid-cols-3 gap-3 mb-6 text-sm">
-        <div className="rounded-xl bg-secondary/60 p-3">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {t("Bei", "Rate")}
-          </div>
-          <div className="font-num font-semibold">{num(f.ratePerL)}/L</div>
-        </div>
+      <div className="grid grid-cols-4 gap-3 mb-6 text-sm">
         <div className="rounded-xl bg-secondary/60 p-3">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
             {t("Litre", "Litres")}
@@ -377,9 +402,21 @@ export function FarmerStatementPrintScreen() {
         </div>
         <div className="rounded-xl bg-secondary/60 p-3">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {t("Kiasi", "Earnings")}
+            {t("Alipata", "Earned")}
           </div>
           <div className="font-num font-semibold text-[#1E7C3F]">{tzs(earnings)}</div>
+        </div>
+        <div className="rounded-xl bg-secondary/60 p-3">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Alilipwa", "Paid")}
+          </div>
+          <div className="font-num font-semibold">{tzs(paid)}</div>
+        </div>
+        <div className="rounded-xl bg-secondary/60 p-3">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {t("Hali", "Status")}
+          </div>
+          <div className="font-semibold">{t(STATUS_LABEL[status].sw, STATUS_LABEL[status].en)}</div>
         </div>
       </div>
 
@@ -423,7 +460,7 @@ export function FarmerStatementPrintScreen() {
         </div>
         <div className="rounded-xl bg-secondary/60 p-3">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {t("Inayodaiwa", "Outstanding payable")}
+            {t("Inayodaiwa (jumla)", "Outstanding payable (overall)")}
           </div>
           <div className="font-num font-semibold text-[#E11B22]">{tzs(f.currentBalanceTZS)}</div>
         </div>

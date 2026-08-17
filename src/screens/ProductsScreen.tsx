@@ -656,8 +656,8 @@ function ProductSheet({ product: p, onClose }: { product: Product; onClose: () =
                 destructive
                 title={t("Futa bidhaa?", "Delete product?")}
                 description={t(
-                  "Bidhaa yenye historia ya mauzo haiwezi kufutwa; itakataliwa na mfumo.",
-                  "A product with sales history cannot be deleted; the system will refuse.",
+                  "Bidhaa itaondolewa kwenye maduka na bei, historia yake itabaki salama. Unaweza kuirudisha kutoka Mipangilio > Tupio.",
+                  "The product will be removed from POS and pricing, its history stays intact. You can restore it from Settings > Trash.",
                 )}
                 confirmLabel={t("Futa", "Delete")}
                 onConfirm={() =>

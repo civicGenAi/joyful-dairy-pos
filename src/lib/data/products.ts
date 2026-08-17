@@ -44,7 +44,9 @@ export const productKeys = {
 
 export const productsRepo = {
   async list(): Promise<Product[]> {
-    const rows = unwrap(await supabase.from("products").select("*").order("name")) as ProductRow[];
+    const rows = unwrap(
+      await supabase.from("products").select("*").is("deleted_at", null).order("name"),
+    ) as ProductRow[];
     return rows.map(toProduct);
   },
 
@@ -158,8 +160,17 @@ export const productsRepo = {
     );
   },
 
+  /** Soft delete: keeps price history and every past movement/sale line
+   *  attributed so old reconciliations and reports don't lose the product
+   *  out from under them. Restore from Settings -> Trash. */
   async remove(id: string, name: string): Promise<void> {
-    unwrap(await supabase.from("products").delete().eq("id", id).select("id"));
+    unwrap(
+      await supabase
+        .from("products")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", id)
+        .select("id"),
+    );
     await recordAudit(
       "delete",
       "products",

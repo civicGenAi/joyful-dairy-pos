@@ -32,7 +32,7 @@ export const locationKeys = {
 export const locationsRepo = {
   async list(): Promise<Location[]> {
     const rows = unwrap(
-      await supabase.from("locations").select("*").order("name"),
+      await supabase.from("locations").select("*").is("deleted_at", null).order("name"),
     ) as LocationRow[];
     return rows.map(toLocation);
   },
@@ -85,8 +85,16 @@ export const locationsRepo = {
     );
   },
 
+  /** Soft delete: past movements/collections/sales at this location stay
+   *  attributed. Restore from Settings -> Trash. */
   async remove(id: string, name: string): Promise<void> {
-    unwrap(await supabase.from("locations").delete().eq("id", id).select("id"));
+    unwrap(
+      await supabase
+        .from("locations")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", id)
+        .select("id"),
+    );
     await recordAudit("delete", "settings", `Amefuta eneo (${name})`, `Deleted location (${name})`);
   },
 };

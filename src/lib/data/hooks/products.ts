@@ -3,12 +3,25 @@ import { productKeys, productsRepo } from "@/lib/data/products";
 
 // BACKEND: react-query wrappers for products + prices.
 
+// Catalogue and pricing barely move intra-day, a longer staleTime than the
+// app default cuts refetches on screens that mount them repeatedly (POS,
+// route, products) without risking stale prices in practice.
+const REFERENCE_STALE_TIME = 5 * 60_000;
+
 export function useProducts() {
-  return useQuery({ queryKey: productKeys.list(), queryFn: productsRepo.list });
+  return useQuery({
+    queryKey: productKeys.list(),
+    queryFn: productsRepo.list,
+    staleTime: REFERENCE_STALE_TIME,
+  });
 }
 
 export function usePriceMatrix() {
-  return useQuery({ queryKey: productKeys.prices(), queryFn: productsRepo.priceMatrix });
+  return useQuery({
+    queryKey: productKeys.prices(),
+    queryFn: productsRepo.priceMatrix,
+    staleTime: REFERENCE_STALE_TIME,
+  });
 }
 
 export function usePriceHistory() {

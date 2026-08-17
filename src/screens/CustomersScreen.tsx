@@ -848,8 +848,8 @@ function CustomerActions({ c }: { c: Customer }) {
         destructive
         title={t("Futa mteja?", "Delete customer?")}
         description={t(
-          `${c.name} na historia yake ya mauzo itaondolewa kwenye orodha.`,
-          `${c.name} will be removed; their sales history links will be detached.`,
+          `${c.name} ataondolewa kwenye orodha, historia yake ya mauzo itabaki salama. Unaweza kumrudisha kutoka Mipangilio > Tupio.`,
+          `${c.name} will be removed from every list, their sales history stays intact. You can restore them from Settings > Trash.`,
         )}
         confirmLabel={t("Futa", "Delete")}
         onConfirm={() =>

@@ -69,15 +69,18 @@ export const collectionsRepo = {
     return rows.map(toEntry);
   },
 
-  async listByFarmer(farmerId: string, fromDate: string): Promise<CollectionEntry[]> {
-    const rows = unwrap(
-      await supabase
-        .from("collections")
-        .select("*")
-        .eq("farmer_id", farmerId)
-        .gte("date", fromDate)
-        .order("date"),
-    ) as CollectionRow[];
+  async listByFarmer(
+    farmerId: string,
+    fromDate: string,
+    toDate?: string,
+  ): Promise<CollectionEntry[]> {
+    let q = supabase
+      .from("collections")
+      .select("*")
+      .eq("farmer_id", farmerId)
+      .gte("date", fromDate);
+    if (toDate) q = q.lte("date", toDate);
+    const rows = unwrap(await q.order("date")) as CollectionRow[];
     return rows.map(toEntry);
   },
 
@@ -97,6 +100,27 @@ export const collectionsRepo = {
       p_session: input.session,
       p_litres: input.litres,
       p_location_id: input.locationId,
+      p_quality_note: input.qualityNote ?? null,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  /** Records a farmer's whole day in one save: morning and evening litres
+   *  together instead of two separate session visits. Either can be zero. */
+  async recordDay(input: {
+    farmerId: string;
+    date: string;
+    locationId: string;
+    morningLitres: number;
+    eveningLitres: number;
+    qualityNote?: string;
+  }): Promise<void> {
+    const { error } = await supabase.rpc("record_collection_day", {
+      p_farmer_id: input.farmerId,
+      p_date: input.date,
+      p_location_id: input.locationId,
+      p_morning_litres: input.morningLitres,
+      p_evening_litres: input.eveningLitres,
       p_quality_note: input.qualityNote ?? null,
     });
     if (error) throw new Error(error.message);

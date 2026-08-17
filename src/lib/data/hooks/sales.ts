@@ -32,6 +32,20 @@ export function useCompleteSale() {
   });
 }
 
+export function useVoidSale() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: salesRepo.void,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: saleKeys.all });
+      qc.invalidateQueries({ queryKey: ["stock"] });
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["recon"] });
+      qc.invalidateQueries({ queryKey: ["finance"] });
+    },
+  });
+}
+
 export function useDeposits(limit = 50) {
   return useQuery({ queryKey: depositKeys.list(), queryFn: () => depositsRepo.list(limit) });
 }

@@ -96,7 +96,12 @@ function toMovement(r: MovementRow): StockMovement {
 export const stockRepo = {
   async list(): Promise<StockItem[]> {
     const rows = unwrap(
-      await supabase.from("stock_items").select("*").order("category").order("name"),
+      await supabase
+        .from("stock_items")
+        .select("*")
+        .is("deleted_at", null)
+        .order("category")
+        .order("name"),
     ) as StockRow[];
     return rows.map(toItem);
   },

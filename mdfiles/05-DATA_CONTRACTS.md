@@ -63,7 +63,7 @@ and are safe to commit; they ship in the client bundle by design.
 | `price_list` | Append-only price history; `current_prices` view | insert (prices:write) |
 | `farmers` | Partner, balance maintained by RPCs; `farmers_view` adds cycle litres | CRUD + RPCs |
 | `customers` | Partner, outstanding maintained by RPCs | CRUD + RPCs |
-| `stock_items` | finished / consumable / raw; on_hand = ledger rollup | CRUD + trigger |
+| `stock_items` | finished / consumable / raw; on_hand = ledger rollup; `alert_threshold_key` maps to Settings → Alert thresholds for the 4 named products | CRUD + trigger |
 | `movements` | **The ledger** (signed qty, kind, product, location, partner, actor) | RPCs only |
 | `collections` | Farmer intake (session, point, rate) | `record_collection` |
 | `transfers` | Location-to-location moves | `record_transfer` |
@@ -79,6 +79,22 @@ and are safe to commit; they ship in the client bundle by design.
 
 RPC rollups (read-only): `recon_for_date`, `current_alerts`, `milk_trend`,
 `sales_by_category`, `sales_channel_split`, `top_customers`, `yield_trend`.
+
+**Soft delete (`00010_soft_delete.sql`)**: `farmers`, `customers`, `products`,
+`locations`, `stock_items` and `expenses` all carry a `deleted_at`. "Delete"
+in the UI is an update, not a `DELETE`, every repository's `remove()` sets
+the timestamp and the *_delete RLS policies were dropped, so no authenticated
+client can hard-delete these rows at all. `trash_list()` (RPC) lists every
+soft-deleted row across the six entities for Settings → Trash; restoring is
+a plain `update ... set deleted_at = null` through the same `*:write` policy
+that could edit the row; `purge_trash(days)` (RPC, `settings:write`) is the
+only path to a real `DELETE`, and only for rows past the retention window
+with zero ledger history. The FKs that used to `cascade`/`set null` off
+farmers/customers/products/locations (silently wiping or orphaning history
+on delete) were tightened to `restrict` as a backstop.
+`farmersRepo.list()`/`customersRepo.list()`/etc. filter `deleted_at is null`;
+`byId()` lookups deliberately do not, so a removed farmer or customer's
+statement/receipt print routes keep resolving.
 
 ## 4. Screen → queries / mutations
 
@@ -160,11 +176,37 @@ is driven by `useQuery().isPending`.
 
 ## 8. Known gaps / follow-ups
 
-- **Receipt voiding** (`sales.voided`) exists in the schema but has no UI.
+- ~~**Receipt voiding** (`sales.voided`) exists in the schema but has no
+  UI.~~ **Resolved** (`00011_void_sale_and_alerts.sql`): `void_sale(sale_id,
+  reason)` reverses the sale's stock movements and any credit balance it
+  created, then marks it voided; POS → shift history has a Void action.
+  Reports already filtered `not voided`, so this alone also fixed cash
+  position, sales-by-category, channel split and top-customers for a voided
+  sale; `recon_for_date`/`milk_trend` needed the explicit reversing ledger
+  row since they roll up `movements`, not `sales`.
 - **Report scheduling** (WhatsApp/Email/SMS) is still a UI preview; needs an
   edge function + provider integration.
-- **Offline route mode** is a visual toggle only; a service-worker queue
-  would be the real implementation.
-- The day-unbalanced alert only covers yesterday; thresholds in
+- ~~**Offline route mode** is a visual toggle only; a service-worker queue
+  would be the real implementation.~~ **Partially resolved**: the van
+  route's online/offline pill now reflects real `navigator.onLine` state
+  (the manual toggle still works too, for training), and a sale made while
+  offline is queued in `localStorage`
+  (`src/lib/offline/salesQueue.ts`) and replayed on reconnect.
+  `complete_sale` takes an idempotent `p_client_ref` (`00012_sale_idempotency.sql`)
+  so a retried queue entry can never double-charge a customer even if the
+  first attempt actually reached the server before the response was lost.
+  What's still open: this covers van sales only (not transfers/returns/
+  cash-up while offline), and there's no asset-level service worker, so the
+  app shell itself still needs a live connection to load in the first place.
+- ~~The day-unbalanced alert only covers yesterday; thresholds in
   `company_settings.alert_thresholds` are persisted but `current_alerts()`
-  currently uses per-item reorder levels rather than the global thresholds.
+  currently uses per-item reorder levels rather than the global
+  thresholds.~~ **Resolved** for low-stock (`00011_void_sale_and_alerts.sql`):
+  `stock_items.alert_threshold_key` maps `s-fresh`/`s-mtindi`/`s-butter`/
+  `c-vik-r` to the `freshLowL`/`mtindiLowL`/`butterLowPcs`/`vikopoRoboLow`
+  keys from Settings → Alert thresholds, falling back to the item's own
+  `reorder` for everything else; the alert also now skips inactive/deleted
+  stock items, which it previously didn't. `overdueDays`, `spoilagePctWarn`
+  and `dayCloseNagHours` are configurable in the same tab but still don't
+  drive anything, `current_alerts()` never reads them, that's still open.
+  The day-unbalanced alert still only checks yesterday, unchanged.

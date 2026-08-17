@@ -7,9 +7,14 @@
  *   - stock item definitions (quantities reset to 0)
  *
  * Wipes: collections, transfers, batches, spoilages, sales, deposits,
- * payouts, expenses, movements, day locks, audit log, farmers, customers,
- * and price history older than the current price. Opens a fresh 15-day
- * payout cycle starting today.
+ * payouts, farmer balance adjustments, expenses, movements, day locks,
+ * audit log, farmers, customers, and price history older than the current
+ * price. Opens a fresh 15-day payout cycle starting today.
+ *
+ * farmer_adjustments must be cleared before farmers: since 00010_soft_delete
+ * tightened farmer_adjustments.farmer_id to ON DELETE RESTRICT (it used to
+ * silently cascade, which was itself the bug that migration fixed), leaving
+ * any adjustment rows behind would make the farmers wipe below fail outright.
  *
  * Usage:  bun run db:clear -- --yes
  * (Needs SUPABASE_SERVICE_ROLE_KEY in .env.local, same as db:seed.)
@@ -55,6 +60,7 @@ await wipe("spoilages");
 await wipe("batches");
 await wipe("transfers");
 await wipe("collections");
+await wipe("farmer_adjustments");
 await wipe("movements");
 await wipe("day_locks", "date");
 await wipe("expenses");

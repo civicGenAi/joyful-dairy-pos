@@ -58,8 +58,8 @@ export function RowActions({ itemName, onView, onEdit, onDelete }: Props) {
                 destructive
                 title={t("Futa rekodi?", "Delete record?")}
                 description={t(
-                  `Una uhakika unataka kufuta "${itemName}"? Kitendo hiki hakiwezi kutenduliwa.`,
-                  `Are you sure you want to delete "${itemName}"? This action cannot be undone.`,
+                  `Una uhakika unataka kufuta "${itemName}"? Itaondolewa kwenye orodha, historia yake itabaki salama, na unaweza kuirudisha kutoka Mipangilio > Tupio.`,
+                  `Are you sure you want to delete "${itemName}"? It will be removed from every list, its history stays intact, and you can restore it from Settings > Trash.`,
                 )}
                 confirmLabel={t("Futa", "Delete")}
                 onConfirm={onDelete}

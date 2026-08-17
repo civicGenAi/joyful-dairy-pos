@@ -12,12 +12,13 @@ import {
   useFarmerAdjustments,
   useRequestAdjustment,
   useReviewAdjustment,
+  useFarmerMonthlySummary,
 } from "@/lib/data/hooks/farmers";
-import { useRecordCollection } from "@/lib/data/hooks/collections";
+import { useRecordCollectionDay } from "@/lib/data/hooks/collections";
 import { useLocations } from "@/lib/data/hooks/locations";
 import { useQuery } from "@tanstack/react-query";
 import { collectionKeys, collectionsRepo } from "@/lib/data/collections";
-import { todayISO, dateLabel, currentSession } from "@/lib/data/dates";
+import { todayISO, dateLabel } from "@/lib/data/dates";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { tzs, L, num } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
 import { RowActions } from "@/components/ui/RowActions";
+import { ImportCollectionsDialog } from "@/screens/ImportCollectionsDialog";
 import type { Farmer } from "@/mock/types";
 
 const VILLAGES = ["Olasiti", "Sakina", "Kisongo", "Ngaramtoni", "Tengeru", "Usa River"];
@@ -189,6 +191,7 @@ export function FarmersScreen() {
               })}
             />
             {canWrite && <AddFarmerDialog />}
+            {can("collection:write") && <ImportCollectionsDialog farmers={farmers} />}
             {can("collection:write") && <RecordCollectionDialog farmers={farmers} />}
           </div>
         }
@@ -360,10 +363,11 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
   const [open, setOpen] = useState(false);
   const [farmerId, setFarmerId] = useState<string>("");
   const [date, setDate] = useState(todayISO());
-  // Session defaults to the real clock so morning/evening cannot be mixed up.
-  const [session, setSession] = useState<"morning" | "evening">(currentSession());
-  const sessionMismatch = date === todayISO() && session !== currentSession();
-  const [litres, setLitres] = useState(32);
+  // One save for the whole day: morning and evening litres side by side,
+  // either can be left at zero. Replaces picking a session and visiting
+  // this dialog twice.
+  const [morningLitres, setMorningLitres] = useState(0);
+  const [eveningLitres, setEveningLitres] = useState(0);
   // Intake points come from the locations table: every active collection
   // point or plant, managed from the Collection points screen or Settings.
   const { data: locations = [] } = useLocations();
@@ -372,18 +376,19 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
   );
   const [locationId, setLocationId] = useState("");
   const [note, setNote] = useState("");
-  const record = useRecordCollection();
+  const record = useRecordCollectionDay();
+  const total = morningLitres + eveningLitres;
 
   const save = () => {
     const fid = farmerId || farmers[0]?.id;
-    if (!fid || litres <= 0) return;
+    if (!fid || total <= 0) return;
     record.mutate(
       {
         farmerId: fid,
         date,
-        session,
-        litres,
         locationId: locationId || points[0]?.id || "loc-main",
+        morningLitres,
+        eveningLitres,
         qualityNote: note || undefined,
       },
       {
@@ -391,17 +396,14 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
           toast.success(t("Ukusanyaji umerekodiwa", "Collection recorded"));
           setOpen(false);
           setNote("");
+          setMorningLitres(0);
+          setEveningLitres(0);
         },
         onError: (e) =>
           toast.error(
-            e.message.includes("session-mismatch")
-              ? t(
-                  "Kipindi hakilingani na muda halisi wa sasa",
-                  "Session does not match the real current time",
-                )
-              : e.message.includes("day-locked")
-                ? t("Siku hii imefungwa", "This day is locked")
-                : t("Imeshindikana kurekodi", "Could not record collection"),
+            e.message.includes("day-locked")
+              ? t("Siku hii imefungwa", "This day is locked")
+              : t("Imeshindikana kurekodi", "Could not record collection"),
           ),
       },
     );
@@ -443,28 +445,6 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
             <div className="grid gap-1.5">
-              <Label>{t("Kipindi", "Session")}</Label>
-              <Select value={session} onValueChange={(v) => setSession(v as typeof session)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="morning">{t("Asubuhi", "Morning")}</SelectItem>
-                  <SelectItem value="evening">{t("Jioni", "Evening")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
-              <Label>{t("Litre", "Litres")}</Label>
-              <Input
-                type="number"
-                value={litres}
-                onChange={(e) => setLitres(Number(e.target.value))}
-              />
-            </div>
-            <div className="grid gap-1.5">
               <Label>{t("Pointi", "Point")}</Label>
               <Select value={locationId || points[0]?.id} onValueChange={setLocationId}>
                 <SelectTrigger>
@@ -480,14 +460,30 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
               </Select>
             </div>
           </div>
-          {sessionMismatch && (
-            <div className="rounded-lg bg-[#E5A100]/10 text-[#8a5a00] px-3 py-2 text-[11px]">
-              {t(
-                `Sasa hivi ni kipindi cha ${currentSession() === "morning" ? "asubuhi" : "jioni"}; mfumo utakataa kipindi kisicholingana.`,
-                `Right now it is the ${currentSession()} session; the system will reject a mismatched session.`,
-              )}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>{t("Asubuhi (L)", "Morning (L)")}</Label>
+              <Input
+                type="number"
+                min={0}
+                value={morningLitres}
+                onChange={(e) => setMorningLitres(Math.max(0, Number(e.target.value)))}
+              />
             </div>
-          )}
+            <div className="grid gap-1.5">
+              <Label>{t("Jioni (L)", "Evening (L)")}</Label>
+              <Input
+                type="number"
+                min={0}
+                value={eveningLitres}
+                onChange={(e) => setEveningLitres(Math.max(0, Number(e.target.value)))}
+              />
+            </div>
+          </div>
+          <div className="rounded-lg bg-secondary/60 px-3 py-2 text-xs flex items-center justify-between">
+            <span className="text-muted-foreground">{t("Jumla ya siku", "Day total")}</span>
+            <span className="font-num font-semibold">{L(total)}</span>
+          </div>
           <div className="grid gap-1.5">
             <Label>{t("Maelezo (hiari)", "Notes (optional)")}</Label>
             <Input
@@ -501,7 +497,7 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
-          <Button onClick={save} disabled={record.isPending}>
+          <Button onClick={save} disabled={record.isPending || total <= 0}>
             {record.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
         </DialogFooter>
@@ -528,6 +524,7 @@ function FarmerDetailDrawer({
     queryFn: () => collectionsRepo.listByFarmer(f.id, monthStart),
   });
   const { data: payouts = [] } = useFarmerPayouts(f.id);
+  const { data: monthly = [] } = useFarmerMonthlySummary(f.id, 6);
 
   const litresByDay = useMemo(() => {
     const map: Record<number, number> = {};
@@ -625,6 +622,65 @@ function FarmerDetailDrawer({
           <div className="text-xs text-muted-foreground mt-2">
             {t("Kila kisanduku, litre kwa siku", "Each cell, litres per day")}
           </div>
+        </div>
+
+        <div className="mt-5">
+          <div className="text-xs font-semibold mb-2 flex items-center gap-1.5">
+            <Wallet className="h-3.5 w-3.5" />
+            {t("Malipo kwa mwezi", "Payment by month")}
+          </div>
+          <ul className="divide-y divide-border text-sm rounded-xl border border-border overflow-hidden">
+            {monthly.map((m) => {
+              const monthLabel = new Date(`${m.month}T00:00:00`).toLocaleDateString(
+                lang === "sw" ? "sw-TZ" : "en-GB",
+                { month: "long", year: "numeric" },
+              );
+              const tone =
+                m.status === "paid"
+                  ? "success"
+                  : m.status === "partial"
+                    ? "warning"
+                    : m.status === "unpaid"
+                      ? "danger"
+                      : "slate";
+              const statusLabel =
+                m.status === "paid"
+                  ? t("Imelipwa", "Paid")
+                  : m.status === "partial"
+                    ? t("Sehemu", "Partial")
+                    : m.status === "unpaid"
+                      ? t("Haijalipwa", "Unpaid")
+                      : t("Hakuna", "None");
+              return (
+                <li key={m.month} className="flex items-center gap-3 px-3 py-2.5">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{monthLabel}</div>
+                    <div className="text-xs text-muted-foreground font-num">
+                      {L(m.litres)} · {t("Alipata", "Earned")} {tzs(m.earnedTZS)}
+                      {m.paidTZS > 0 && (
+                        <>
+                          {" "}
+                          · {t("Alilipwa", "Paid")} {tzs(m.paidTZS)}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <Pill tone={tone}>{statusLabel}</Pill>
+                  {m.status !== "none" && (
+                    <Button asChild size="icon" variant="ghost" className="h-7 w-7 shrink-0">
+                      <Link
+                        to="/statement/farmer/$id"
+                        params={{ id: f.id }}
+                        search={{ month: m.month }}
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </div>
 
         <div className="mt-5">

@@ -15,6 +15,7 @@ import { useCustomers } from "@/lib/data/hooks/customers";
 import { useStock } from "@/lib/data/hooks/stock";
 import { useYieldTrend } from "@/lib/data/hooks/production";
 import { useDayLock } from "@/lib/data/hooks/recon";
+import { DayLockBanner } from "@/components/shell/DayLockBanner";
 import { todayISO, daysAgoISO } from "@/lib/data/dates";
 import {
   AreaChart,
@@ -220,6 +221,7 @@ export function DashboardScreen() {
 
   return (
     <AppShell title={t("Dashibodi", "Dashboard")}>
+      <DayLockBanner />
       {/* Date + live clock strip, compact */}
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
         <LiveDateTime />

@@ -20,6 +20,14 @@ export function useCycleSummary() {
   return useQuery({ queryKey: farmerKeys.cycle(), queryFn: farmersRepo.cycleSummary });
 }
 
+export function useFarmerMonthlySummary(farmerId: string | null, months = 12) {
+  return useQuery({
+    queryKey: farmerKeys.monthly(farmerId ?? "", months),
+    queryFn: () => farmersRepo.monthlySummary(farmerId!, months),
+    enabled: !!farmerId,
+  });
+}
+
 export function useFarmerPayouts(id: string | null) {
   return useQuery({
     queryKey: farmerKeys.payouts(id ?? ""),

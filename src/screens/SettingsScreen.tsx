@@ -78,10 +78,15 @@ import {
   FileClock,
   Eye,
   KeyRound,
+  RotateCcw,
+  Ban,
+  Trash,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useTrash, useRestoreFromTrash, usePurgeTrash } from "@/lib/data/hooks/trash";
+import type { TrashEntry } from "@/lib/data/trash";
 
 const ALL_ROLES: Role[] = ["admin", "finance", "production", "sales", "route", "store", "viewer"];
 
@@ -110,6 +115,7 @@ export function SettingsScreen() {
           {can("audit:read") && (
             <TabsTrigger value="audit">{t("Kumbukumbu", "Audit trail")}</TabsTrigger>
           )}
+          {can("settings:write") && <TabsTrigger value="trash">{t("Tupio", "Trash")}</TabsTrigger>}
           <TabsTrigger value="notifications">{t("Arifa", "Notifications")}</TabsTrigger>
           <TabsTrigger value="company">{t("Kampuni", "Company")}</TabsTrigger>
           <TabsTrigger value="alerts">{t("Vituo vya arifa", "Alert thresholds")}</TabsTrigger>
@@ -322,8 +328,8 @@ export function SettingsScreen() {
                         destructive
                         title={t("Futa eneo?", "Delete location?")}
                         description={t(
-                          "Eneo halitaonekana kwenye fomu za uhamishaji, mauzo wala uzalishaji.",
-                          "It will no longer appear in transfers, sales, or production forms.",
+                          "Eneo halitaonekana tena kwenye fomu za uhamishaji, mauzo wala uzalishaji. Unaweza kulirudisha kutoka kichupo cha Tupio.",
+                          "It will no longer appear in transfers, sales, or production forms. You can restore it from the Trash tab.",
                         )}
                         onConfirm={() =>
                           deleteLocation.mutate(
@@ -357,6 +363,12 @@ export function SettingsScreen() {
         {can("audit:read") && (
           <TabsContent value="audit" className="mt-4">
             <AuditTrail />
+          </TabsContent>
+        )}
+
+        {can("settings:write") && (
+          <TabsContent value="trash" className="mt-4">
+            <TrashTab />
           </TabsContent>
         )}
 
@@ -790,6 +802,8 @@ const ACTION_META: Record<
   create: { icon: Plus, tone: "success", sw: "Kuunda", en: "Create" },
   edit: { icon: Pencil, tone: "warning", sw: "Kuhariri", en: "Edit" },
   delete: { icon: Trash2, tone: "danger", sw: "Kufuta", en: "Delete" },
+  restore: { icon: RotateCcw, tone: "success", sw: "Kurejesha", en: "Restore" },
+  void: { icon: Ban, tone: "danger", sw: "Kubatilisha", en: "Void" },
   "lock-day": { icon: Lock, tone: "info", sw: "Kufunga siku", en: "Lock day" },
   confirm: { icon: CheckCircle2, tone: "success", sw: "Kuthibitisha", en: "Confirm" },
   payout: { icon: Wallet, tone: "warning", sw: "Malipo", en: "Payout" },
@@ -999,6 +1013,133 @@ function AuditTrail() {
         </div>
       </SectionCard>
     </>
+  );
+}
+
+const TRASH_ENTITY_LABEL: Record<TrashEntry["entity"], { sw: string; en: string }> = {
+  farmer: { sw: "Mfugaji", en: "Farmer" },
+  customer: { sw: "Mteja", en: "Customer" },
+  product: { sw: "Bidhaa", en: "Product" },
+  location: { sw: "Eneo", en: "Location" },
+  "stock-item": { sw: "Bidhaa ghalani", en: "Stock item" },
+  expense: { sw: "Matumizi", en: "Expense" },
+};
+
+function TrashTab() {
+  const { t, lang } = useApp();
+  const { data: trash = [], isPending } = useTrash();
+  const restore = useRestoreFromTrash();
+  const purge = usePurgeTrash();
+
+  const fmtDate = (iso: string) =>
+    new Date(iso).toLocaleString(lang === "sw" ? "sw-TZ" : "en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+  return (
+    <SectionCard
+      title={t("Tupio la takataka", "Trash bin")}
+      action={
+        <ConfirmDialog
+          destructive
+          title={t("Safisha tupio?", "Empty trash?")}
+          description={t(
+            "Vitu vilivyofutwa zaidi ya siku 30 zilizopita vitaondolewa kabisa, lakini tu ikiwa havina historia ya mauzo, ukusanyaji au malipo. Vitu vyenye historia vitabaki kwenye tupio.",
+            "Items deleted more than 30 days ago are removed for good, but only if they have no sales, collection, or payment history. Anything with history stays in the trash.",
+          )}
+          confirmLabel={t("Safisha", "Empty trash")}
+          onConfirm={() =>
+            purge.mutate(30, {
+              onSuccess: (counts) => {
+                const n = Object.values(counts).reduce((a, b) => a + b, 0);
+                toast.success(
+                  n > 0
+                    ? t(`Vitu ${n} vimeondolewa kabisa`, `${n} item(s) permanently removed`)
+                    : t("Hakuna kilichoondolewa", "Nothing was old enough to remove"),
+                );
+              },
+              onError: () => toast.error(t("Imeshindikana kusafisha", "Could not empty trash")),
+            })
+          }
+          trigger={
+            <Button size="sm" variant="outline" className="h-8 text-xs">
+              <Trash className="h-3.5 w-3.5 mr-1.5" />
+              {t("Safisha tupio", "Empty trash")}
+            </Button>
+          }
+        />
+      }
+    >
+      {isPending ? (
+        <div className="text-sm text-muted-foreground py-6 text-center">
+          {t("Inapakia...", "Loading...")}
+        </div>
+      ) : trash.length === 0 ? (
+        <EmptyState
+          title={t("Tupio ni tupu", "Trash is empty")}
+          description={t(
+            "Vitu vilivyofutwa kutoka Wafugaji, Wateja, Bidhaa, Maeneo na Matumizi vitaonekana hapa.",
+            "Items deleted from Farmers, Customers, Products, Locations and Expenses show up here.",
+          )}
+        />
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+              <th className="py-2 px-3">{t("Aina", "Type")}</th>
+              <th>{t("Jina", "Name")}</th>
+              <th>{t("Alifutwa", "Deleted")}</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {trash.map((entry) => (
+              <tr
+                key={`${entry.entity}-${entry.id}`}
+                className="border-b border-border last:border-0"
+              >
+                <td className="py-2.5 px-3">
+                  <Pill tone="slate">
+                    {lang === "sw"
+                      ? TRASH_ENTITY_LABEL[entry.entity].sw
+                      : TRASH_ENTITY_LABEL[entry.entity].en}
+                  </Pill>
+                </td>
+                <td className="py-2.5 font-medium">{entry.name}</td>
+                <td className="py-2.5 text-xs text-muted-foreground">{fmtDate(entry.deletedAt)}</td>
+                <td className="py-2.5 text-right">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    onClick={() =>
+                      restore.mutate(entry, {
+                        onSuccess: () => toast.success(t("Imerudishwa", "Restored")),
+                        onError: () =>
+                          toast.error(t("Imeshindikana kurudisha", "Could not restore")),
+                      })
+                    }
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                    {t("Rudisha", "Restore")}
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <div className="mt-3 text-xs text-muted-foreground">
+        {t(
+          "Kufuta hakuondoi data kabisa, kinaificha tu na kuiweka hapa. Rudisha wakati wowote.",
+          "Deleting never destroys the data, it just hides it and puts it here. Restore it any time.",
+        )}
+      </div>
+    </SectionCard>
   );
 }
 
@@ -1272,7 +1413,12 @@ function UserActions({ user }: { user: User }) {
                     ? t("Huwezi kujifuta mwenyewe", "You cannot delete your own account")
                     : e.message.includes("last-admin")
                       ? t("Huwezi kumfuta admin wa mwisho", "Cannot delete the last admin")
-                      : t("Imeshindikana kufuta", "Could not delete the user"),
+                      : e.message.includes("user-has-history")
+                        ? t(
+                            "Mtumiaji huyu ana historia ya vitendo mfumoni, msimamishe badala ya kumfuta",
+                            "This user has activity history, suspend the account instead of deleting it",
+                          )
+                        : t("Imeshindikana kufuta", "Could not delete the user"),
                 ),
             },
           )

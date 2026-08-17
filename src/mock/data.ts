@@ -996,6 +996,8 @@ export type AuditAction =
   | "create"
   | "edit"
   | "delete"
+  | "restore"
+  | "void"
   | "lock-day"
   | "confirm"
   | "payout"

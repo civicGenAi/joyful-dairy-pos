@@ -47,6 +47,7 @@ export const farmerKeys = {
   payouts: (id: string) => ["farmers", "payouts", id] as const,
   cycle: () => ["farmers", "cycle"] as const,
   adjustments: () => ["farmers", "adjustments"] as const,
+  monthly: (id: string, months: number) => ["farmers", "monthly", id, months] as const,
 };
 
 export interface FarmerAdjustment {
@@ -71,14 +72,33 @@ export interface CycleSummary {
   paidTZS: number;
 }
 
+export interface FarmerMonth {
+  month: string;
+  litres: number;
+  earnedTZS: number;
+  paidTZS: number;
+  status: "paid" | "partial" | "unpaid" | "none";
+}
+
 export const farmersRepo = {
+  // A hard cap, not real pagination: keeps a single accidental full-table
+  // scan from ever pulling an unbounded result set as the roster grows.
+  // Screens beyond this size need a real paged UI, not just a bigger limit.
   async list(): Promise<Farmer[]> {
     const rows = unwrap(
-      await supabase.from("farmers_view").select("*").order("name"),
+      await supabase
+        .from("farmers_view")
+        .select("*")
+        .is("deleted_at", null)
+        .order("name")
+        .limit(2000),
     ) as FarmerRow[];
     return rows.map(toFarmer);
   },
 
+  // Deliberately not filtered on deleted_at: statement and payout-slip print
+  // routes look a farmer up by id long after they may have been removed,
+  // and should keep resolving.
   async byId(id: string): Promise<Farmer> {
     const row = unwrap(
       await supabase.from("farmers_view").select("*").eq("id", id).single(),
@@ -140,8 +160,17 @@ export const farmersRepo = {
     );
   },
 
+  /** Soft delete: the farmer drops out of every list but their collection
+   *  and payout history stays intact for already-reconciled days. Restore
+   *  from Settings -> Trash. */
   async remove(id: string, name: string): Promise<void> {
-    unwrap(await supabase.from("farmers").delete().eq("id", id).select("id"));
+    unwrap(
+      await supabase
+        .from("farmers")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", id)
+        .select("id"),
+    );
     await recordAudit("delete", "farmers", `Amefuta mfugaji (${name})`, `Deleted farmer (${name})`);
   },
 
@@ -192,6 +221,32 @@ export const farmersRepo = {
       daysTotal,
       paidTZS: (paid ?? []).reduce((a, r) => a + Number(r.amount_tzs), 0),
     };
+  },
+
+  /** Litres, amount earned, amount paid and a Paid/Partial/Unpaid status
+   *  per calendar month, so a gap in payment history is visible at a
+   *  glance instead of only ever showing the current 15-day cycle. */
+  async monthlySummary(farmerId: string, months = 12): Promise<FarmerMonth[]> {
+    const { data, error } = await supabase.rpc("farmer_monthly_summary", {
+      p_farmer_id: farmerId,
+      p_months: months,
+    });
+    if (error) throw new Error(error.message);
+    return (
+      data as {
+        month: string;
+        litres: number;
+        earned_tzs: number;
+        paid_tzs: number;
+        status: FarmerMonth["status"];
+      }[]
+    ).map((r) => ({
+      month: r.month,
+      litres: Number(r.litres),
+      earnedTZS: Number(r.earned_tzs),
+      paidTZS: Number(r.paid_tzs),
+      status: r.status,
+    }));
   },
 
   async payouts(farmerId: string): Promise<PayoutEntry[]> {

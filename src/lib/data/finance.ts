@@ -103,6 +103,7 @@ export const expensesRepo = {
       await supabase
         .from("expenses")
         .select("*, profiles(name)")
+        .is("deleted_at", null)
         .order("date", { ascending: false })
         .order("created_at", { ascending: false })
         .limit(limit),
@@ -152,8 +153,15 @@ export const expensesRepo = {
     );
   },
 
+  /** Soft delete. Restore from Settings -> Trash. */
   async remove(id: string, vendor: string): Promise<void> {
-    unwrap(await supabase.from("expenses").delete().eq("id", id).select("id"));
+    unwrap(
+      await supabase
+        .from("expenses")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", id)
+        .select("id"),
+    );
     await recordAudit(
       "delete",
       "finance",
