@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useApp } from "@/app/context";
+import { usePrefersReducedMotion } from "@/hooks/use-local-storage";
 // BACKEND: login authenticates against Supabase Auth, with a TOTP step when
 // 2FA is enabled and a session-limit gate (max 2 active devices).
 import { COMPANY } from "@/mock/data";
@@ -34,6 +35,43 @@ export const Route = createFileRoute("/")({
 });
 
 type Step = "credentials" | "otp" | "sessions";
+
+const staggerForm = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.07, delayChildren: 0.1 } },
+};
+const staggerField = {
+  hidden: { opacity: 0, y: 10 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" as const } },
+};
+
+/** Three slow, softly blurred brand-green blobs drifting behind the card.
+ *  Static (no animation) when the visitor prefers reduced motion. */
+function AmbientGlow() {
+  const reduced = usePrefersReducedMotion();
+  const blobs = [
+    { color: "#8CC63F", size: 420, top: "-10%", left: "-8%", duration: 22 },
+    { color: "#1E7C3F", size: 360, top: "55%", left: "70%", duration: 26 },
+    { color: "#2F9E44", size: 280, top: "75%", left: "-5%", duration: 30 },
+  ];
+  return (
+    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+      {blobs.map((b, i) => (
+        <motion.div
+          key={i}
+          className="absolute rounded-full opacity-[0.16] blur-3xl dark:opacity-[0.22]"
+          style={{ width: b.size, height: b.size, top: b.top, left: b.left, background: b.color }}
+          animate={
+            reduced
+              ? undefined
+              : { x: [0, 24, -16, 0], y: [0, -20, 16, 0], scale: [1, 1.08, 0.96, 1] }
+          }
+          transition={{ duration: b.duration, repeat: Infinity, ease: "easeInOut" }}
+        />
+      ))}
+    </div>
+  );
+}
 
 function LoginPage() {
   const { login, completeLogin, lang, setLang, t } = useApp();
@@ -107,12 +145,13 @@ function LoginPage() {
       <BrandPanel />
 
       {/* Right sign-in */}
-      <div className="flex items-center justify-center p-4 sm:p-6 lg:p-12 bg-background">
+      <div className="relative flex items-center justify-center overflow-hidden p-4 sm:p-6 lg:p-12 bg-background">
+        <AmbientGlow />
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: "easeOut" }}
-          className="w-full max-w-md"
+          className="relative z-10 w-full max-w-md"
         >
           {/* Header row, mobile shows the logo here since the brand panel is hidden */}
           <div className="flex items-center justify-between mb-6">
@@ -128,7 +167,7 @@ function LoginPage() {
                 </div>
                 <div className="text-xs sm:text-sm text-muted-foreground">
                   {step === "credentials" &&
-                    t("Ingia kwenye mfumo wa African Joy", "Sign in to the African Joy system")}
+                    t("Ingia mara moja, endesha kila kitu", "One login, the whole operation.")}
                   {step === "otp" &&
                     t("Akaunti hii inalindwa na 2FA", "This account is protected by 2FA")}
                   {step === "sessions" &&
@@ -149,115 +188,148 @@ function LoginPage() {
             </button>
           </div>
 
-          <div className="rounded-2xl bg-card border border-border shadow-card p-5 sm:p-6">
-            {step === "credentials" && (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  enter();
-                }}
-                className="space-y-4"
-              >
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="email"
-                    className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                  >
-                    {t("Barua pepe", "Email")}
-                  </Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      type="email"
-                      autoComplete="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="h-11 pl-10"
-                      placeholder="name@africanjoy.co.tz"
-                    />
-                  </div>
-                </div>
+          <div className="relative rounded-2xl border border-border/60 bg-card/70 shadow-[0_8px_40px_-12px_rgba(30,124,63,0.25)] backdrop-blur-xl p-5 sm:p-6">
+            {/* Thin brand-gradient accent along the top edge */}
+            <div
+              className="absolute inset-x-6 top-0 h-px"
+              style={{
+                background: "linear-gradient(90deg, transparent, #1E7C3F, #8CC63F, transparent)",
+              }}
+            />
 
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
+            <AnimatePresence mode="wait">
+              {step === "credentials" && (
+                <motion.form
+                  key="credentials"
+                  initial="hidden"
+                  animate="show"
+                  exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
+                  variants={staggerForm}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    enter();
+                  }}
+                  className="space-y-4"
+                >
+                  <motion.div variants={staggerField} className="space-y-1.5">
                     <Label
-                      htmlFor="pwd"
+                      htmlFor="email"
                       className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
                     >
-                      {t("Nenosiri", "Password")}
+                      {t("Barua pepe", "Email")}
                     </Label>
-                    <button
-                      type="button"
-                      onClick={() => toast(t("Wasiliana na admin", "Contact your admin"))}
-                      className="text-[11px] font-semibold text-[#1E7C3F] hover:underline"
-                    >
-                      {t("Umesahau?", "Forgot?")}
-                    </button>
-                  </div>
-                  <div className="relative">
-                    <LockIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="pwd"
-                      type={showPwd ? "text" : "password"}
-                      autoComplete="current-password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="h-11 pl-10 pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPwd((s) => !s)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 hover:bg-accent text-muted-foreground"
-                      aria-label={showPwd ? t("Ficha", "Hide") : t("Onyesha", "Show")}
-                    >
-                      {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
+                    <div className="group relative">
+                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-[#1E7C3F]" />
+                      <Input
+                        id="email"
+                        type="email"
+                        autoComplete="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="h-11 pl-10 transition-shadow focus-visible:ring-2 focus-visible:ring-[#1E7C3F]/40 focus-visible:border-[#1E7C3F]/50"
+                        placeholder="name@africanjoy.co.tz"
+                      />
+                    </div>
+                  </motion.div>
 
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="remember" />
-                  <label
-                    htmlFor="remember"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-muted-foreground"
-                  >
-                    {t("Kumbuka akaunti yangu", "Remember me")}
-                  </label>
-                </div>
+                  <motion.div variants={staggerField} className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label
+                        htmlFor="pwd"
+                        className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                      >
+                        {t("Nenosiri", "Password")}
+                      </Label>
+                      <button
+                        type="button"
+                        onClick={() => toast(t("Wasiliana na admin", "Contact your admin"))}
+                        className="text-[11px] font-semibold text-[#1E7C3F] hover:underline"
+                      >
+                        {t("Umesahau?", "Forgot?")}
+                      </button>
+                    </div>
+                    <div className="group relative">
+                      <LockIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-[#1E7C3F]" />
+                      <Input
+                        id="pwd"
+                        type={showPwd ? "text" : "password"}
+                        autoComplete="current-password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="h-11 pl-10 pr-10 transition-shadow focus-visible:ring-2 focus-visible:ring-[#1E7C3F]/40 focus-visible:border-[#1E7C3F]/50"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPwd((s) => !s)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 hover:bg-accent text-muted-foreground"
+                        aria-label={showPwd ? t("Ficha", "Hide") : t("Onyesha", "Show")}
+                      >
+                        {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </motion.div>
 
-                <Button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full h-11 rounded-xl text-white font-semibold border-0"
-                  style={{
-                    background: "linear-gradient(135deg, #1E7C3F, #2F9E44 55%, #8CC63F)",
-                  }}
+                  <motion.div variants={staggerField} className="flex items-center space-x-2">
+                    <Checkbox id="remember" />
+                    <label
+                      htmlFor="remember"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-muted-foreground"
+                    >
+                      {t("Kumbuka akaunti yangu", "Remember me")}
+                    </label>
+                  </motion.div>
+
+                  <motion.div variants={staggerField}>
+                    <Button
+                      type="submit"
+                      disabled={submitting}
+                      className="w-full h-11 rounded-xl text-white font-semibold border-0 transition-transform duration-150 hover:scale-[1.015] hover:shadow-lg hover:shadow-[#1E7C3F]/25 active:scale-[0.985]"
+                      style={{
+                        background: "linear-gradient(135deg, #1E7C3F, #2F9E44 55%, #8CC63F)",
+                      }}
+                    >
+                      {submitting ? (
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                          {t("Inaingia…", "Signing in…")}
+                        </span>
+                      ) : (
+                        <span>{t("Ingia", "Sign in")}</span>
+                      )}
+                    </Button>
+                  </motion.div>
+                </motion.form>
+              )}
+
+              {step === "otp" && (
+                <motion.div
+                  key="otp"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
                 >
-                  {submitting ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                      {t("Inaingia…", "Signing in…")}
-                    </span>
-                  ) : (
-                    <span>{t("Ingia", "Sign in")}</span>
-                  )}
-                </Button>
-              </form>
-            )}
+                  <OtpStep factorId={mfaFactorId} onVerified={afterAuth} onCancel={cancelLogin} />
+                </motion.div>
+              )}
 
-            {step === "otp" && (
-              <OtpStep factorId={mfaFactorId} onVerified={afterAuth} onCancel={cancelLogin} />
-            )}
-
-            {step === "sessions" && (
-              <SessionGate
-                sessions={sessions}
-                onChanged={setSessions}
-                onContinue={finalize}
-                onCancel={cancelLogin}
-              />
-            )}
+              {step === "sessions" && (
+                <motion.div
+                  key="sessions"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                >
+                  <SessionGate
+                    sessions={sessions}
+                    onChanged={setSessions}
+                    onContinue={finalize}
+                    onCancel={cancelLogin}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </motion.div>
       </div>
