@@ -379,6 +379,21 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
   const record = useRecordCollectionDay();
   const total = morningLitres + eveningLitres;
 
+  // Search the farmer list once at least two letters are typed, matching
+  // the start of the full name or any word in it (so "Ma" finds both
+  // "Mary..." and "John Mwakalinga").
+  const [farmerQuery, setFarmerQuery] = useState("");
+  const farmerQueryNorm = farmerQuery.trim().toLowerCase();
+  const filteredFarmers =
+    farmerQueryNorm.length >= 2
+      ? farmers.filter((f) =>
+          f.name
+            .toLowerCase()
+            .split(" ")
+            .some((w) => w.startsWith(farmerQueryNorm)),
+        )
+      : farmers;
+
   const save = () => {
     const fid = farmerId || farmers[0]?.id;
     if (!fid || total <= 0) return;
@@ -426,16 +441,36 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Mfugaji", "Farmer")}</Label>
-            <Select value={farmerId || farmers[0]?.id} onValueChange={setFarmerId}>
+            <Select
+              value={farmerId || farmers[0]?.id}
+              onValueChange={setFarmerId}
+              onOpenChange={(o) => !o && setFarmerQuery("")}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {farmers.map((f) => (
-                  <SelectItem key={f.id} value={f.id}>
-                    {f.name}
-                  </SelectItem>
-                ))}
+                <div className="relative px-1 pb-1.5">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={farmerQuery}
+                    onChange={(e) => setFarmerQuery(e.target.value)}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    placeholder={t("Andika herufi 2+…", "Type 2+ letters…")}
+                    className="h-8 pl-8 text-xs"
+                  />
+                </div>
+                {filteredFarmers.length === 0 ? (
+                  <div className="px-2 py-3 text-center text-xs text-muted-foreground">
+                    {t("Hakuna mfugaji analingana", "No matching farmer")}
+                  </div>
+                ) : (
+                  filteredFarmers.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
