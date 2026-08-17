@@ -10,6 +10,56 @@ const LAST_ACTIVITY_KEY = "ajd:last-activity";
 /** Set just before the idle logout reload so the login page can explain why. */
 export const IDLE_LOGOUT_FLAG = "ajd:idle-logout";
 
+// A route/driver account gets a hard 12-hour session cap regardless of
+// activity, on top of (not instead of) the 30-minute idle timeout: a driver
+// who leaves the app open and active all shift still has to sign back in
+// once a day. Office roles are unaffected.
+export const ROUTE_SESSION_MAX_HOURS = 12;
+const ROUTE_SESSION_START_KEY = "ajd:route-session-start";
+export const ROUTE_SESSION_EXPIRED_FLAG = "ajd:route-session-expired";
+
+/** Stamps the start of a fresh sign-in. Call once, right after a route/driver
+ *  account actually completes login, not on every reload. */
+export function markRouteSessionStart(): void {
+  localStorage.setItem(ROUTE_SESSION_START_KEY, String(Date.now()));
+}
+
+export function clearRouteSessionStart(): void {
+  localStorage.removeItem(ROUTE_SESSION_START_KEY);
+}
+
+/** Watches the 12-hour hard cap for a route/driver account and calls
+ *  onExpire once it's passed, regardless of activity. If no start timestamp
+ *  is on record yet (first mount after login), stamps one now. Returns a
+ *  cleanup function. */
+export function startRouteSessionCap(onExpire: () => void): () => void {
+  if (!localStorage.getItem(ROUTE_SESSION_START_KEY)) markRouteSessionStart();
+  const check = () => {
+    const start = Number(localStorage.getItem(ROUTE_SESSION_START_KEY) || Date.now());
+    if (Date.now() - start > ROUTE_SESSION_MAX_HOURS * 60 * 60_000) {
+      sessionStorage.setItem(ROUTE_SESSION_EXPIRED_FLAG, "1");
+      onExpire();
+    }
+  };
+  check();
+  const interval = window.setInterval(check, 60_000);
+  const onVisible = () => {
+    if (document.visibilityState === "visible") check();
+  };
+  document.addEventListener("visibilitychange", onVisible);
+  return () => {
+    window.clearInterval(interval);
+    document.removeEventListener("visibilitychange", onVisible);
+  };
+}
+
+/** True (once) when the last sign-out was caused by the 12-hour route cap. */
+export function consumeRouteSessionExpiredFlag(): boolean {
+  const v = sessionStorage.getItem(ROUTE_SESSION_EXPIRED_FLAG) === "1";
+  sessionStorage.removeItem(ROUTE_SESSION_EXPIRED_FLAG);
+  return v;
+}
+
 /**
  * Watches user activity (shared across tabs via localStorage) and calls
  * onTimeout once nothing has happened for IDLE_MINUTES. The caller signs

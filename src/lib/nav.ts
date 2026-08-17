@@ -58,6 +58,7 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: "UserSquare2",
         cap: "customers:read",
       },
+      { to: "/drivers", label: "Drivers", sw: "Madereva", icon: "IdCard", cap: "users:read" },
     ],
   },
   {

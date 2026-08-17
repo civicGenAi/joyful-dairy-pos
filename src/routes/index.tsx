@@ -27,7 +27,11 @@ import {
 import { supabase } from "@/lib/api/client";
 import { mfaRepo } from "@/lib/data/mfa";
 import { profileRepo, deviceLabel, type DeviceSession } from "@/lib/data/profile";
-import { MAX_ACTIVE_SESSIONS, consumeIdleLogoutFlag } from "@/lib/security";
+import {
+  MAX_ACTIVE_SESSIONS,
+  consumeIdleLogoutFlag,
+  consumeRouteSessionExpiredFlag,
+} from "@/lib/security";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [{ title: "Sign in, African Joy Dairy" }] }),
@@ -91,6 +95,18 @@ function LoginPage() {
         t(
           "Umetolewa baada ya dakika 30 bila matumizi. Ingia tena.",
           "You were signed out after 30 minutes of inactivity. Please sign in again.",
+        ),
+      );
+    }
+  }, [t]);
+
+  // Explain why a driver is back here after the 12-hour route session cap.
+  useEffect(() => {
+    if (consumeRouteSessionExpiredFlag()) {
+      toast.info(
+        t(
+          "Kikao chako cha saa 12 kimeisha. Ingia tena kuendelea.",
+          "Your 12-hour session has ended. Sign in again to continue.",
         ),
       );
     }

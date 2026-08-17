@@ -53,8 +53,12 @@ import {
   List,
   Pencil,
   Paperclip,
+  Calendar,
+  Wallet,
+  UserCircle2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { DriverAccountSheet } from "@/components/van/DriverAccountSheet";
 
 interface CartLine {
   productId: string;
@@ -93,6 +97,7 @@ export function RouteScreen() {
   const saveVanLoad = useSaveVanLoad();
 
   const [tab, setTab] = useState("plan");
+  const [accountOpen, setAccountOpen] = useState(false);
   // Reflects the real connection, not just a demo label: seeded from
   // navigator.onLine and kept live via the online/offline window events.
   // The pill stays clickable too, so a driver can still rehearse the
@@ -445,39 +450,47 @@ export function RouteScreen() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-20 bg-card border-b border-border">
-        <div className="mx-auto max-w-md flex items-center justify-between px-4 py-3">
-          <JoyLogo size={32} />
+      <header className="sticky top-0 z-20 bg-[#14532D] text-white shadow-[0_2px_16px_rgba(0,0,0,0.18)]">
+        <div className="mx-auto max-w-md flex items-center justify-between px-4 py-3.5">
+          <JoyLogo size={34} />
           <div className="flex items-center gap-2">
             <button
               onClick={() => setOnline((o) => !o)}
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold ${online ? "bg-[#1D9E75]/15 text-[#0f5d44]" : "bg-[#E5A100]/15 text-[#8a5a00]"}`}
+              className={`inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-xs font-bold ${online ? "bg-[#2F9E44] text-white" : "bg-[#E5A100] text-[#3A2600]"}`}
               title={
                 online
                   ? t("Bonyeza kuiga offline", "Click to simulate offline")
                   : t("Bonyeza kurudi online", "Click to go online")
               }
             >
-              {online ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-              {online ? t("Imewasiliana", "Online") : t("Hakuna mtandao", "Offline")}
+              {online ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
+              {online ? t("Mtandaoni", "Online") : t("Nje ya mtandao", "Offline")}
             </button>
             {queuedCount > 0 && (
               <span
-                className="inline-flex items-center gap-1 rounded-full bg-[#E5A100]/15 px-2 py-1 text-[10px] font-semibold text-[#8a5a00]"
+                className="inline-flex h-9 items-center gap-1 rounded-full bg-[#E5A100] px-2.5 text-xs font-bold text-[#3A2600]"
                 title={t(
                   `Mauzo ${queuedCount} yanasubiri kusawazishwa`,
                   `${queuedCount} sale(s) waiting to sync`,
                 )}
               >
-                {queuedCount} {t("inasubiri", "pending")}
+                {queuedCount}
               </span>
             )}
+            <button
+              onClick={() => setAccountOpen(true)}
+              className="grid h-9 w-9 place-items-center rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition-all"
+              title={t("Akaunti yangu", "My account")}
+            >
+              <UserCircle2 className="h-5 w-5" />
+            </button>
             <button
               onClick={() => {
                 logout();
                 nav({ to: "/" });
               }}
-              className="rounded-lg p-1.5 hover:bg-accent"
+              className="grid h-9 w-9 place-items-center rounded-full bg-white/10 hover:bg-[#E11B22] active:scale-95 transition-all"
+              title={t("Toka", "Sign out")}
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -485,7 +498,9 @@ export function RouteScreen() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-md px-4 py-5 pb-28 space-y-4">
+      <DriverAccountSheet open={accountOpen} onClose={() => setAccountOpen(false)} />
+
+      <main className="mx-auto max-w-md px-4 py-5 pb-32 space-y-4">
         <div
           className="rounded-2xl text-white p-4 shadow-elevated"
           style={{ background: "linear-gradient(135deg, #14532D, #1E7C3F, #2F9E44)" }}
@@ -493,23 +508,23 @@ export function RouteScreen() {
           <div className="text-[11px] uppercase tracking-wider opacity-80">
             {t("Kipindi", "Session")}
           </div>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2 mt-1.5">
             <button
               onClick={() => setSession("morning")}
-              className={`flex-1 rounded-xl py-2 text-sm font-semibold ${session === "morning" ? "bg-white text-[#14532D]" : "bg-white/15"}`}
+              className={`flex-1 rounded-xl py-3 text-base font-bold transition-all active:scale-[0.97] ${session === "morning" ? "bg-white text-[#14532D] shadow-lg" : "bg-white/15"}`}
             >
-              <Sun className="h-3.5 w-3.5 inline mr-1" />
+              <Sun className="h-4 w-4 inline mr-1.5" />
               {t("Asubuhi", "Morning")}
             </button>
             <button
               onClick={() => setSession("evening")}
-              className={`flex-1 rounded-xl py-2 text-sm font-semibold ${session === "evening" ? "bg-white text-[#14532D]" : "bg-white/15"}`}
+              className={`flex-1 rounded-xl py-3 text-base font-bold transition-all active:scale-[0.97] ${session === "evening" ? "bg-white text-[#14532D] shadow-lg" : "bg-white/15"}`}
             >
-              <Moon className="h-3.5 w-3.5 inline mr-1" />
+              <Moon className="h-4 w-4 inline mr-1.5" />
               {t("Jioni", "Evening")}
             </button>
           </div>
-          <div className="mt-3 flex justify-between text-xs opacity-85">
+          <div className="mt-3.5 flex justify-between text-xs font-semibold opacity-90">
             <span>{user.name}</span>
             <span>{today}</span>
           </div>
@@ -522,14 +537,6 @@ export function RouteScreen() {
         </div>
 
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid grid-cols-5 w-full">
-            <TabsTrigger value="plan">{t("Ratiba", "Plan")}</TabsTrigger>
-            <TabsTrigger value="loadout">{t("Pakia", "Load")}</TabsTrigger>
-            <TabsTrigger value="sell">{t("Uza", "Sell")}</TabsTrigger>
-            <TabsTrigger value="returns">{t("Rudi", "Returns")}</TabsTrigger>
-            <TabsTrigger value="cashup">{t("Fungasa", "Cash-up")}</TabsTrigger>
-          </TabsList>
-
           <TabsContent value="plan" className="space-y-3 mt-4">
             <div className="rounded-2xl bg-card border border-border p-4">
               <div className="font-semibold mb-3 flex items-center gap-2">
@@ -907,7 +914,7 @@ export function RouteScreen() {
                       </div>
                     );
                   })}
-                  <div className="border-t border-border pt-2 flex justify-between font-bold">
+                  <div className="border-t border-border pt-2 flex justify-between text-lg font-extrabold">
                     <span>{t("Jumla", "Total")}</span>
                     <span className="font-num">{tzs(cartTotal)}</span>
                   </div>
@@ -920,11 +927,11 @@ export function RouteScreen() {
                   uploadingReceipt ||
                   (online && payment === "mpesa" && !mpesaReceipt)
                 }
-                className="w-full h-11 text-white"
+                className="w-full h-14 text-base font-extrabold text-white shadow-lg transition-transform active:scale-[0.98]"
                 style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
                 onClick={() => void completeSale()}
               >
-                <Receipt className="h-4 w-4 mr-1.5" />{" "}
+                <Receipt className="h-5 w-5 mr-2" />{" "}
                 {uploadingReceipt
                   ? t("Inapakia risiti…", "Uploading receipt…")
                   : completeSaleMut.isPending
@@ -1137,7 +1144,7 @@ export function RouteScreen() {
                 </div>
               </div>
               <Button
-                className="w-full text-white"
+                className="h-14 w-full text-base font-extrabold text-white shadow-lg transition-transform active:scale-[0.98]"
                 style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
                 disabled={cashUp.isPending}
                 onClick={() => {
@@ -1195,6 +1202,27 @@ export function RouteScreen() {
               </div>
             )}
           </TabsContent>
+
+          <TabsList className="fixed inset-x-0 bottom-0 z-30 grid h-auto w-full grid-cols-5 gap-1 rounded-none border-t border-border bg-card/95 p-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] shadow-[0_-4px_24px_rgba(0,0,0,0.12)] backdrop-blur-lg">
+            {(
+              [
+                { value: "plan", icon: Calendar, sw: "Ratiba", en: "Plan" },
+                { value: "loadout", icon: Truck, sw: "Pakia", en: "Load" },
+                { value: "sell", icon: Receipt, sw: "Uza", en: "Sell" },
+                { value: "returns", icon: RotateCcw, sw: "Rudi", en: "Returns" },
+                { value: "cashup", icon: Wallet, sw: "Fungasa", en: "Cash-up" },
+              ] as const
+            ).map((tb) => (
+              <TabsTrigger
+                key={tb.value}
+                value={tb.value}
+                className="flex h-14 flex-col gap-1 rounded-xl text-muted-foreground transition-all active:scale-95 data-[state=active]:bg-[#1E7C3F] data-[state=active]:text-white data-[state=active]:shadow-lg"
+              >
+                <tb.icon className="h-5 w-5" />
+                <span className="text-[10px] font-bold">{t(tb.sw, tb.en)}</span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
         </Tabs>
       </main>
     </div>

@@ -27,6 +27,7 @@ import { Route as HealthRouteImport } from './routes/health'
 import { Route as FinanceRouteImport } from './routes/finance'
 import { Route as FarmersRouteImport } from './routes/farmers'
 import { Route as ExpensesRouteImport } from './routes/expenses'
+import { Route as DriversRouteImport } from './routes/drivers'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as CollectionPointsRouteImport } from './routes/collection-points'
@@ -130,6 +131,11 @@ const ExpensesRoute = ExpensesRouteImport.update({
   path: '/expenses',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DriversRoute = DriversRouteImport.update({
+  id: '/drivers',
+  path: '/drivers',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -198,6 +204,7 @@ export interface FileRoutesByFullPath {
   '/collection-points': typeof CollectionPointsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
+  '/drivers': typeof DriversRoute
   '/expenses': typeof ExpensesRoute
   '/farmers': typeof FarmersRoute
   '/finance': typeof FinanceRoute
@@ -230,6 +237,7 @@ export interface FileRoutesByTo {
   '/collection-points': typeof CollectionPointsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
+  '/drivers': typeof DriversRoute
   '/expenses': typeof ExpensesRoute
   '/farmers': typeof FarmersRoute
   '/finance': typeof FinanceRoute
@@ -263,6 +271,7 @@ export interface FileRoutesById {
   '/collection-points': typeof CollectionPointsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
+  '/drivers': typeof DriversRoute
   '/expenses': typeof ExpensesRoute
   '/farmers': typeof FarmersRoute
   '/finance': typeof FinanceRoute
@@ -297,6 +306,7 @@ export interface FileRouteTypes {
     | '/collection-points'
     | '/customers'
     | '/dashboard'
+    | '/drivers'
     | '/expenses'
     | '/farmers'
     | '/finance'
@@ -329,6 +339,7 @@ export interface FileRouteTypes {
     | '/collection-points'
     | '/customers'
     | '/dashboard'
+    | '/drivers'
     | '/expenses'
     | '/farmers'
     | '/finance'
@@ -361,6 +372,7 @@ export interface FileRouteTypes {
     | '/collection-points'
     | '/customers'
     | '/dashboard'
+    | '/drivers'
     | '/expenses'
     | '/farmers'
     | '/finance'
@@ -394,6 +406,7 @@ export interface RootRouteChildren {
   CollectionPointsRoute: typeof CollectionPointsRoute
   CustomersRoute: typeof CustomersRoute
   DashboardRoute: typeof DashboardRoute
+  DriversRoute: typeof DriversRoute
   ExpensesRoute: typeof ExpensesRoute
   FarmersRoute: typeof FarmersRoute
   FinanceRoute: typeof FinanceRoute
@@ -548,6 +561,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ExpensesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/drivers': {
+      id: '/drivers'
+      path: '/drivers'
+      fullPath: '/drivers'
+      preLoaderRoute: typeof DriversRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
@@ -642,6 +662,7 @@ const rootRouteChildren: RootRouteChildren = {
   CollectionPointsRoute: CollectionPointsRoute,
   CustomersRoute: CustomersRoute,
   DashboardRoute: DashboardRoute,
+  DriversRoute: DriversRoute,
   ExpensesRoute: ExpensesRoute,
   FarmersRoute: FarmersRoute,
   FinanceRoute: FinanceRoute,

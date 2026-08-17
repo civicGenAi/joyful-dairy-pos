@@ -5,7 +5,14 @@ import { useLocalStorage } from "@/hooks/use-local-storage";
 // BACKEND: auth now flows through Supabase (src/lib/data/auth.ts), not @/mock/data.
 import { authRepo } from "@/lib/data/auth";
 import { supabase } from "@/lib/api/client";
-import { startIdleLogout, clearActivityMarker, installInspectGuard } from "@/lib/security";
+import {
+  startIdleLogout,
+  clearActivityMarker,
+  installInspectGuard,
+  startRouteSessionCap,
+  markRouteSessionStart,
+  clearRouteSessionStart,
+} from "@/lib/security";
 
 type Lang = "sw" | "en";
 type Theme = "light" | "dark" | "system";
@@ -101,6 +108,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return stop;
   }, [user]);
 
+  // Route/driver accounts get a hard 12-hour session cap on top of the idle
+  // timeout: still active or not, a driver signs back in once a day. Office
+  // roles are unaffected, this only runs when "route" is among the roles.
+  useEffect(() => {
+    if (!user?.roles.includes("route")) return;
+    const stop = startRouteSessionCap(() => {
+      void authRepo
+        .signOut()
+        .catch(() => {})
+        .finally(() => {
+          clearActivityMarker();
+          clearRouteSessionStart();
+          window.location.assign("/");
+        });
+    });
+    return stop;
+  }, [user]);
+
   // Internal-system lockdown (production builds only).
   useEffect(() => installInspectGuard(), []);
 
@@ -148,11 +173,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const u = await authRepo.completeSignIn();
         setUser(u);
         setViewAs(u.roles[0]);
+        // A fresh sign-in starts the 12-hour route session clock; harmless
+        // to stamp for every role, only route accounts ever check it.
+        markRouteSessionStart();
         return u;
       },
       logout: () => {
         void authRepo.signOut();
         clearActivityMarker();
+        clearRouteSessionStart();
         setUser(null);
       },
       refreshUser: async () => {
