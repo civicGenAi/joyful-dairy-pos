@@ -42,7 +42,7 @@ import {
 } from "recharts";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Factory, Plus, Droplets, TriangleAlert, History } from "lucide-react";
+import { Factory, Plus, TriangleAlert, History } from "lucide-react";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { Product, StockItem } from "@/mock/types";
@@ -62,6 +62,9 @@ export function ProductionScreen() {
   const stockItemUnit = (id: string) => stock.find((s) => s.id === id)?.unit ?? "";
   const onHandOf = (productId: string) =>
     stock.find((s) => s.productId === productId && s.category === "finished")?.onHand ?? 0;
+  // fresh-milk is the internal raw-milk bucket, never something actually
+  // produced, everything else is a real product line (Mtindi, cheese, yoghurt).
+  const producibleProducts = products.filter((p) => p.category !== "fresh-milk" && p.active);
   const rawOnHand = stock.find((s) => s.id === "raw-milk")?.onHand ?? 0;
 
   const totalRaw = useMemo(() => batches.reduce((a, b) => a + b.inputLitres, 0), [batches]);
@@ -135,7 +138,7 @@ export function ProductionScreen() {
 
       <div className="grid lg:grid-cols-3 gap-4 mb-5">
         <SectionCard
-          title={t("Mpango wa kuzalisha leo", "To produce today")}
+          title={t("Bidhaa zetu za uzalishaji", "Our production lines")}
           className="lg:col-span-2"
           action={
             canWrite && (
@@ -146,55 +149,42 @@ export function ProductionScreen() {
             )
           }
         >
-          <ul className="divide-y divide-border">
-            {[
-              {
-                pid: "p-mtindi",
-                name: "Mtindi (Mgando)",
-                suggest: "250 L",
-                from: "250 L raw",
-                yield: "100%",
-              },
-              {
-                pid: "p-mozz",
-                name: "Mozzarella",
-                suggest: "20 kg",
-                from: "244 L raw",
-                yield: "8.2%",
-              },
-              {
-                pid: "p-hall",
-                name: "Halloumi",
-                suggest: "6.35 kg",
-                from: "75 L raw",
-                yield: "8.5%",
-              },
-              {
-                pid: "p-yog-straw",
-                name: "Yoghurt Strawberry",
-                suggest: "60 pcs (500ml)",
-                from: "30 L raw",
-                yield: "100%",
-              },
-              { pid: "p-ghee", name: "Ghee", suggest: "6 L", from: "Cream 18 L", yield: "33%" },
-            ].map((r) => (
-              <li key={r.pid} className="flex items-center gap-3 py-3">
-                <div className="flex-1">
-                  <div className="font-medium">{r.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {t("Kutoka", "From")}: {r.from} · yield {r.yield}
+          {producibleProducts.length === 0 ? (
+            <EmptyState
+              icon={Factory}
+              title={t("Hakuna bidhaa za uzalishaji bado", "No production products yet")}
+              description={t(
+                "Ongeza bidhaa katika Bidhaa na Bei.",
+                "Add products in Products & Pricing.",
+              )}
+            />
+          ) : (
+            <ul className="divide-y divide-border">
+              {producibleProducts.map((p) => (
+                <li key={p.id} className="flex items-center gap-3 py-3">
+                  <div className="flex-1">
+                    <div className="font-medium">{p.name}</div>
+                    <div className="text-xs text-muted-foreground capitalize">{p.category}</div>
                   </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-num font-semibold">{r.suggest}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {t("Stock sasa", "Now")}:{" "}
-                    <span className="font-num">{num(onHandOf(r.pid))}</span>
+                  <div className="text-right">
+                    {p.defaultYieldPct != null ? (
+                      <div className="font-num font-semibold text-[#1E7C3F]">
+                        {num(p.defaultYieldPct)}% {t("mavuno", "yield")}
+                      </div>
+                    ) : (
+                      <Pill tone="slate">{t("Kwa mkono", "Manual")}</Pill>
+                    )}
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {t("Stock sasa", "Now")}:{" "}
+                      <span className="font-num">
+                        {num(onHandOf(p.id))} {p.unit}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          )}
         </SectionCard>
 
         <SectionCard title={t("Mlolongo wa yield", "Yield trend")}>
@@ -229,31 +219,6 @@ export function ProductionScreen() {
           </div>
         </SectionCard>
       </div>
-
-      <SectionCard title={t("Ubadilishaji wa kilogramu", "kg / litre conversions")}>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[
-            { name: "Mozzarella", note: "244 L ≈ 20 kg", color: "#1E7C3F" },
-            { name: "Halloumi", note: "75 L ≈ 6.35 kg", color: "#2F9E44" },
-            { name: "Paneer", note: "60 L ≈ 5 kg", color: "#6FBF59" },
-            { name: "Ghee", note: "18 L cream ≈ 6 L ghee", color: "#E5A100" },
-          ].map((x) => (
-            <div key={x.name} className="rounded-2xl p-4 border border-border bg-card shadow-card">
-              <div
-                className="flex items-center gap-2 text-xs uppercase tracking-wider"
-                style={{ color: x.color }}
-              >
-                <Droplets className="h-3.5 w-3.5" />
-                {x.name}
-              </div>
-              <div className="font-num text-xl font-bold mt-1">{x.note}</div>
-              <div className="text-xs text-muted-foreground mt-1">
-                {t("Mahesabu ya kweli", "Real plant ratio")}
-              </div>
-            </div>
-          ))}
-        </div>
-      </SectionCard>
 
       <div className="mt-5 grid lg:grid-cols-3 gap-4">
         <SectionCard
