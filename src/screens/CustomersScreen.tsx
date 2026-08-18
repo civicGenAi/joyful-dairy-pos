@@ -606,24 +606,55 @@ const TIER_LABEL: Record<PriceTier, { sw: string; en: string }> = {
  *  one itemised line the Activity tab, monthly statement and bill invoice
  *  can all reference, instead of the customer only showing up when they
  *  happen to pass through a full POS/Route checkout. */
+interface IntakeLine {
+  productId: string;
+  qty: number;
+  tier: PriceTier;
+  unitPrice: number;
+}
+
 function RecordIntakeDialog({ customerId }: { customerId: string }) {
   const { t, lang } = useApp();
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(todayISO());
   const [tier, setTier] = useState<PriceTier>("own");
-  const [qty, setQty] = useState<Record<string, number>>({});
+  const [productId, setProductId] = useState("");
+  const [pendingQty, setPendingQty] = useState<number | "">("");
+  const [lines, setLines] = useState<IntakeLine[]>([]);
   const { data: products = [] } = useProducts();
   const { data: priceMatrix = {} } = usePriceMatrix();
   const complete = useCompleteSale();
 
   const activeProducts = products.filter((p) => p.active);
-  const priceOf = (productId: string) => priceMatrix[productId]?.[tier] ?? 0;
-  const lines = activeProducts
-    .map((p) => ({ product: p, qty: qty[p.id] ?? 0, unitPrice: priceOf(p.id) }))
-    .filter((l) => l.qty > 0);
+  const productOf = (id: string) => activeProducts.find((p) => p.id === id);
+  const priceOf = (id: string, tr: PriceTier) => priceMatrix[id]?.[tr] ?? 0;
   const total = lines.reduce((a, l) => a + l.qty * l.unitPrice, 0);
 
-  const reset = () => setQty({});
+  const reset = () => {
+    setLines([]);
+    setProductId("");
+    setPendingQty("");
+  };
+
+  const addLine = () => {
+    const qty = Number(pendingQty);
+    if (!productId || !qty || qty <= 0) return;
+    const unitPrice = priceOf(productId, tier);
+    setLines((ls) => {
+      // Same product at the same tier merges into one line, a tier change
+      // starts a new line so an earlier price is never silently overwritten.
+      const i = ls.findIndex((l) => l.productId === productId && l.tier === tier);
+      if (i >= 0) {
+        const next = [...ls];
+        next[i] = { ...next[i], qty: next[i].qty + qty };
+        return next;
+      }
+      return [...ls, { productId, qty, tier, unitPrice }];
+    });
+    setPendingQty("");
+  };
+
+  const removeLine = (i: number) => setLines((ls) => ls.filter((_, idx) => idx !== i));
 
   const save = () => {
     if (lines.length === 0) return;
@@ -632,11 +663,7 @@ function RecordIntakeDialog({ customerId }: { customerId: string }) {
         channel: "counter",
         payment: "credit",
         tier,
-        lines: lines.map((l) => ({
-          productId: l.product.id,
-          qty: l.qty,
-          unitPrice: l.unitPrice,
-        })),
+        lines: lines.map((l) => ({ productId: l.productId, qty: l.qty, unitPrice: l.unitPrice })),
         customerId,
         locationId: "loc-main",
         date,
@@ -666,6 +693,8 @@ function RecordIntakeDialog({ customerId }: { customerId: string }) {
       },
     );
   };
+
+  const previewPrice = productId ? priceOf(productId, tier) : null;
 
   return (
     <Dialog
@@ -713,43 +742,100 @@ function RecordIntakeDialog({ customerId }: { customerId: string }) {
             </div>
           </div>
 
-          <div className="max-h-72 overflow-y-auto rounded-lg border border-border">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-card">
-                <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                  <th className="py-2 px-2">{t("Bidhaa", "Product")}</th>
-                  <th className="text-right px-2">{t("Bei", "Price")}</th>
-                  <th className="text-right px-2 w-20">{t("Idadi", "Qty")}</th>
-                  <th className="text-right py-2 px-2">{t("Jumla", "Amount")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activeProducts.map((p) => (
-                  <tr key={p.id} className="border-b border-border last:border-0">
-                    <td className="py-1.5 px-2">{p.name}</td>
-                    <td className="py-1.5 px-2 text-right font-num text-xs text-muted-foreground">
-                      {num(priceOf(p.id))}/{p.unit}
-                    </td>
-                    <td className="py-1.5 px-2 text-right">
-                      <Input
-                        type="number"
-                        min={0}
-                        value={qty[p.id] ?? ""}
-                        placeholder="0"
-                        onChange={(e) =>
-                          setQty((q) => ({ ...q, [p.id]: Number(e.target.value) || 0 }))
-                        }
-                        className="h-7 w-16 text-right font-num ml-auto"
-                      />
-                    </td>
-                    <td className="py-1.5 px-2 text-right font-num font-semibold">
-                      {(qty[p.id] ?? 0) > 0 ? num((qty[p.id] ?? 0) * priceOf(p.id)) : "-"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="rounded-lg border border-border p-3 space-y-2">
+            <Label>{t("Ongeza bidhaa", "Add a product")}</Label>
+            <div className="flex items-end gap-2">
+              <Select value={productId} onValueChange={setProductId}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder={t("Chagua bidhaa…", "Select a product…")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeProducts.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                min={0}
+                placeholder={t("Idadi", "Qty")}
+                value={pendingQty}
+                onChange={(e) => setPendingQty(e.target.value === "" ? "" : Number(e.target.value))}
+                className="w-24 font-num"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!productId || !pendingQty || Number(pendingQty) <= 0}
+                onClick={addLine}
+              >
+                {t("Ongeza", "Add")}
+              </Button>
+            </div>
+            {productId && (
+              <div className="text-xs text-muted-foreground">
+                {t("Bei", "Price")}:{" "}
+                <span className="font-num font-semibold">{num(previewPrice ?? 0)}</span>/
+                {productOf(productId)?.unit} · {TIER_LABEL[tier][lang]}
+              </div>
+            )}
           </div>
+
+          {lines.length === 0 ? (
+            <EmptyState
+              title={t("Bado hakuna bidhaa", "No products added yet")}
+              description={t(
+                "Chagua bidhaa hapo juu na ubonyeze Ongeza.",
+                "Pick a product above and click Add.",
+              )}
+            />
+          ) : (
+            <div className="max-h-56 overflow-y-auto rounded-lg border border-border">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-card">
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                    <th className="py-2 px-2">{t("Bidhaa", "Product")}</th>
+                    <th className="text-right px-2">{t("Bei", "Price")}</th>
+                    <th className="text-right px-2">{t("Idadi", "Qty")}</th>
+                    <th className="text-right px-2">{t("Jumla", "Amount")}</th>
+                    <th className="w-8"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((l, i) => (
+                    <tr
+                      key={`${l.productId}-${l.tier}`}
+                      className="border-b border-border last:border-0"
+                    >
+                      <td className="py-1.5 px-2">
+                        {productOf(l.productId)?.name}
+                        <span className="ml-1.5 text-[10px] text-muted-foreground">
+                          {TIER_LABEL[l.tier][lang]}
+                        </span>
+                      </td>
+                      <td className="py-1.5 px-2 text-right font-num text-xs text-muted-foreground">
+                        {num(l.unitPrice)}
+                      </td>
+                      <td className="py-1.5 px-2 text-right font-num">{l.qty}</td>
+                      <td className="py-1.5 px-2 text-right font-num font-semibold">
+                        {num(l.qty * l.unitPrice)}
+                      </td>
+                      <td className="py-1.5 px-1 text-right">
+                        <button
+                          onClick={() => removeLine(i)}
+                          className="text-muted-foreground hover:text-[#E11B22]"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <div className="flex items-center justify-between rounded-lg bg-secondary/60 px-3 py-2 text-sm font-semibold">
             <span>{t("Jumla ya siku", "Day's total")}</span>
