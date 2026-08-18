@@ -11,7 +11,9 @@ import {
   Monitor,
   HelpCircle,
   UserCircle2,
+  RefreshCw,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useApp } from "@/app/context";
 // BACKEND: live data via src/lib/data hooks; ROLE_LABEL is static UI config.
 import { ROLE_LABEL } from "@/mock/data";
@@ -49,7 +51,19 @@ export function Topbar({
 }) {
   const { user, lang, setLang, logout, t, can, theme, setTheme } = useApp();
   const nav = useNavigate();
+  const qc = useQueryClient();
   const [q, setQ] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  // Refetches only the queries currently in use on screen, so this reloads
+  // exactly the page the user is looking at, not the whole app's cache.
+  const refreshPage = async () => {
+    setRefreshing(true);
+    try {
+      await qc.refetchQueries({ type: "active" });
+    } finally {
+      setRefreshing(false);
+    }
+  };
   // Search + alerts tolerate missing read capability: errors render as empty.
   const customers = useCustomers().data ?? [];
   const farmers = useFarmers().data ?? [];
@@ -177,6 +191,16 @@ export function Topbar({
           </PopoverContent>
         )}
       </Popover>
+
+      <button
+        onClick={() => void refreshPage()}
+        disabled={refreshing}
+        className="rounded-lg border border-border bg-card p-2 hover:bg-accent disabled:opacity-60"
+        title={t("Onyesha upya ukurasa huu", "Refresh this page")}
+        aria-label={t("Onyesha upya ukurasa huu", "Refresh this page")}
+      >
+        <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+      </button>
 
       <button
         onClick={() => setLang(lang === "sw" ? "en" : "sw")}
