@@ -51,6 +51,8 @@ import {
   Ban,
   Trash2,
   ListChecks,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { Unit } from "@/mock/types";
@@ -91,7 +93,9 @@ export function StockScreen() {
   const { t, can } = useApp();
   const writable = can("stock:write");
   const { data: items = [], isPending, isError, refetch } = useStock();
-  const { data: movements = [] } = useStockMovements();
+  const MOVEMENTS_PAGE_SIZE = 50;
+  const [movementsPage, setMovementsPage] = useState(0);
+  const { data: movements = [] } = useStockMovements(movementsPage, MOVEMENTS_PAGE_SIZE);
   const setReorderMut = useSetReorder();
   const [tab, setTab] = useState<"finished" | "consumable" | "raw" | "movements">("finished");
   const [viewingId, setViewingId] = useState<string | null>(null);
@@ -477,6 +481,33 @@ export function StockScreen() {
                   ))}
                 </tbody>
               </table>
+            )}
+            {(movementsPage > 0 || movements.length === MOVEMENTS_PAGE_SIZE) && (
+              <div className="flex items-center justify-between gap-3 pt-3 mt-1 border-t border-border">
+                <span className="text-xs text-muted-foreground">
+                  {t(`Ukurasa ${movementsPage + 1}`, `Page ${movementsPage + 1}`)}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="h-7 w-7"
+                    disabled={movementsPage === 0}
+                    onClick={() => setMovementsPage((p) => Math.max(0, p - 1))}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="h-7 w-7"
+                    disabled={movements.length < MOVEMENTS_PAGE_SIZE}
+                    onClick={() => setMovementsPage((p) => p + 1)}
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
             )}
           </SectionCard>
         </TabsContent>

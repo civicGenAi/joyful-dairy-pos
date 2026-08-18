@@ -60,7 +60,7 @@ export interface StockMovement {
 export const stockKeys = {
   all: ["stock"] as const,
   list: () => ["stock", "list"] as const,
-  movements: (itemId?: string) => ["stock", "movements", itemId ?? "all"] as const,
+  movements: (itemId?: string, page = 0) => ["stock", "movements", itemId ?? "all", page] as const,
 };
 
 interface MovementRow {
@@ -106,14 +106,14 @@ export const stockRepo = {
     return rows.map(toItem);
   },
 
-  async movements(limit = 50): Promise<StockMovement[]> {
+  async movements(limit = 50, offset = 0): Promise<StockMovement[]> {
     const rows = unwrap(
       await supabase
         .from("movements")
         .select("*, profiles(name)")
         .not("stock_item_id", "is", null)
         .order("at", { ascending: false })
-        .limit(limit),
+        .range(offset, offset + limit - 1),
     ) as MovementRow[];
     return rows.map(toMovement);
   },

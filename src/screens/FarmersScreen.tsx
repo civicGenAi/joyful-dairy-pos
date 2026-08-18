@@ -58,6 +58,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
 import { RowActions } from "@/components/ui/RowActions";
+import { PaginationBar } from "@/components/ui/PaginationBar";
+import { usePagination } from "@/hooks/use-pagination";
 import { ImportCollectionsDialog } from "@/screens/ImportCollectionsDialog";
 import type { Farmer } from "@/mock/types";
 
@@ -83,6 +85,7 @@ export function FarmersScreen() {
       }),
     [q, filter, farmers],
   );
+  const { page, setPage, totalPages, paged, pageSize, total, start } = usePagination(filtered, 25);
 
   const totalLitres = farmers.reduce((a, f) => a + f.litresThisCycle, 0);
   const totalDue = farmers.reduce((a, f) => a + f.currentBalanceTZS, 0);
@@ -221,7 +224,7 @@ export function FarmersScreen() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((f) => (
+                {paged.map((f) => (
                   <tr
                     key={f.id}
                     className="border-b border-border last:border-0 hover:bg-accent/40"
@@ -290,6 +293,14 @@ export function FarmersScreen() {
                 ))}
               </tbody>
             </table>
+            <PaginationBar
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              pageSize={pageSize}
+              start={start}
+              onPageChange={setPage}
+            />
           </div>
         )}
       </SectionCard>

@@ -59,6 +59,8 @@ import type { BillingCycle, Customer, CustomerType, PriceTier } from "@/mock/typ
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
+import { PaginationBar } from "@/components/ui/PaginationBar";
+import { usePagination } from "@/hooks/use-pagination";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useIssueBillInvoice } from "@/lib/data/hooks/invoices";
 import { ReceiptText } from "lucide-react";
@@ -117,6 +119,7 @@ export function CustomersScreen() {
       }),
     [tab, q, customers],
   );
+  const { page, setPage, totalPages, paged, pageSize, total, start } = usePagination(filtered, 25);
 
   const outstanding = customers.reduce((a, c) => a + c.outstandingTZS, 0);
   const overdue = customers.filter((c) => c.status === "overdue").length;
@@ -237,7 +240,7 @@ export function CustomersScreen() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((c) => (
+                    {paged.map((c) => (
                       <tr
                         key={c.id}
                         className="border-b border-border last:border-0 hover:bg-accent/40"
@@ -293,6 +296,14 @@ export function CustomersScreen() {
                     ))}
                   </tbody>
                 </table>
+                <PaginationBar
+                  page={page}
+                  totalPages={totalPages}
+                  total={total}
+                  pageSize={pageSize}
+                  start={start}
+                  onPageChange={setPage}
+                />
               </div>
             )}
           </TabsContent>

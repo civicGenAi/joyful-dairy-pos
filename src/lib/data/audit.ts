@@ -38,13 +38,17 @@ export type AuditEntryWithDevice = AuditEntry & { device?: string };
 
 export const auditKeys = {
   all: ["audit"] as const,
-  list: (limit: number) => ["audit", "list", limit] as const,
+  list: (limit: number, offset = 0) => ["audit", "list", limit, offset] as const,
 };
 
 export const auditRepo = {
-  async list(limit = 100): Promise<AuditEntryWithDevice[]> {
+  async list(limit = 100, offset = 0): Promise<AuditEntryWithDevice[]> {
     const rows = unwrap(
-      await supabase.from("audit_log").select("*").order("at", { ascending: false }).limit(limit),
+      await supabase
+        .from("audit_log")
+        .select("*")
+        .order("at", { ascending: false })
+        .range(offset, offset + limit - 1),
     ) as AuditRow[];
     return rows.map((r) => ({
       id: r.id,

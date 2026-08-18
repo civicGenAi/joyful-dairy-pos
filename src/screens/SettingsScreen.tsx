@@ -81,6 +81,8 @@ import {
   RotateCcw,
   Ban,
   Trash,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ExportMenu } from "@/components/ui/ExportMenu";
@@ -814,9 +816,12 @@ const ACTION_META: Record<
   print: { icon: Printer, tone: "slate", sw: "Kuchapisha", en: "Print" },
 };
 
+const AUDIT_PAGE_SIZE = 100;
+
 function AuditTrail() {
   const { t, lang } = useApp();
-  const { data: auditLog = [] } = useAuditLog();
+  const [auditPage, setAuditPage] = useState(0);
+  const { data: auditLog = [] } = useAuditLog(auditPage, AUDIT_PAGE_SIZE);
   const [q, setQ] = useState("");
   const [action, setAction] = useState<AuditAction | "all">("all");
   const [moduleFilter, setModuleFilter] = useState<AuditModule | "all">("all");
@@ -1004,6 +1009,33 @@ function AuditTrail() {
               })}
             </tbody>
           </table>
+        )}
+        {(auditPage > 0 || auditLog.length === AUDIT_PAGE_SIZE) && (
+          <div className="flex items-center justify-between gap-3 pt-3 mt-1 border-t border-border">
+            <span className="text-xs text-muted-foreground">
+              {t(`Ukurasa ${auditPage + 1}`, `Page ${auditPage + 1}`)}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="icon"
+                variant="outline"
+                className="h-7 w-7"
+                disabled={auditPage === 0}
+                onClick={() => setAuditPage((p) => Math.max(0, p - 1))}
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="outline"
+                className="h-7 w-7"
+                disabled={auditLog.length < AUDIT_PAGE_SIZE}
+                onClick={() => setAuditPage((p) => p + 1)}
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
         )}
         <div className="mt-3 text-xs text-muted-foreground">
           {t(

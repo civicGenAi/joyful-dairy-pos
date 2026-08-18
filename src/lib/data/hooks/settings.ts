@@ -62,6 +62,9 @@ export function useUpdateCompany() {
   });
 }
 
-export function useAuditLog(limit = 100) {
-  return useQuery({ queryKey: auditKeys.list(limit), queryFn: () => auditRepo.list(limit) });
+export function useAuditLog(page = 0, pageSize = 100) {
+  return useQuery({
+    queryKey: auditKeys.list(pageSize, page * pageSize),
+    queryFn: () => auditRepo.list(pageSize, page * pageSize),
+  });
 }

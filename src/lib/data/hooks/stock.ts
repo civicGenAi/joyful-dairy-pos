@@ -7,10 +7,10 @@ export function useStock() {
   return useQuery({ queryKey: stockKeys.list(), queryFn: stockRepo.list });
 }
 
-export function useStockMovements(limit = 50) {
+export function useStockMovements(page = 0, pageSize = 50) {
   return useQuery({
-    queryKey: stockKeys.movements(),
-    queryFn: () => stockRepo.movements(limit),
+    queryKey: stockKeys.movements(undefined, page),
+    queryFn: () => stockRepo.movements(pageSize, page * pageSize),
   });
 }
 
