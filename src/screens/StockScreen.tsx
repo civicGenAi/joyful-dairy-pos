@@ -11,6 +11,7 @@ import {
   useCreateStockItem,
   useUpdateStockItem,
   useSetStockItemActive,
+  useDeleteStockItem,
 } from "@/lib/data/hooks/stock";
 import { todayISO } from "@/lib/data/dates";
 import type { StockItem } from "@/mock/types";
@@ -38,7 +39,17 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { num } from "@/lib/format";
-import { AlertTriangle, PackagePlus, Pencil, Plus, Boxes, Truck, Factory, Ban } from "lucide-react";
+import {
+  AlertTriangle,
+  PackagePlus,
+  Pencil,
+  Plus,
+  Boxes,
+  Truck,
+  Factory,
+  Ban,
+  Trash2,
+} from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { Unit } from "@/mock/types";
 import { useMemo, useState } from "react";
@@ -611,6 +622,7 @@ function StoreItemDialog({ category, item }: { category: "raw" | "consumable"; i
 function ItemRowActions({ item }: { item: StockItem }) {
   const { t } = useApp();
   const setActive = useSetStockItemActive();
+  const deleteItem = useDeleteStockItem();
   if (item.category === "finished") return null;
   return (
     <>
@@ -654,6 +666,34 @@ function ItemRowActions({ item }: { item: StockItem }) {
             title={item.active === false ? t("Rudisha", "Reactivate") : t("Simamisha", "Suspend")}
           >
             <Ban className="h-3.5 w-3.5" />
+          </Button>
+        }
+      />
+      <ConfirmDialog
+        destructive
+        title={t("Futa bidhaa ghalani?", "Delete this store item?")}
+        description={t(
+          "Itaondolewa kwenye maghala na fomu za harakati, historia yake ya harakati itabaki salama. Unaweza kuirudisha kutoka Mipangilio > Tupio.",
+          "It will be removed from stock lists and movement forms, its movement history stays intact. You can restore it from Settings > Trash.",
+        )}
+        confirmLabel={t("Futa", "Delete")}
+        onConfirm={() =>
+          deleteItem.mutate(
+            { id: item.id, name: item.name },
+            {
+              onSuccess: () => toast.success(t("Bidhaa imefutwa", "Item deleted")),
+              onError: () => toast.error(t("Imeshindikana kufuta", "Could not delete the item")),
+            },
+          )
+        }
+        trigger={
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-muted-foreground hover:text-[#E11B22]"
+            title={t("Futa", "Delete")}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
         }
       />

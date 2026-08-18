@@ -79,6 +79,17 @@ export function useSetStockItemActive() {
   });
 }
 
+export function useDeleteStockItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) => stockRepo.remove(id, name),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: stockKeys.all });
+      qc.invalidateQueries({ queryKey: ["trash"] });
+    },
+  });
+}
+
 export function useSetReorder() {
   const qc = useQueryClient();
   return useMutation({

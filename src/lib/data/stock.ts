@@ -224,6 +224,25 @@ export const stockRepo = {
     );
   },
 
+  /** Soft delete: removed from every list and form, its movement history
+   *  (and the ledger rows that reference it) stays intact and traceable.
+   *  Restore from Settings -> Trash. */
+  async remove(id: string, name: string): Promise<void> {
+    unwrap(
+      await supabase
+        .from("stock_items")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", id)
+        .select("id"),
+    );
+    await recordAudit(
+      "delete",
+      "stock",
+      `Amefuta bidhaa ghalani (${name})`,
+      `Deleted store item (${name})`,
+    );
+  },
+
   async createItem(input: {
     name: string;
     swName?: string;
