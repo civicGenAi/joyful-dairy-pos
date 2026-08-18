@@ -103,6 +103,13 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: "/reports", label: "Reports", sw: "Ripoti", icon: "BarChart3", cap: "view:reports" },
       {
+        to: "/customer-feedback",
+        label: "Customer feedback",
+        sw: "Maoni ya wateja",
+        icon: "Star",
+        cap: "view:reports",
+      },
+      {
         to: "/products",
         label: "Products & pricing",
         sw: "Bidhaa",

@@ -26,11 +26,13 @@ import { Route as MaintenanceRouteImport } from './routes/maintenance'
 import { Route as HelpRouteImport } from './routes/help'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as FinanceRouteImport } from './routes/finance'
+import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as FarmersRouteImport } from './routes/farmers'
 import { Route as ExpensesRouteImport } from './routes/expenses'
 import { Route as DriversRouteImport } from './routes/drivers'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CustomersRouteImport } from './routes/customers'
+import { Route as CustomerFeedbackRouteImport } from './routes/customer-feedback'
 import { Route as CollectionPointsRouteImport } from './routes/collection-points'
 import { Route as R500RouteImport } from './routes/500'
 import { Route as R403RouteImport } from './routes/403'
@@ -129,6 +131,11 @@ const FinanceRoute = FinanceRouteImport.update({
   path: '/finance',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FeedbackRoute = FeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FarmersRoute = FarmersRouteImport.update({
   id: '/farmers',
   path: '/farmers',
@@ -152,6 +159,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const CustomersRoute = CustomersRouteImport.update({
   id: '/customers',
   path: '/customers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CustomerFeedbackRoute = CustomerFeedbackRouteImport.update({
+  id: '/customer-feedback',
+  path: '/customer-feedback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CollectionPointsRoute = CollectionPointsRouteImport.update({
@@ -220,11 +232,13 @@ export interface FileRoutesByFullPath {
   '/403': typeof R403Route
   '/500': typeof R500Route
   '/collection-points': typeof CollectionPointsRoute
+  '/customer-feedback': typeof CustomerFeedbackRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/drivers': typeof DriversRoute
   '/expenses': typeof ExpensesRoute
   '/farmers': typeof FarmersRoute
+  '/feedback': typeof FeedbackRoute
   '/finance': typeof FinanceRoute
   '/health': typeof HealthRoute
   '/help': typeof HelpRoute
@@ -256,11 +270,13 @@ export interface FileRoutesByTo {
   '/403': typeof R403Route
   '/500': typeof R500Route
   '/collection-points': typeof CollectionPointsRoute
+  '/customer-feedback': typeof CustomerFeedbackRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/drivers': typeof DriversRoute
   '/expenses': typeof ExpensesRoute
   '/farmers': typeof FarmersRoute
+  '/feedback': typeof FeedbackRoute
   '/finance': typeof FinanceRoute
   '/health': typeof HealthRoute
   '/help': typeof HelpRoute
@@ -293,11 +309,13 @@ export interface FileRoutesById {
   '/403': typeof R403Route
   '/500': typeof R500Route
   '/collection-points': typeof CollectionPointsRoute
+  '/customer-feedback': typeof CustomerFeedbackRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/drivers': typeof DriversRoute
   '/expenses': typeof ExpensesRoute
   '/farmers': typeof FarmersRoute
+  '/feedback': typeof FeedbackRoute
   '/finance': typeof FinanceRoute
   '/health': typeof HealthRoute
   '/help': typeof HelpRoute
@@ -331,11 +349,13 @@ export interface FileRouteTypes {
     | '/403'
     | '/500'
     | '/collection-points'
+    | '/customer-feedback'
     | '/customers'
     | '/dashboard'
     | '/drivers'
     | '/expenses'
     | '/farmers'
+    | '/feedback'
     | '/finance'
     | '/health'
     | '/help'
@@ -367,11 +387,13 @@ export interface FileRouteTypes {
     | '/403'
     | '/500'
     | '/collection-points'
+    | '/customer-feedback'
     | '/customers'
     | '/dashboard'
     | '/drivers'
     | '/expenses'
     | '/farmers'
+    | '/feedback'
     | '/finance'
     | '/health'
     | '/help'
@@ -403,11 +425,13 @@ export interface FileRouteTypes {
     | '/403'
     | '/500'
     | '/collection-points'
+    | '/customer-feedback'
     | '/customers'
     | '/dashboard'
     | '/drivers'
     | '/expenses'
     | '/farmers'
+    | '/feedback'
     | '/finance'
     | '/health'
     | '/help'
@@ -440,11 +464,13 @@ export interface RootRouteChildren {
   R403Route: typeof R403Route
   R500Route: typeof R500Route
   CollectionPointsRoute: typeof CollectionPointsRoute
+  CustomerFeedbackRoute: typeof CustomerFeedbackRoute
   CustomersRoute: typeof CustomersRoute
   DashboardRoute: typeof DashboardRoute
   DriversRoute: typeof DriversRoute
   ExpensesRoute: typeof ExpensesRoute
   FarmersRoute: typeof FarmersRoute
+  FeedbackRoute: typeof FeedbackRoute
   FinanceRoute: typeof FinanceRoute
   HealthRoute: typeof HealthRoute
   HelpRoute: typeof HelpRoute
@@ -593,6 +619,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FinanceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/feedback': {
+      id: '/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof FeedbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/farmers': {
       id: '/farmers'
       path: '/farmers'
@@ -626,6 +659,13 @@ declare module '@tanstack/react-router' {
       path: '/customers'
       fullPath: '/customers'
       preLoaderRoute: typeof CustomersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/customer-feedback': {
+      id: '/customer-feedback'
+      path: '/customer-feedback'
+      fullPath: '/customer-feedback'
+      preLoaderRoute: typeof CustomerFeedbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/collection-points': {
@@ -720,11 +760,13 @@ const rootRouteChildren: RootRouteChildren = {
   R403Route: R403Route,
   R500Route: R500Route,
   CollectionPointsRoute: CollectionPointsRoute,
+  CustomerFeedbackRoute: CustomerFeedbackRoute,
   CustomersRoute: CustomersRoute,
   DashboardRoute: DashboardRoute,
   DriversRoute: DriversRoute,
   ExpensesRoute: ExpensesRoute,
   FarmersRoute: FarmersRoute,
+  FeedbackRoute: FeedbackRoute,
   FinanceRoute: FinanceRoute,
   HealthRoute: HealthRoute,
   HelpRoute: HelpRoute,
