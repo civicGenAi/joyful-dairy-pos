@@ -1,4 +1,5 @@
 import { supabase, unwrap } from "@/lib/api/client";
+import { todayISO } from "@/lib/data/dates";
 import type { PriceTier, Unit } from "@/mock/types";
 
 // BACKEND: sales repository. complete_sale is fully transactional server-side
@@ -108,6 +109,9 @@ export const salesRepo = {
     /** Scanned receipt URL, so a mobile-money sale carries the actual
      *  confirmation photo instead of just the "mpesa" tag. */
     receiptUrl?: string;
+    /** Defaults to today, pass an earlier date to backfill a customer's
+     *  actual delivery/intake date (e.g. recording day 17 on day 20). */
+    date?: string;
   }): Promise<Sale> {
     const { data, error } = await supabase.rpc("complete_sale", {
       p_channel: input.channel,
@@ -122,6 +126,7 @@ export const salesRepo = {
       p_location_id: input.locationId ?? null,
       p_client_ref: input.clientRef ?? null,
       p_receipt_url: input.receiptUrl ?? null,
+      p_date: input.date ?? todayISO(),
     });
     if (error) throw new Error(error.message);
     return toSale(data as SaleRow);

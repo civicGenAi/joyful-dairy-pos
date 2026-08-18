@@ -12,7 +12,8 @@ import {
   useSetCustomerSuspended,
   useSendReminder,
 } from "@/lib/data/hooks/customers";
-import { useProducts } from "@/lib/data/hooks/products";
+import { useProducts, usePriceMatrix } from "@/lib/data/hooks/products";
+import { useCompleteSale } from "@/lib/data/hooks/sales";
 import { todayISO } from "@/lib/data/dates";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { tzs, num } from "@/lib/format";
@@ -50,10 +51,11 @@ import {
   Mail,
   UserX,
   UserCheck,
+  PackagePlus,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import type { Customer, CustomerType } from "@/mock/types";
+import type { Customer, CustomerType, PriceTier } from "@/mock/types";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
@@ -405,6 +407,11 @@ function CustomerDrawer({ c }: { c: Customer }) {
           </TabsList>
 
           <TabsContent value="activity" className="mt-3">
+            {canInvoice && (
+              <div className="flex justify-end mb-3">
+                <RecordIntakeDialog customerId={c.id} />
+              </div>
+            )}
             {activities.length === 0 ? (
               <EmptyState
                 title={t("Hakuna shughuli", "No activity yet")}
@@ -585,6 +592,182 @@ function CustomerDrawer({ c }: { c: Customer }) {
         </Tabs>
       </SheetContent>
     </Sheet>
+  );
+}
+
+const TIER_LABEL: Record<PriceTier, { sw: string; en: string }> = {
+  own: { sw: "Chombo cha mteja", en: "Own container" },
+  bottle: { sw: "Chupa", en: "With bottle" },
+  bulk: { sw: "Jumla", en: "Bulk" },
+};
+
+/** Logs exactly which products a customer took on a given date, priced from
+ *  the price matrix, so a delivery like "12L fresh milk on the 17th" becomes
+ *  one itemised line the Activity tab, monthly statement and bill invoice
+ *  can all reference, instead of the customer only showing up when they
+ *  happen to pass through a full POS/Route checkout. */
+function RecordIntakeDialog({ customerId }: { customerId: string }) {
+  const { t, lang } = useApp();
+  const [open, setOpen] = useState(false);
+  const [date, setDate] = useState(todayISO());
+  const [tier, setTier] = useState<PriceTier>("own");
+  const [qty, setQty] = useState<Record<string, number>>({});
+  const { data: products = [] } = useProducts();
+  const { data: priceMatrix = {} } = usePriceMatrix();
+  const complete = useCompleteSale();
+
+  const activeProducts = products.filter((p) => p.active);
+  const priceOf = (productId: string) => priceMatrix[productId]?.[tier] ?? 0;
+  const lines = activeProducts
+    .map((p) => ({ product: p, qty: qty[p.id] ?? 0, unitPrice: priceOf(p.id) }))
+    .filter((l) => l.qty > 0);
+  const total = lines.reduce((a, l) => a + l.qty * l.unitPrice, 0);
+
+  const reset = () => setQty({});
+
+  const save = () => {
+    if (lines.length === 0) return;
+    complete.mutate(
+      {
+        channel: "counter",
+        payment: "credit",
+        tier,
+        lines: lines.map((l) => ({
+          productId: l.product.id,
+          qty: l.qty,
+          unitPrice: l.unitPrice,
+        })),
+        customerId,
+        locationId: "loc-main",
+        date,
+      },
+      {
+        onSuccess: () => {
+          toast.success(t("Ulaji umerekodiwa", "Intake recorded"));
+          reset();
+          setOpen(false);
+        },
+        onError: (e) =>
+          toast.error(
+            e.message.includes("day-locked")
+              ? t("Siku hii imefungwa", "This day is locked")
+              : e.message.includes("future-date")
+                ? t(
+                    "Huwezi kurekodi tarehe ijayo, chagua leo au tarehe iliyopita",
+                    "You can't record a future date, pick today or an earlier date",
+                  )
+                : e.message.includes("customer-overdue")
+                  ? t(
+                      "Mteja huyu amechelewa, mkopo umesimamishwa mpaka alipe",
+                      "This customer is overdue, credit is on hold until they pay",
+                    )
+                  : t("Imeshindikana kurekodi", "Could not record the intake"),
+          ),
+      },
+    );
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) reset();
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" className="h-8 text-xs">
+          <PackagePlus className="h-3.5 w-3.5 mr-1.5" />
+          {t("Rekodi ulaji", "Record intake")}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{t("Rekodi ulaji wa bidhaa", "Record product intake")}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>{t("Tarehe", "Date")}</Label>
+              <Input
+                type="date"
+                value={date}
+                max={todayISO()}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>{t("Aina ya bei", "Price tier")}</Label>
+              <Select value={tier} onValueChange={(v) => setTier(v as PriceTier)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(TIER_LABEL) as PriceTier[]).map((tr) => (
+                    <SelectItem key={tr} value={tr}>
+                      {TIER_LABEL[tr][lang]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="max-h-72 overflow-y-auto rounded-lg border border-border">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-card">
+                <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                  <th className="py-2 px-2">{t("Bidhaa", "Product")}</th>
+                  <th className="text-right px-2">{t("Bei", "Price")}</th>
+                  <th className="text-right px-2 w-20">{t("Idadi", "Qty")}</th>
+                  <th className="text-right py-2 px-2">{t("Jumla", "Amount")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activeProducts.map((p) => (
+                  <tr key={p.id} className="border-b border-border last:border-0">
+                    <td className="py-1.5 px-2">{p.name}</td>
+                    <td className="py-1.5 px-2 text-right font-num text-xs text-muted-foreground">
+                      {num(priceOf(p.id))}/{p.unit}
+                    </td>
+                    <td className="py-1.5 px-2 text-right">
+                      <Input
+                        type="number"
+                        min={0}
+                        value={qty[p.id] ?? ""}
+                        placeholder="0"
+                        onChange={(e) =>
+                          setQty((q) => ({ ...q, [p.id]: Number(e.target.value) || 0 }))
+                        }
+                        className="h-7 w-16 text-right font-num ml-auto"
+                      />
+                    </td>
+                    <td className="py-1.5 px-2 text-right font-num font-semibold">
+                      {(qty[p.id] ?? 0) > 0 ? num((qty[p.id] ?? 0) * priceOf(p.id)) : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg bg-secondary/60 px-3 py-2 text-sm font-semibold">
+            <span>{t("Jumla ya siku", "Day's total")}</span>
+            <span className="font-num">{tzs(total)}</span>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            className="text-white"
+            style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+            disabled={lines.length === 0 || complete.isPending}
+            onClick={save}
+          >
+            {complete.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi ulaji", "Save intake")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
