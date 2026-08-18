@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Star, Smile, Meh, Frown, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
+import confetti from "canvas-confetti";
+import { playChime } from "@/lib/audio-utils";
 
 // Public, no login: this is what a customer scans a QR code to reach.
 // Brought in from the standalone feedback-form app so submissions land in
@@ -18,6 +20,33 @@ const RATING_TYPES: { id: RatingType; icon: typeof Smile; label: { sw: string; e
   { id: "okay", icon: Meh, label: { sw: "Kawaida", en: "It was okay" } },
   { id: "not_good", icon: Frown, label: { sw: "Sikupenda", en: "Not good" } },
 ];
+
+const CONFETTI_COLORS = ["#1E7C3F", "#E11B22", "#FFD700", "#FFFFFF"];
+
+/** Celebration for a 5-star review: chime + three confetti bursts (center,
+ *  then left and right a beat later). */
+function celebrate() {
+  playChime();
+  confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: CONFETTI_COLORS });
+  setTimeout(() => {
+    confetti({
+      particleCount: 50,
+      angle: 60,
+      spread: 55,
+      origin: { x: 0 },
+      colors: CONFETTI_COLORS,
+    });
+  }, 200);
+  setTimeout(() => {
+    confetti({
+      particleCount: 50,
+      angle: 120,
+      spread: 55,
+      origin: { x: 1 },
+      colors: CONFETTI_COLORS,
+    });
+  }, 400);
+}
 
 export function FeedbackFormScreen() {
   const { t } = useApp();
@@ -33,13 +62,20 @@ export function FeedbackFormScreen() {
 
   const save = () => {
     if (!canSubmit || !ratingType) return;
-    submit.mutate({
-      rating,
-      ratingType,
-      name: name || undefined,
-      location: location || undefined,
-      feedback: comment || undefined,
-    });
+    submit.mutate(
+      {
+        rating,
+        ratingType,
+        name: name || undefined,
+        location: location || undefined,
+        feedback: comment || undefined,
+      },
+      {
+        onSuccess: () => {
+          if (rating === 5) celebrate();
+        },
+      },
+    );
   };
 
   if (submit.isSuccess) {
@@ -144,18 +180,18 @@ export function FeedbackFormScreen() {
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={t("Jina (hiari)", "Name (optional)")}
+              placeholder={t("Jina", "Name")}
             />
             <Input
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              placeholder={t("Mahali (hiari)", "Location (optional)")}
+              placeholder={t("Mahali", "Location")}
             />
           </div>
           <Textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder={t("Maoni yako (hiari)", "Your comment (optional)")}
+            placeholder={t("Maoni yako", "Your comment")}
             rows={3}
           />
 
