@@ -43,15 +43,13 @@ import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
 
-const CATEGORIES: ProductCategory[] = [
-  "fresh-milk",
-  "cultured",
-  "yoghurt",
-  "cream",
-  "cheese",
-  "ghee",
-  "butter",
-];
+// The real catalogue is Mtindi (cultured), cheese, and yoghurt, that's what
+// this dairy actually makes. "fresh-milk" stays out of this list on
+// purpose: it's not offered when adding a product, but it must never be
+// removed from the database category itself, the system uses a
+// "Fresh milk" product internally to track raw milk moving through
+// collection and production, it's plumbing, not something sold.
+const CATEGORIES: ProductCategory[] = ["cultured", "cheese", "yoghurt"];
 
 const TIERS: PriceTier[] = ["own", "bottle", "bulk"];
 
@@ -591,6 +589,12 @@ function ProductSheet({ product: p, onClose }: { product: Product; onClose: () =
   const [tierEdits, setTierEdits] = useState<Partial<Record<PriceTier, number>>>({});
   const priceOf = (tier: PriceTier) => tierEdits[tier] ?? prices[p.id]?.[tier] ?? 0;
   const producible = category !== "fresh-milk";
+  // Keeps a legacy category (fresh-milk/cream/ghee/butter from the old demo
+  // catalogue) selectable on its own product so editing it doesn't silently
+  // reset the value, without offering it for anything else.
+  const categoryOptions = CATEGORIES.includes(p.category)
+    ? CATEGORIES
+    : [...CATEGORIES, p.category];
 
   const saveDetails = () => {
     update.mutate(
@@ -760,7 +764,7 @@ function ProductSheet({ product: p, onClose }: { product: Product; onClose: () =
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.map((c) => (
+                    {categoryOptions.map((c) => (
                       <SelectItem key={c} value={c}>
                         {c}
                       </SelectItem>
