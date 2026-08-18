@@ -571,15 +571,27 @@ function FarmerDetailDrawer({
   const { data: payouts = [] } = useFarmerPayouts(f.id);
   const { data: monthly = [] } = useFarmerMonthlySummary(f.id, 6);
 
-  const litresByDay = useMemo(() => {
-    const map: Record<number, number> = {};
+  // Morning and evening tracked separately so a specific day can show both,
+  // not just one combined number, the calendar cell still shows the total.
+  const bySessionByDay = useMemo(() => {
+    const map: Record<number, { morning: number; evening: number }> = {};
     for (const c of monthCollections) {
       const d = Number(c.date.slice(8, 10));
-      map[d] = (map[d] ?? 0) + c.litres;
+      const row = (map[d] ??= { morning: 0, evening: 0 });
+      row[c.session] += c.litres;
     }
     return map;
   }, [monthCollections]);
+  const litresByDay = useMemo(() => {
+    const map: Record<number, number> = {};
+    for (const [d, s] of Object.entries(bySessionByDay)) {
+      map[Number(d)] = s.morning + s.evening;
+    }
+    return map;
+  }, [bySessionByDay]);
   const todayDay = new Date().getDate();
+  const [selectedDay, setSelectedDay] = useState(todayDay);
+  const selected = bySessionByDay[selectedDay] ?? { morning: 0, evening: 0 };
   const monthLabel = new Date().toLocaleDateString(lang === "sw" ? "sw-TZ" : "en-GB", {
     month: "long",
     year: "numeric",
@@ -646,26 +658,63 @@ function FarmerDetailDrawer({
               </div>
             ))}
             {Array.from({ length: 31 }).map((_, i) => {
-              const v = litresByDay[i + 1] ?? 0;
-              const isToday = i + 1 === todayDay;
+              const day = i + 1;
+              const v = litresByDay[day] ?? 0;
+              const isToday = day === todayDay;
+              const isSelected = day === selectedDay;
               return (
-                <div
+                <button
                   key={i}
-                  className={`aspect-square rounded-md p-1 text-[10px] font-num font-semibold flex flex-col justify-between ${isToday ? "ring-2 ring-[#1E7C3F]" : ""}`}
+                  type="button"
+                  onClick={() => setSelectedDay(day)}
+                  className={`aspect-square rounded-md p-1 text-[10px] font-num font-semibold flex flex-col justify-between transition ${
+                    isSelected ? "ring-2 ring-[#E11B22]" : isToday ? "ring-2 ring-[#1E7C3F]" : ""
+                  }`}
                   style={{
                     background: `rgba(47,158,68,${v > 0 ? 0.1 + Math.min(v / 100, 0.7) : 0.05})`,
                     color: "#14532D",
                   }}
-                  title={`Day ${i + 1}: ${v} L`}
+                  title={`Day ${day}: ${v} L`}
                 >
-                  <span className="text-[9px] opacity-70">{i + 1}</span>
+                  <span className="text-[9px] opacity-70">{day}</span>
                   <span className="text-right text-[10px]">{v > 0 ? v : ""}</span>
-                </div>
+                </button>
               );
             })}
           </div>
           <div className="text-xs text-muted-foreground mt-2">
-            {t("Kila kisanduku, litre kwa siku", "Each cell, litres per day")}
+            {t(
+              "Bonyeza siku kuona kipimo cha asubuhi na jioni",
+              "Click a day to see its morning and evening breakdown",
+            )}
+          </div>
+
+          <div className="mt-3 rounded-xl border border-border bg-secondary/40 p-3">
+            <div className="text-xs font-semibold mb-2">
+              {t(`Siku ya ${selectedDay}`, `Day ${selectedDay}`)}
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg bg-card p-2.5 text-center">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {t("Asubuhi", "Morning")}
+                </div>
+                <div className="font-num font-bold">{L(selected.morning)}</div>
+              </div>
+              <div className="rounded-lg bg-card p-2.5 text-center">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {t("Jioni", "Evening")}
+                </div>
+                <div className="font-num font-bold">{L(selected.evening)}</div>
+              </div>
+              <div className="rounded-lg bg-card p-2.5 text-center">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {t("Jumla", "Total")}
+                </div>
+                <div className="font-num font-bold text-[#1E7C3F]">
+                  {L(selected.morning + selected.evening)}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
