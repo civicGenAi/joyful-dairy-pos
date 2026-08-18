@@ -3,7 +3,7 @@ import { useApp } from "@/app/context";
 import { usePublicCatalog } from "@/lib/data/hooks/catalog";
 import type { CatalogProduct } from "@/lib/data/catalog";
 import { tzs } from "@/lib/format";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Globe, Instagram, Music2, Linkedin } from "lucide-react";
 import { useMemo } from "react";
 
 // Public, no login: what a customer's phone opens after scanning the
@@ -12,6 +12,17 @@ import { useMemo } from "react";
 // Backed by public_catalog(), the third anon-callable RPC in this schema.
 
 const WHATSAPP_NUMBER = "255784240780";
+
+const SOCIAL_LINKS = [
+  { href: "https://www.africanjoydairy.com/", icon: Globe, label: "africanjoydairy.com" },
+  { href: "https://www.instagram.com/africanjoy_", icon: Instagram, label: "@africanjoy_" },
+  { href: "https://www.tiktok.com/@africanjoy_", icon: Music2, label: "@africanjoy_" },
+  {
+    href: "https://www.linkedin.com/company/african-joy",
+    icon: Linkedin,
+    label: "African Joy",
+  },
+];
 
 const CATEGORY_LABEL: Record<string, { sw: string; en: string }> = {
   cultured: { sw: "Mtindi", en: "Cultured milk" },
@@ -121,7 +132,25 @@ export function CatalogScreen() {
           </div>
         )}
 
-        <p className="text-center text-[11px] text-muted-foreground mt-8">
+        <div className="flex items-center justify-center gap-4 mt-8">
+          {SOCIAL_LINKS.map((s) => {
+            const Icon = s.icon;
+            return (
+              <a
+                key={s.href}
+                href={s.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={s.label}
+                className="grid h-9 w-9 place-items-center rounded-full border border-border text-muted-foreground hover:text-[#1E7C3F] hover:border-[#1E7C3F] transition"
+              >
+                <Icon className="h-4 w-4" />
+              </a>
+            );
+          })}
+        </div>
+
+        <p className="text-center text-[11px] text-muted-foreground mt-3">
           {t(
             "African Joy Dairy, Arusha. Bei zinaweza kubadilika.",
             "African Joy Dairy, Arusha. Prices may vary.",

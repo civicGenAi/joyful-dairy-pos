@@ -46,9 +46,12 @@ export function FeedbackFormScreen() {
     return (
       <div className="grid min-h-screen place-items-center bg-background px-4">
         <div className="max-w-sm w-full text-center">
-          <div className="flex justify-center mb-6">
+          <div className="flex justify-center mb-2">
             <JoyLogo />
           </div>
+          <p className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1E7C3F] mb-5">
+            Drink, Eat, Enjoy
+          </p>
           <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-[#DFF0E4] text-[#2C7A4B] mb-5 shadow-elevated">
             <CheckCircle2 className="h-9 w-9" />
           </div>
@@ -69,9 +72,12 @@ export function FeedbackFormScreen() {
   return (
     <div className="grid min-h-screen place-items-center bg-background px-4 py-10">
       <div className="max-w-sm w-full">
-        <div className="flex justify-center mb-6">
+        <div className="flex justify-center mb-2">
           <JoyLogo />
         </div>
+        <p className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1E7C3F] mb-5">
+          Drink, Eat, Enjoy
+        </p>
         <h1 className="font-display text-lg font-bold text-center">
           {t("Tupe maoni yako", "Tell us what you think")}
         </h1>
