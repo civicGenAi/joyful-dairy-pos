@@ -418,7 +418,17 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
           toast.error(
             e.message.includes("day-locked")
               ? t("Siku hii imefungwa", "This day is locked")
-              : t("Imeshindikana kurekodi", "Could not record collection"),
+              : e.message.includes("future-date")
+                ? t(
+                    "Huwezi kurekodi tarehe ijayo, chagua leo au tarehe iliyopita",
+                    "You can't record a future date, pick today or an earlier date",
+                  )
+                : e.message.includes("empty-collection")
+                  ? t(
+                      "Weka lita za asubuhi au jioni, angalau moja",
+                      "Enter morning or evening litres, at least one",
+                    )
+                  : t("Imeshindikana kurekodi", "Could not record collection"),
           ),
       },
     );
