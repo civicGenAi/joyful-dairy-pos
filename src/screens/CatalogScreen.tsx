@@ -22,7 +22,7 @@ const SOCIAL_LINKS = [
     icon: Linkedin,
     label: "African Joy",
   },
-];
+] as const;
 
 const CATEGORY_LABEL: Record<string, { sw: string; en: string }> = {
   cultured: { sw: "Mtindi", en: "Cultured milk" },
@@ -56,30 +56,50 @@ export function CatalogScreen() {
 
   return (
     <div className="min-h-screen bg-background px-4 py-10">
-      <div className="max-w-lg mx-auto">
-        <div className="flex justify-center mb-5">
+      <div className="fixed right-2 sm:right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
+        <a
+          href={waLink(generalMessage)}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={t("Ongea nasi kwa WhatsApp", "Chat with us on WhatsApp")}
+          className="grid h-10 w-10 place-items-center rounded-full text-white shadow-elevated"
+          style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+        >
+          <MessageCircle className="h-[18px] w-[18px]" />
+        </a>
+        {SOCIAL_LINKS.map((s) => {
+          const Icon = s.icon;
+          return (
+            <a
+              key={s.href}
+              href={s.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={s.label}
+              className="grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-muted-foreground hover:text-[#1E7C3F] hover:border-[#1E7C3F] transition shadow-card"
+            >
+              <Icon className="h-4 w-4" />
+            </a>
+          );
+        })}
+      </div>
+
+      <div className="max-w-lg mx-auto pr-10 sm:pr-0">
+        <div className="flex justify-center mb-2">
           <JoyLogo />
         </div>
+        <p className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1E7C3F] mb-5">
+          Drink, Eat, Enjoy
+        </p>
         <h1 className="font-display text-lg font-bold text-center">
           {t("Bidhaa zetu", "Our products")}
         </h1>
-        <p className="text-muted-foreground text-sm text-center mt-1 mb-5">
+        <p className="text-muted-foreground text-sm text-center mt-1 mb-6">
           {t(
             "Angalia bidhaa zetu na uagize moja kwa moja kwa WhatsApp.",
             "Browse our products and order directly on WhatsApp.",
           )}
         </p>
-
-        <a
-          href={waLink(generalMessage)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 w-full rounded-xl px-4 py-3 text-sm font-semibold text-white mb-6"
-          style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
-        >
-          <MessageCircle className="h-4 w-4" />
-          {t("Ongea nasi kwa WhatsApp", "Chat with us on WhatsApp")}
-        </a>
 
         {isPending ? (
           <div className="text-center text-sm text-muted-foreground py-10">
@@ -132,25 +152,7 @@ export function CatalogScreen() {
           </div>
         )}
 
-        <div className="flex items-center justify-center gap-4 mt-8">
-          {SOCIAL_LINKS.map((s) => {
-            const Icon = s.icon;
-            return (
-              <a
-                key={s.href}
-                href={s.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={s.label}
-                className="grid h-9 w-9 place-items-center rounded-full border border-border text-muted-foreground hover:text-[#1E7C3F] hover:border-[#1E7C3F] transition"
-              >
-                <Icon className="h-4 w-4" />
-              </a>
-            );
-          })}
-        </div>
-
-        <p className="text-center text-[11px] text-muted-foreground mt-3">
+        <p className="text-center text-[11px] text-muted-foreground mt-8">
           {t(
             "African Joy Dairy, Arusha. Bei zinaweza kubadilika.",
             "African Joy Dairy, Arusha. Prices may vary.",
