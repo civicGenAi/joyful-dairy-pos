@@ -57,15 +57,24 @@ import type { Customer, CustomerType } from "@/mock/types";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useIssueBillInvoice } from "@/lib/data/hooks/invoices";
+import { ReceiptText } from "lucide-react";
 
-const MONTHS = [
-  { id: "2026-05", label: "May 2026" },
-  { id: "2026-04", label: "Apr 2026" },
-  { id: "2026-03", label: "Mar 2026" },
-  { id: "2026-02", label: "Feb 2026" },
-  { id: "2026-01", label: "Jan 2026" },
-];
+// Last 12 months from today, newest first, generated live so the current
+// month is always selectable instead of a fixed list going stale.
+function recentMonths(): { id: string; label: string }[] {
+  const out: { id: string; label: string }[] = [];
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const id = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = d.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+    out.push({ id, label });
+  }
+  return out;
+}
+const MONTHS = recentMonths();
 
 function ageOfActivity(date: string, todayIso: string): "current" | "30d" | "60d" | "90+" {
   const a = new Date(date).getTime();
@@ -281,9 +290,26 @@ export function CustomersScreen() {
 
 function CustomerDrawer({ c }: { c: Customer }) {
   const { t, can } = useApp();
+  const nav = useNavigate();
   const canDeposit = can("deposit:write");
+  const canInvoice = can("customers:write") || can("finance:write");
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(MONTHS[0].id);
+  const issueBill = useIssueBillInvoice();
+
+  const issueInvoiceForMonth = () => {
+    const [y, m] = month.split("-").map(Number);
+    const periodStart = `${month}-01`;
+    const periodEnd = new Date(y, m, 0).toISOString().slice(0, 10); // last day of month
+    issueBill.mutate(
+      { customerId: c.id, periodStart, periodEnd },
+      {
+        onSuccess: (inv) => nav({ to: "/invoice/$id", params: { id: inv.id } }),
+        onError: () =>
+          toast.error(t("Imeshindikana kutengeneza ankara", "Could not generate the invoice")),
+      },
+    );
+  };
   // BACKEND: activities and deposits are fetched per customer when the drawer opens.
   const { data: activities = [] } = useCustomerActivities(open ? c.id : null);
   const { data: deposits = [] } = useCustomerDeposits(open ? c.id : null);
@@ -497,6 +523,18 @@ function CustomerDrawer({ c }: { c: Customer }) {
                     {t("Fungua kwa kuchapisha", "Open print view")}
                   </Link>
                 </Button>
+                {canInvoice && (
+                  <Button
+                    variant="outline"
+                    disabled={issueBill.isPending}
+                    onClick={issueInvoiceForMonth}
+                  >
+                    <ReceiptText className="h-4 w-4 mr-1.5" />
+                    {issueBill.isPending
+                      ? t("Inatengeneza…", "Generating…")
+                      : t("Toa ankara", "Issue invoice")}
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   onClick={() =>

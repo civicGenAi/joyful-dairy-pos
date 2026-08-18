@@ -19,6 +19,10 @@ export interface CompanySettings {
   tin: string;
   alertThresholds: Record<string, unknown>;
   reportSchedule: Record<string, unknown>;
+  /** Mpesa Lipa Namba shown on printed invoices' "Pay by" box. */
+  mpesaLipaNamba: string;
+  bankName: string;
+  bankAccount: string;
 }
 
 export const settingsKeys = {
@@ -94,6 +98,9 @@ interface CompanyRow {
   tin: string;
   alert_thresholds: Record<string, unknown>;
   report_schedule: Record<string, unknown>;
+  mpesa_lipa_namba: string | null;
+  bank_name: string | null;
+  bank_account: string | null;
 }
 
 export const companyRepo = {
@@ -112,6 +119,9 @@ export const companyRepo = {
       tin: r.tin,
       alertThresholds: r.alert_thresholds ?? {},
       reportSchedule: r.report_schedule ?? {},
+      mpesaLipaNamba: r.mpesa_lipa_namba ?? "",
+      bankName: r.bank_name ?? "",
+      bankAccount: r.bank_account ?? "",
     };
   },
 
@@ -127,6 +137,9 @@ export const companyRepo = {
     if (patch.tin !== undefined) row.tin = patch.tin;
     if (patch.alertThresholds !== undefined) row.alert_thresholds = patch.alertThresholds;
     if (patch.reportSchedule !== undefined) row.report_schedule = patch.reportSchedule;
+    if (patch.mpesaLipaNamba !== undefined) row.mpesa_lipa_namba = patch.mpesaLipaNamba;
+    if (patch.bankName !== undefined) row.bank_name = patch.bankName;
+    if (patch.bankAccount !== undefined) row.bank_account = patch.bankAccount;
     unwrap(await supabase.from("company_settings").update(row).eq("id", 1).select("id"));
     await recordAudit(
       "edit",

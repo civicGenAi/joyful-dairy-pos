@@ -1148,8 +1148,19 @@ function CompanyTab() {
   const { data: company } = useCompany();
   const update = useUpdateCompany();
   const [form, setForm] = useState<Record<string, string>>({});
-  const val = (k: "name" | "city" | "phone" | "email" | "footer" | "tin" | "vrn") =>
-    form[k] ?? company?.[k] ?? "";
+  const val = (
+    k:
+      | "name"
+      | "city"
+      | "phone"
+      | "email"
+      | "footer"
+      | "tin"
+      | "vrn"
+      | "mpesaLipaNamba"
+      | "bankName"
+      | "bankAccount",
+  ) => form[k] ?? company?.[k] ?? "";
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -1163,6 +1174,9 @@ function CompanyTab() {
         footer: val("footer"),
         tin: val("tin"),
         vrn: val("vrn"),
+        mpesaLipaNamba: val("mpesaLipaNamba"),
+        bankName: val("bankName"),
+        bankAccount: val("bankAccount"),
       },
       {
         onSuccess: () => toast.success(t("Mipangilio imehifadhiwa", "Settings saved")),
@@ -1225,6 +1239,25 @@ function CompanyTab() {
           <div>
             <Label>{t("VRN", "VRN")}</Label>
             <Input value={val("vrn")} onChange={set("vrn")} />
+          </div>
+          <div className="pt-2 border-t border-border">
+            <div className="text-xs font-semibold text-muted-foreground mb-2">
+              {t("Malipo kwenye ankara", "Payment details on invoices")}
+            </div>
+          </div>
+          <div>
+            <Label>{t("M-Pesa Lipa Namba", "M-Pesa Lipa Namba")}</Label>
+            <Input value={val("mpesaLipaNamba")} onChange={set("mpesaLipaNamba")} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>{t("Benki", "Bank")}</Label>
+              <Input value={val("bankName")} onChange={set("bankName")} />
+            </div>
+            <div>
+              <Label>{t("Namba ya akaunti", "Account number")}</Label>
+              <Input value={val("bankAccount")} onChange={set("bankAccount")} />
+            </div>
           </div>
           <Button
             className="mt-2 text-white"

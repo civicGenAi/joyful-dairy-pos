@@ -54,6 +54,8 @@ import type { Customer, PriceMatrix, Product } from "@/mock/types";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { DayLockBanner } from "@/components/shell/DayLockBanner";
 import { uploadHardCopy } from "@/lib/data/uploads";
+import { useIssueOrderInvoice } from "@/lib/data/hooks/invoices";
+import { FileText } from "lucide-react";
 
 const CATS: { id: ProductCategory; label: { sw: string; en: string }; color: string }[] = [
   { id: "fresh-milk", label: { sw: "Maziwa Fresh", en: "Fresh milk" }, color: "#1E7C3F" },
@@ -89,6 +91,7 @@ export function POSScreen() {
   const { data: shift = [] } = useSalesByDate(today, "counter");
   const completeSaleMut = useCompleteSale();
   const voidSaleMut = useVoidSale();
+  const issueInvoiceMut = useIssueOrderInvoice();
 
   const [cat, setCat] = useState<ProductCategory>("fresh-milk");
   const [tier, setTier] = useState<PriceTier>("own");
@@ -750,6 +753,37 @@ export function POSScreen() {
                           <Printer className="h-3.5 w-3.5 mr-1" />
                           {t("Chapisha", "Print")}
                         </Button>
+                        {s.customerId && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs"
+                            disabled={issueInvoiceMut.isPending}
+                            title={t(
+                              "Tengeneza ankara rasmi kwa mteja huyu",
+                              "Generate a formal invoice for this customer",
+                            )}
+                            onClick={() =>
+                              issueInvoiceMut.mutate(
+                                { saleId: s.id },
+                                {
+                                  onSuccess: (inv) =>
+                                    nav({ to: "/invoice/$id", params: { id: inv.id } }),
+                                  onError: () =>
+                                    toast.error(
+                                      t(
+                                        "Imeshindikana kutengeneza ankara",
+                                        "Could not generate the invoice",
+                                      ),
+                                    ),
+                                },
+                              )
+                            }
+                          >
+                            <FileText className="h-3.5 w-3.5 mr-1" />
+                            {t("Ankara", "Invoice")}
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"

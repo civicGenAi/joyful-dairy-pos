@@ -21,6 +21,7 @@ import { useProducts, usePriceMatrix } from "@/lib/data/hooks/products";
 import { useCustomers } from "@/lib/data/hooks/customers";
 import { useStock } from "@/lib/data/hooks/stock";
 import { useSalesByDate, useCompleteSale } from "@/lib/data/hooks/sales";
+import { useIssueOrderInvoice } from "@/lib/data/hooks/invoices";
 import { useRecordTransfer } from "@/lib/data/hooks/collections";
 import { useRecordReturn } from "@/lib/data/hooks/stock";
 import { useVanLoads, useSaveVanLoad } from "@/lib/data/hooks/van";
@@ -56,6 +57,7 @@ import {
   Calendar,
   Wallet,
   UserCircle2,
+  FileText,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DriverAccountSheet } from "@/components/van/DriverAccountSheet";
@@ -92,6 +94,7 @@ export function RouteScreen() {
   const { data: sales = [] } = useSalesByDate(today, "route");
   const { data: vanLoads = [] } = useVanLoads(today);
   const completeSaleMut = useCompleteSale();
+  const issueInvoiceMut = useIssueOrderInvoice();
   const recordTransfer = useRecordTransfer();
   const recordReturn = useRecordReturn();
   const saveVanLoad = useSaveVanLoad();
@@ -947,9 +950,9 @@ export function RouteScreen() {
                 </div>
                 <ul className="divide-y divide-border text-sm">
                   {sales.slice(0, 5).map((s) => (
-                    <li key={s.id} className="flex items-center justify-between py-2">
-                      <div>
-                        <div className="font-medium">
+                    <li key={s.id} className="flex items-center justify-between py-2 gap-2">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">
                           {s.customerName ?? t("Mteja wa kupita", "Walk-in")}
                         </div>
                         <div className="text-xs text-muted-foreground">
@@ -960,7 +963,37 @@ export function RouteScreen() {
                           · {s.payment}
                         </div>
                       </div>
-                      <div className="font-num font-semibold">{tzs(s.totalTZS)}</div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {s.customerId && (
+                          <button
+                            disabled={issueInvoiceMut.isPending}
+                            title={t(
+                              "Tengeneza ankara rasmi kwa mteja huyu",
+                              "Generate a formal invoice for this customer",
+                            )}
+                            onClick={() =>
+                              issueInvoiceMut.mutate(
+                                { saleId: s.id },
+                                {
+                                  onSuccess: (inv) =>
+                                    nav({ to: "/invoice/$id", params: { id: inv.id } }),
+                                  onError: () =>
+                                    toast.error(
+                                      t(
+                                        "Imeshindikana kutengeneza ankara",
+                                        "Could not generate the invoice",
+                                      ),
+                                    ),
+                                },
+                              )
+                            }
+                            className="rounded-md bg-secondary/60 p-1.5 text-muted-foreground hover:text-foreground"
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        <div className="font-num font-semibold">{tzs(s.totalTZS)}</div>
+                      </div>
                     </li>
                   ))}
                 </ul>
