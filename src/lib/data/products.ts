@@ -11,6 +11,7 @@ interface ProductRow {
   category: ProductCategory;
   unit: Unit;
   conversion_note: string | null;
+  default_yield_pct: number | null;
   active: boolean;
 }
 
@@ -22,6 +23,7 @@ function toProduct(r: ProductRow): Product {
     category: r.category,
     unit: r.unit,
     conversionNote: r.conversion_note ?? undefined,
+    defaultYieldPct: r.default_yield_pct ?? undefined,
     active: r.active,
   };
 }
@@ -95,6 +97,7 @@ export const productsRepo = {
     category: ProductCategory;
     unit: Unit;
     conversionNote?: string;
+    defaultYieldPct?: number;
     prices: Record<PriceTier, number>;
   }): Promise<Product> {
     const row = unwrap(
@@ -106,6 +109,7 @@ export const productsRepo = {
           category: input.category,
           unit: input.unit,
           conversion_note: input.conversionNote ?? null,
+          default_yield_pct: input.defaultYieldPct ?? null,
         })
         .select("*")
         .single(),
@@ -138,6 +142,7 @@ export const productsRepo = {
     category: ProductCategory;
     unit: Unit;
     conversionNote?: string;
+    defaultYieldPct?: number;
   }): Promise<void> {
     unwrap(
       await supabase
@@ -148,6 +153,7 @@ export const productsRepo = {
           category: input.category,
           unit: input.unit,
           conversion_note: input.conversionNote ?? null,
+          default_yield_pct: input.defaultYieldPct ?? null,
         })
         .eq("id", input.id)
         .select("id"),

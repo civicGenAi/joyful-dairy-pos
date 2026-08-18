@@ -431,7 +431,9 @@ function AddProductDialog() {
   const [category, setCategory] = useState<ProductCategory>("yoghurt");
   const [unit, setUnit] = useState<Unit>("pcs");
   const [conversionNote, setConversionNote] = useState("");
+  const [yieldPct, setYieldPct] = useState<number | "">("");
   const create = useCreateProduct();
+  const producible = category !== "fresh-milk";
 
   const save = () => {
     if (!name.trim()) return;
@@ -442,6 +444,7 @@ function AddProductDialog() {
         category,
         unit,
         conversionNote: conversionNote || undefined,
+        defaultYieldPct: producible && yieldPct !== "" ? Number(yieldPct) : undefined,
         prices: { own: 0, bottle: 0, bulk: 0 },
       },
       {
@@ -531,6 +534,25 @@ function AddProductDialog() {
               placeholder="244 L ≈ 20 kg"
             />
           </div>
+          {producible && (
+            <div className="grid gap-1.5">
+              <Label>{t("Mavuno % (hiari)", "Default yield % (optional)")}</Label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={yieldPct}
+                onChange={(e) => setYieldPct(e.target.value === "" ? "" : Number(e.target.value))}
+                placeholder="9.5"
+              />
+              <div className="text-[11px] text-muted-foreground">
+                {t(
+                  "Ukijaza hii, Uzalishaji utakokotoa toleo na hasara moja kwa moja kutoka lita za maziwa ghafi.",
+                  "If set, Production will compute output and wastage automatically from raw milk litres.",
+                )}
+              </div>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
@@ -565,12 +587,22 @@ function ProductSheet({ product: p, onClose }: { product: Product; onClose: () =
   const [category, setCategory] = useState<ProductCategory>(p.category);
   const [unit, setUnit] = useState<Unit>(p.unit);
   const [note, setNote] = useState(p.conversionNote ?? "");
+  const [yieldPct, setYieldPct] = useState<number | "">(p.defaultYieldPct ?? "");
   const [tierEdits, setTierEdits] = useState<Partial<Record<PriceTier, number>>>({});
   const priceOf = (tier: PriceTier) => tierEdits[tier] ?? prices[p.id]?.[tier] ?? 0;
+  const producible = category !== "fresh-milk";
 
   const saveDetails = () => {
     update.mutate(
-      { id: p.id, name, swName, category, unit, conversionNote: note || undefined },
+      {
+        id: p.id,
+        name,
+        swName,
+        category,
+        unit,
+        conversionNote: note || undefined,
+        defaultYieldPct: producible && yieldPct !== "" ? Number(yieldPct) : undefined,
+      },
       {
         onSuccess: () => toast.success(t("Bidhaa imehifadhiwa", "Product saved")),
         onError: () => toast.error(t("Imeshindikana kuhifadhi", "Could not save product")),
@@ -754,6 +786,26 @@ function ProductSheet({ product: p, onClose }: { product: Product; onClose: () =
               <Label>{t("Maelezo ya ubadilishaji", "Conversion note")}</Label>
               <Input value={note} onChange={(e) => setNote(e.target.value)} readOnly={!canWrite} />
             </div>
+            {producible && (
+              <div className="grid gap-1.5">
+                <Label>{t("Mavuno % (hiari)", "Default yield % (optional)")}</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={yieldPct}
+                  onChange={(e) => setYieldPct(e.target.value === "" ? "" : Number(e.target.value))}
+                  readOnly={!canWrite}
+                  placeholder="9.5"
+                />
+                <div className="text-[11px] text-muted-foreground">
+                  {t(
+                    "Ukijaza hii, Uzalishaji utakokotoa toleo na hasara moja kwa moja kutoka lita za maziwa ghafi.",
+                    "If set, Production will compute output and wastage automatically from raw milk litres.",
+                  )}
+                </div>
+              </div>
+            )}
             {canWrite && (
               <Button
                 onClick={saveDetails}

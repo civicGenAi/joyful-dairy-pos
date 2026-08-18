@@ -337,7 +337,6 @@ function RecordBatchDialog({ products }: { products: Product[] }) {
   const [output, setOutput] = useState(20);
   const [wastage, setWastage] = useState(4);
   const record = useRecordBatch();
-  const yieldPct = input > 0 ? (output / input) * 100 : 0;
   const producible = products.filter(
     (p) =>
       p.category === "cheese" ||
@@ -347,11 +346,23 @@ function RecordBatchDialog({ products }: { products: Product[] }) {
       p.category === "butter" ||
       p.category === "cream",
   );
+  const selected = producible.find((p) => p.id === productId);
+  // Product has a configured yield %: output/wastage compute automatically
+  // from input litres, both read-only. No yield configured: fully manual,
+  // exactly as before. Recording the batch itself is always a manual click.
+  const auto = selected?.defaultYieldPct != null;
+  const autoOutput = auto
+    ? Math.round(input * (selected!.defaultYieldPct! / 100) * 100) / 100
+    : output;
+  const autoWastage = auto ? Math.max(input - autoOutput, 0) : wastage;
+  const yieldPct = input > 0 ? (autoOutput / input) * 100 : 0;
 
   const save = () => {
-    if (!productId || output <= 0) return;
+    if (!productId || autoOutput <= 0) return;
     record.mutate(
-      { productId, inputLitres: input, outputQty: output, wastage },
+      auto
+        ? { productId, inputLitres: input }
+        : { productId, inputLitres: input, outputQty: output, wastage },
       {
         onSuccess: () => {
           toast.success(t("Batch imerekodiwa", "Batch recorded"));
@@ -415,14 +426,18 @@ function RecordBatchDialog({ products }: { products: Product[] }) {
               <Label>{t("Toleo", "Output")}</Label>
               <Input
                 type="number"
-                value={output}
+                value={auto ? autoOutput : output}
+                readOnly={auto}
+                disabled={auto}
                 onChange={(e) => setOutput(Number(e.target.value))}
               />
             </div>
           </div>
           <div className="rounded-xl bg-secondary/60 p-3 flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
-              {t("Yield iliyokokotolewa", "Computed yield")}
+              {auto
+                ? t("Mavuno yaliyowekwa", "Configured yield")
+                : t("Yield iliyokokotolewa", "Computed yield")}
             </span>
             <span className="font-num font-bold text-[#1E7C3F]">{yieldPct.toFixed(1)}%</span>
           </div>
@@ -430,9 +445,19 @@ function RecordBatchDialog({ products }: { products: Product[] }) {
             <Label>{t("Wastage (L)", "Wastage (L)")}</Label>
             <Input
               type="number"
-              value={wastage}
+              value={auto ? autoWastage : wastage}
+              readOnly={auto}
+              disabled={auto}
               onChange={(e) => setWastage(Number(e.target.value))}
             />
+            {auto && (
+              <div className="text-[11px] text-muted-foreground">
+                {t(
+                  "Kimewekwa kiotomatiki kutoka mavuno % ya bidhaa, kitarekodiwa kama uharibifu.",
+                  "Set automatically from the product's yield %, will be recorded as spoilage.",
+                )}
+              </div>
+            )}
           </div>
         </div>
         <DialogFooter>

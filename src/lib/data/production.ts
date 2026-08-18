@@ -67,19 +67,22 @@ export const productionRepo = {
     return rows.map(toBatch);
   },
 
-  /** Records a batch via RPC: consumes raw milk, produces finished stock, audits. */
+  /** Records a batch via RPC: consumes raw milk, produces finished stock, audits.
+   *  outputQty/wastage are optional: omit them for a product with a default
+   *  yield % configured and the server computes both (and auto-records the
+   *  yield loss as spoilage); pass them explicitly for the fully-manual path. */
   async recordBatch(input: {
     productId: string;
     inputLitres: number;
-    outputQty: number;
+    outputQty?: number;
     wastage?: number;
     note?: string;
   }): Promise<void> {
     const { error } = await supabase.rpc("record_batch", {
       p_product_id: input.productId,
       p_input_litres: input.inputLitres,
-      p_output_qty: input.outputQty,
-      p_wastage: input.wastage ?? 0,
+      p_output_qty: input.outputQty ?? null,
+      p_wastage: input.wastage ?? null,
       p_note: input.note ?? null,
     });
     if (error) throw new Error(error.message);

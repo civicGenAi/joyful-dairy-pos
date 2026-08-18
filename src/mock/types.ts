@@ -29,6 +29,10 @@ export interface Product {
   category: ProductCategory;
   unit: Unit;
   conversionNote?: string;
+  /** % of input raw milk litres this product yields when produced (e.g.
+   *  cheese ~9-10%, Mtindi/yoghurt ~100%). Unset means production batches
+   *  for this product stay fully manual (typed output + wastage). */
+  defaultYieldPct?: number;
   active: boolean;
 }
 
