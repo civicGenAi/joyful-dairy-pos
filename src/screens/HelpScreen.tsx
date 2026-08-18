@@ -36,7 +36,7 @@ const GLOSSARY: { sw: string; en: string; note?: { sw: string; en: string } }[] 
   {
     sw: "Mzunguko",
     en: "Cycle",
-    note: { sw: "Mzunguko wa siku 15 wa malipo", en: "15-day payment cycle" },
+    note: { sw: "Mzunguko wa malipo kila mwezi", en: "Monthly payment cycle" },
   },
   {
     sw: "Yield",
@@ -60,8 +60,8 @@ const SECTIONS: {
     id: "procurement",
     title: { sw: "Ununuzi (Procurement)", en: "Procurement" },
     blurb: {
-      sw: "Maziwa kutoka kwa wafugaji wa kike, mzunguko wa malipo wa siku 15, vidhibiti vya ubora kwenye pointi za ukusanyaji.",
-      en: "Milk from women smallholder farmers, 15-day payout cycle, quality checks at collection points.",
+      sw: "Maziwa kutoka kwa wafugaji wa kike, mzunguko wa malipo kila mwezi, vidhibiti vya ubora kwenye pointi za ukusanyaji.",
+      en: "Milk from women smallholder farmers, monthly payout cycle, quality checks at collection points.",
     },
     link: "/farmers",
   },

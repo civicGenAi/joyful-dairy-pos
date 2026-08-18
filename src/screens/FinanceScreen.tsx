@@ -144,8 +144,8 @@ export function FinanceScreen() {
           sub={
             cycle
               ? t(
-                  `Mzunguko 15-siku, ${dateLabel(cycle.endDate)}`,
-                  `15-day cycle, ${dateLabel(cycle.endDate)}`,
+                  `Mzunguko wa mwezi, ${dateLabel(cycle.endDate)}`,
+                  `Monthly cycle, ${dateLabel(cycle.endDate)}`,
                 )
               : t("Hakuna mzunguko wazi", "No open cycle")
           }
@@ -273,7 +273,7 @@ export function FinanceScreen() {
 
         <TabsContent value="payables" className="mt-4">
           <SectionCard
-            title={t("Malipo yajayo, mzunguko wa siku 15", "Upcoming payouts, 15-day cycle")}
+            title={t("Malipo yajayo, mzunguko wa mwezi", "Upcoming payouts, monthly cycle")}
           >
             <div className="rounded-xl bg-[#1E7C3F]/10 p-4 mb-4 flex items-center gap-3">
               <Calendar className="h-5 w-5 text-[#1E7C3F]" />

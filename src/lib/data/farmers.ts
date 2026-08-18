@@ -190,7 +190,7 @@ export const farmersRepo = {
     if (error) throw new Error(error.message);
   },
 
-  /** The open 15-day payout cycle plus what has already been paid inside it. */
+  /** The open monthly payout cycle plus what has already been paid inside it. */
   async cycleSummary(): Promise<CycleSummary | null> {
     const { data: cycle, error } = await supabase
       .from("cycles")
@@ -225,7 +225,7 @@ export const farmersRepo = {
 
   /** Litres, amount earned, amount paid and a Paid/Partial/Unpaid status
    *  per calendar month, so a gap in payment history is visible at a
-   *  glance instead of only ever showing the current 15-day cycle. */
+   *  glance instead of only ever showing the current payout cycle. */
   async monthlySummary(farmerId: string, months = 12): Promise<FarmerMonth[]> {
     const { data, error } = await supabase.rpc("farmer_monthly_summary", {
       p_farmer_id: farmerId,

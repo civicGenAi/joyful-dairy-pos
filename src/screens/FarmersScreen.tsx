@@ -308,7 +308,7 @@ export function FarmersScreen() {
       )}
 
       <div className="mt-5">
-        <SectionCard title={t("Mzunguko wa malipo (siku 15)", "Payment cycle (15 days)")}>
+        <SectionCard title={t("Mzunguko wa malipo (kila mwezi)", "Payment cycle (monthly)")}>
           <div className="grid lg:grid-cols-2 gap-6">
             <div>
               <div className="text-xs text-muted-foreground mb-2">

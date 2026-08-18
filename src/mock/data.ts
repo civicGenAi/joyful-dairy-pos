@@ -683,7 +683,7 @@ export const ALERTS: Alert[] = [
   {
     id: "al-6",
     kind: "farmer-payable",
-    title: "15-day payout due in 3 days",
+    title: "Monthly payout due in 3 days",
     detail: "12 farmers, total TZS 4,830,000",
     severity: "info",
     timeAgo: "Today",
