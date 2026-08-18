@@ -12,7 +12,8 @@ import {
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { Button } from "@/components/ui/button";
 import { num } from "@/lib/format";
-import { Star, ChevronLeft, ChevronRight } from "lucide-react";
+import { useQrDataUrl } from "@/lib/qr";
+import { Star, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { useState } from "react";
 import {
   LineChart,
@@ -72,6 +73,27 @@ export function CustomerFeedbackScreen() {
 
   return (
     <AppShell title={t("Maoni ya wateja", "Customer feedback")}>
+      <SectionCard title={t("Nambari za QR kwa wateja", "QR codes for customers")} className="mb-5">
+        <p className="text-xs text-muted-foreground mb-3">
+          {t(
+            "Pakua na uchapishe, kila moja kwa kusudi lake mahali tofauti.",
+            "Download and print, each one belongs in a different spot.",
+          )}
+        </p>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <QrTile
+            path="/feedback"
+            title={t("Toa maoni", "Rate us")}
+            hint={t("Kwa risiti, baada ya ununuzi", "For receipts, after purchase")}
+          />
+          <QrTile
+            path="/catalog"
+            title={t("Bidhaa zetu", "Our products")}
+            hint={t("Kwa vifungashio, dukani", "For packaging, storefront")}
+          />
+        </div>
+      </SectionCard>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         <StatCard
           label={t("Jumla ya maoni", "Total reviews")}
@@ -239,5 +261,38 @@ export function CustomerFeedbackScreen() {
         )}
       </SectionCard>
     </AppShell>
+  );
+}
+
+function QrTile({ path, title, hint }: { path: string; title: string; hint: string }) {
+  const { t } = useApp();
+  const url = typeof window !== "undefined" ? `${window.location.origin}${path}` : path;
+  const qr = useQrDataUrl(url, 240);
+
+  return (
+    <div className="flex items-center gap-4 rounded-xl border border-border p-3">
+      <div className="shrink-0 rounded-lg bg-white p-1.5 border border-border">
+        {qr ? (
+          <img src={qr} alt={title} className="h-20 w-20" />
+        ) : (
+          <div className="h-20 w-20 animate-pulse bg-secondary rounded" />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="font-semibold text-sm">{title}</div>
+        <div className="text-xs text-muted-foreground">{hint}</div>
+        <div className="text-[11px] font-num text-muted-foreground truncate mt-0.5">{url}</div>
+        {qr && (
+          <a
+            href={qr}
+            download={`african-joy-${path.replace("/", "")}-qr.png`}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-[#1E7C3F] hover:underline mt-1.5"
+          >
+            <Download className="h-3 w-3" />
+            {t("Pakua", "Download")}
+          </a>
+        )}
+      </div>
+    </div>
   );
 }

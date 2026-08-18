@@ -17,6 +17,9 @@ const CATEGORY_LABEL: Record<string, { sw: string; en: string }> = {
   cultured: { sw: "Mtindi", en: "Cultured milk" },
   cheese: { sw: "Jibini", en: "Cheese" },
   yoghurt: { sw: "Yogati", en: "Yoghurt" },
+  cream: { sw: "Krimu", en: "Cream" },
+  ghee: { sw: "Samli", en: "Ghee" },
+  butter: { sw: "Siagi", en: "Butter" },
 };
 
 function waLink(message: string): string {

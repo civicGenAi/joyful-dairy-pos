@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 /** Renders a QR code to a data: URI PNG, not a live <canvas>/<svg>, so the
  *  PDF export (which rasterizes the DOM as-is) always captures it reliably
  *  regardless of timing. */
-export function useQrDataUrl(text: string | null): string | null {
+export function useQrDataUrl(text: string | null, size = 180): string | null {
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -15,7 +15,7 @@ export function useQrDataUrl(text: string | null): string | null {
     let cancelled = false;
     QRCode.toDataURL(text, {
       margin: 1,
-      width: 180,
+      width: size,
       color: { dark: "#14532D", light: "#FFFFFF" },
     })
       .then((u) => {
@@ -27,7 +27,7 @@ export function useQrDataUrl(text: string | null): string | null {
     return () => {
       cancelled = true;
     };
-  }, [text]);
+  }, [text, size]);
 
   return url;
 }
