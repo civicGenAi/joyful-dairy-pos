@@ -1,11 +1,13 @@
 import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
 // BACKEND: additive to the existing day-lock reconciliation, never replaces
-// it. src/lib/data/stockCounts + stock. A morning ritual: count what's
-// physically on the shelf/tank before the day's activity starts, so a
-// mismatch is caught at 7am, not discovered at the evening lock.
+// it. src/lib/data/stockCounts + stock + packSizes. A morning ritual: count
+// what's physically on the shelf/tank before the day's activity starts, so
+// a mismatch is caught at 7am, not discovered at the evening lock.
 import { useStock } from "@/lib/data/hooks/stock";
 import { useStockCountsForDate, useRecordStockCount } from "@/lib/data/hooks/stockCounts";
+import { usePackSizes } from "@/lib/data/hooks/packSizes";
+import type { PackSize } from "@/lib/data/packSizes";
 import { todayISO, dateLabel } from "@/lib/data/dates";
 import { SectionCard, Pill } from "@/components/ui/data-bits";
 import { Input } from "@/components/ui/input";
@@ -18,17 +20,6 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
 import type { StockItem } from "@/mock/types";
 
-// Raw milk is the only item counted by container, everything else (finished
-// products) is one plain number in its own unit, per how the business
-// actually counts stock: cheese and yoghurt don't come in a mix of jerrican
-// sizes, only milk does.
-const MILK_CONTAINERS: { id: string; litres: number; label: { sw: string; en: string } }[] = [
-  { id: "ndoo20", litres: 20, label: { sw: "Ndoo (20L)", en: "20L bucket (ndoo)" } },
-  { id: "galoni5", litres: 5, label: { sw: "Galoni 5L", en: "5L jerrican" } },
-  { id: "galoni3", litres: 3, label: { sw: "Galoni 3L", en: "3L jerrican" } },
-  { id: "chupa1_5", litres: 1.5, label: { sw: "Chupa 1.5L", en: "1.5L bottle" } },
-];
-
 const VARIANCE_TOLERANCE = 0.5;
 
 export function StockCountScreen() {
@@ -37,6 +28,7 @@ export function StockCountScreen() {
   const today = todayISO();
   const { data: items = [], isPending: itemsPending } = useStock();
   const { data: counts = [], isPending: countsPending } = useStockCountsForDate(today);
+  const { data: allSizes = [], isPending: sizesPending } = usePackSizes();
 
   const countable = items
     .filter((i) => i.active !== false && (i.category === "raw" || i.category === "finished"))
@@ -44,7 +36,7 @@ export function StockCountScreen() {
       a.category === b.category ? a.name.localeCompare(b.name) : a.category === "raw" ? -1 : 1,
     );
 
-  if (itemsPending || countsPending) {
+  if (itemsPending || countsPending || sizesPending) {
     return (
       <AppShell title={t("Hesabu ya asubuhi", "Morning stock count")}>
         <SectionSkeleton>
@@ -82,6 +74,7 @@ export function StockCountScreen() {
               key={item.id}
               item={item}
               date={today}
+              sizes={allSizes.filter((p) => p.stockItemId === item.id)}
               existing={counts.find((c) => c.stockItemId === item.id)}
               canWrite={canWrite}
             />
@@ -95,16 +88,18 @@ export function StockCountScreen() {
 function CountRow({
   item,
   date,
+  sizes,
   existing,
   canWrite,
 }: {
   item: StockItem;
   date: string;
+  sizes: PackSize[];
   existing?: { countedQty: number; variance: number; containers: Record<string, number> | null };
   canWrite: boolean;
 }) {
-  const { t, lang } = useApp();
-  const isMilk = item.category === "raw";
+  const { t } = useApp();
+  const hasSizes = sizes.length > 0;
   const [containers, setContainers] = useState<Record<string, number>>(
     () => existing?.containers ?? {},
   );
@@ -113,17 +108,21 @@ function CountRow({
   const [savedVariance, setSavedVariance] = useState<number | null>(existing?.variance ?? null);
 
   useEffect(() => {
-    if (isMilk) {
-      const total = MILK_CONTAINERS.reduce((a, c) => a + (containers[c.id] ?? 0) * c.litres, 0);
+    if (hasSizes) {
+      const total = sizes.reduce((a, p) => a + (containers[p.id] ?? 0) * p.qtyPerPack, 0);
       setQty(total);
     }
-  }, [containers, isMilk]);
+    // sizes is derived fresh from allSizes each render, comparing by content
+    // via containers/hasSizes is enough, adding it would just re-run this
+    // needlessly whenever the parent list re-fetches.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [containers, hasSizes]);
 
   const save = () => {
     const q = Number(qty);
     if (!q && q !== 0) return;
     record.mutate(
-      { date, stockItemId: item.id, countedQty: q, containers: isMilk ? containers : undefined },
+      { date, stockItemId: item.id, countedQty: q, containers: hasSizes ? containers : undefined },
       {
         onSuccess: (row) => {
           setSavedVariance(row.variance);
@@ -163,27 +162,31 @@ function CountRow({
         </>
       }
     >
-      {isMilk ? (
+      {hasSizes ? (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {MILK_CONTAINERS.map((c) => (
-            <div key={c.id} className="grid gap-1">
-              <label className="text-xs text-muted-foreground">{c.label[lang]}</label>
+          {sizes.map((p) => (
+            <div key={p.id} className="grid gap-1">
+              <label className="text-xs text-muted-foreground">
+                {p.label} ({num(p.qtyPerPack)} {item.unit})
+              </label>
               <Input
                 type="number"
                 min={0}
                 disabled={!canWrite}
-                value={containers[c.id] ?? ""}
+                value={containers[p.id] ?? ""}
                 placeholder="0"
                 onChange={(e) =>
-                  setContainers((cs) => ({ ...cs, [c.id]: Number(e.target.value) || 0 }))
+                  setContainers((cs) => ({ ...cs, [p.id]: Number(e.target.value) || 0 }))
                 }
                 className="font-num"
               />
             </div>
           ))}
           <div className="col-span-2 sm:col-span-4 flex items-center justify-between rounded-lg bg-secondary/60 px-3 py-2">
-            <span className="text-sm">{t("Jumla ya lita", "Total litres")}</span>
-            <span className="font-num font-bold">{num(Number(qty) || 0)} L</span>
+            <span className="text-sm">{t("Jumla", "Total")}</span>
+            <span className="font-num font-bold">
+              {num(Number(qty) || 0)} {item.unit}
+            </span>
           </div>
         </div>
       ) : (

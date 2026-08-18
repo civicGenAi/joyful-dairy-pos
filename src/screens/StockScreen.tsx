@@ -13,6 +13,7 @@ import {
   useSetStockItemActive,
   useDeleteStockItem,
 } from "@/lib/data/hooks/stock";
+import { usePackSizes, useCreatePackSize, useDeletePackSize } from "@/lib/data/hooks/packSizes";
 import { todayISO } from "@/lib/data/dates";
 import type { StockItem } from "@/mock/types";
 import type { StockMovement } from "@/lib/data/stock";
@@ -49,6 +50,7 @@ import {
   Factory,
   Ban,
   Trash2,
+  ListChecks,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { Unit } from "@/mock/types";
@@ -320,6 +322,7 @@ export function StockScreen() {
                             onClick={(e) => e.stopPropagation()}
                           >
                             {writable && thisTab === "consumable" && <ItemRowActions item={s} />}
+                            {writable && thisTab === "finished" && <PackSizesDialog item={s} />}
                             <Button
                               size="sm"
                               variant="ghost"
@@ -399,6 +402,7 @@ export function StockScreen() {
                           {s.lastMovement}
                         </td>
                         <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                          {writable && <PackSizesDialog item={s} />}
                           {writable && <ItemRowActions item={s} />}
                         </td>
                       </tr>
@@ -619,6 +623,123 @@ function StoreItemDialog({ category, item }: { category: "raw" | "consumable"; i
 }
 
 /** Edit + suspend controls for a raw / consumable item row. */
+/** Configures the container/pack sizes this item is counted by in Morning
+ *  Count (e.g. Mtindi's own cup/bottle sizes, distinct from raw milk's
+ *  ndoo/galoni/chupa). An item with nothing configured here just gets a
+ *  plain single-number count instead, that's the default for everything. */
+function PackSizesDialog({ item }: { item: StockItem }) {
+  const { t } = useApp();
+  const [open, setOpen] = useState(false);
+  const [label, setLabel] = useState("");
+  const [qty, setQty] = useState<number | "">("");
+  const { data: allSizes = [] } = usePackSizes();
+  const create = useCreatePackSize();
+  const remove = useDeletePackSize();
+  const sizes = allSizes.filter((p) => p.stockItemId === item.id);
+
+  const add = () => {
+    if (!label.trim() || !qty || Number(qty) <= 0) return;
+    create.mutate(
+      { stockItemId: item.id, label: label.trim(), qtyPerPack: Number(qty) },
+      {
+        onSuccess: () => {
+          setLabel("");
+          setQty("");
+        },
+        onError: () => toast.error(t("Imeshindikana kuongeza", "Could not add the size")),
+      },
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 text-muted-foreground"
+          title={t("Vipimo vya kuhesabu", "Count pack sizes")}
+        >
+          <ListChecks className="h-3.5 w-3.5" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {t("Vipimo vya kuhesabu", "Pack sizes for counting")}: {item.name}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            {t(
+              "Ukiweka vipimo hapa, Hesabu ya asubuhi itauliza idadi ya kila kimoja badala ya jumla moja.",
+              "Once sizes are set here, Morning Count asks for a count of each one instead of a single total.",
+            )}
+          </p>
+          {sizes.length === 0 ? (
+            <EmptyState
+              title={t("Bado hakuna vipimo", "No sizes yet")}
+              description={t(
+                `${item.name} itahesabiwa kwa namba moja mpaka uongeze vipimo.`,
+                `${item.name} is counted as one plain number until you add sizes.`,
+              )}
+            />
+          ) : (
+            <ul className="divide-y divide-border rounded-lg border border-border">
+              {sizes.map((p) => (
+                <li key={p.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                  <span>
+                    {p.label}{" "}
+                    <span className="text-xs text-muted-foreground font-num">
+                      ({num(p.qtyPerPack)} {item.unit})
+                    </span>
+                  </span>
+                  <button
+                    onClick={() => remove.mutate({ id: p.id, label: p.label })}
+                    className="text-muted-foreground hover:text-[#E11B22]"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex items-end gap-2">
+            <div className="grid gap-1 flex-1">
+              <Label className="text-xs">{t("Jina la kipimo", "Size label")}</Label>
+              <Input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder={t("mf. Chupa 500ml", "e.g. 500ml bottle")}
+              />
+            </div>
+            <div className="grid gap-1 w-28">
+              <Label className="text-xs">
+                {t("Kiasi", "Qty")} ({item.unit})
+              </Label>
+              <Input
+                type="number"
+                min={0}
+                value={qty}
+                onChange={(e) => setQty(e.target.value === "" ? "" : Number(e.target.value))}
+                className="font-num"
+              />
+            </div>
+            <Button variant="outline" disabled={create.isPending} onClick={add}>
+              {t("Ongeza", "Add")}
+            </Button>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            {t("Funga", "Close")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ItemRowActions({ item }: { item: StockItem }) {
   const { t } = useApp();
   const setActive = useSetStockItemActive();
