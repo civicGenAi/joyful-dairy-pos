@@ -622,7 +622,6 @@ function StoreItemDialog({ category, item }: { category: "raw" | "consumable"; i
   );
 }
 
-/** Edit + suspend controls for a raw / consumable item row. */
 /** Configures the container/pack sizes this item is counted by in Morning
  *  Count (e.g. Mtindi's own cup/bottle sizes, distinct from raw milk's
  *  ndoo/galoni/chupa). An item with nothing configured here just gets a
@@ -725,7 +724,11 @@ function PackSizesDialog({ item }: { item: StockItem }) {
                 className="font-num"
               />
             </div>
-            <Button variant="outline" disabled={create.isPending} onClick={add}>
+            <Button
+              variant="outline"
+              disabled={create.isPending || !label.trim() || !qty || Number(qty) <= 0}
+              onClick={add}
+            >
               {t("Ongeza", "Add")}
             </Button>
           </div>
@@ -740,6 +743,7 @@ function PackSizesDialog({ item }: { item: StockItem }) {
   );
 }
 
+/** Edit + suspend controls for a raw / consumable item row. */
 function ItemRowActions({ item }: { item: StockItem }) {
   const { t } = useApp();
   const setActive = useSetStockItemActive();
