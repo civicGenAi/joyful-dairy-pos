@@ -232,7 +232,7 @@ export const farmersRepo = {
       p_months: months,
     });
     if (error) throw new Error(error.message);
-    return (
+    const rows = (
       data as {
         month: string;
         litres: number;
@@ -247,6 +247,12 @@ export const farmersRepo = {
       paidTZS: Number(r.paid_tzs),
       status: r.status,
     }));
+    // Rows come back newest-first. Trim the trailing run of months with
+    // no activity at all, they're months before this farmer had started,
+    // not a real gap. A "none" month that falls after real activity
+    // (a genuine missed month) is left alone.
+    const lastActive = rows.map((r) => r.status !== "none").lastIndexOf(true);
+    return lastActive === -1 ? [] : rows.slice(0, lastActive + 1);
   },
 
   async payouts(farmerId: string): Promise<PayoutEntry[]> {
