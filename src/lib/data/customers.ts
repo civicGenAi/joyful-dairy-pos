@@ -1,6 +1,6 @@
 import { supabase, unwrap } from "@/lib/api/client";
 import { recordAudit } from "@/lib/data/audit";
-import type { Customer, CustomerActivity, CustomerType, Unit } from "@/mock/types";
+import type { BillingCycle, Customer, CustomerActivity, CustomerType, Unit } from "@/mock/types";
 
 // BACKEND: customers repository. Activities derive from sales + sale_lines,
 // deposits from the deposits table, so statements stay ledger-true.
@@ -17,6 +17,7 @@ interface CustomerRow {
   reminders_enabled?: boolean;
   suspended?: boolean;
   next_due_date?: string | null;
+  billing_cycle?: BillingCycle;
 }
 
 function toCustomer(r: CustomerRow): Customer {
@@ -32,6 +33,7 @@ function toCustomer(r: CustomerRow): Customer {
     remindersEnabled: r.reminders_enabled ?? true,
     suspended: r.suspended ?? false,
     nextDueDate: r.next_due_date ?? undefined,
+    billingCycle: r.billing_cycle ?? "month_end",
   };
 }
 
@@ -134,6 +136,7 @@ export const customersRepo = {
     email?: string;
     type: CustomerType;
     nextDueDate?: string;
+    billingCycle?: BillingCycle;
   }): Promise<Customer> {
     const row = unwrap(
       await supabase
@@ -144,6 +147,7 @@ export const customersRepo = {
           email: input.email ?? "",
           type: input.type,
           next_due_date: input.nextDueDate || null,
+          billing_cycle: input.billingCycle ?? "month_end",
         })
         .select("*")
         .single(),
@@ -165,6 +169,7 @@ export const customersRepo = {
     type: CustomerType;
     remindersEnabled?: boolean;
     nextDueDate?: string;
+    billingCycle?: BillingCycle;
   }): Promise<void> {
     unwrap(
       await supabase
@@ -176,6 +181,7 @@ export const customersRepo = {
           type: input.type,
           reminders_enabled: input.remindersEnabled ?? true,
           next_due_date: input.nextDueDate || null,
+          billing_cycle: input.billingCycle ?? "month_end",
         })
         .eq("id", input.id)
         .select("id"),

@@ -55,7 +55,7 @@ import {
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import type { Customer, CustomerType, PriceTier } from "@/mock/types";
+import type { BillingCycle, Customer, CustomerType, PriceTier } from "@/mock/types";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
@@ -77,6 +77,18 @@ function recentMonths(): { id: string; label: string }[] {
   return out;
 }
 const MONTHS = recentMonths();
+
+// Almost every monthly-credit customer settles a full month after the
+// billing period ends. One special case pays within the first few days of
+// the next month instead, this maps that choice to the invoice terms.
+const BILLING_CYCLE_LABEL: Record<BillingCycle, { sw: string; en: string }> = {
+  month_end: { sw: "Mwisho wa mwezi", en: "End of month" },
+  month_start: { sw: "Mwanzo wa mwezi", en: "Start of month" },
+};
+const TERMS_DAYS_BY_CYCLE: Record<BillingCycle, number> = {
+  month_end: 30,
+  month_start: 5,
+};
 
 function ageOfActivity(date: string, todayIso: string): "current" | "30d" | "60d" | "90+" {
   const a = new Date(date).getTime();
@@ -291,7 +303,7 @@ export function CustomersScreen() {
 }
 
 function CustomerDrawer({ c }: { c: Customer }) {
-  const { t, can } = useApp();
+  const { t, can, lang } = useApp();
   const nav = useNavigate();
   const canDeposit = can("deposit:write");
   const canInvoice = can("customers:write") || can("finance:write");
@@ -304,7 +316,7 @@ function CustomerDrawer({ c }: { c: Customer }) {
     const periodStart = `${month}-01`;
     const periodEnd = new Date(y, m, 0).toISOString().slice(0, 10); // last day of month
     issueBill.mutate(
-      { customerId: c.id, periodStart, periodEnd },
+      { customerId: c.id, periodStart, periodEnd, termsDays: TERMS_DAYS_BY_CYCLE[c.billingCycle] },
       {
         onSuccess: (inv) => nav({ to: "/invoice/$id", params: { id: inv.id } }),
         onError: () =>
@@ -473,7 +485,12 @@ function CustomerDrawer({ c }: { c: Customer }) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="font-display text-lg font-bold mt-1">{c.name}</div>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="font-display text-lg font-bold">{c.name}</div>
+                <Pill tone={c.billingCycle === "month_start" ? "warning" : "info"}>
+                  {t("Analipa", "Pays")} {BILLING_CYCLE_LABEL[c.billingCycle][lang].toLowerCase()}
+                </Pill>
+              </div>
 
               <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
                 <div className="flex justify-between border-b border-border py-2">
@@ -941,19 +958,20 @@ function RecordDepositDialog({ customerId }: { customerId: string }) {
 }
 
 function AddCustomerDialog() {
-  const { t } = useApp();
+  const { t, lang } = useApp();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [type, setType] = useState<CustomerType>("cash");
   const [dueDate, setDueDate] = useState("");
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("month_end");
   const create = useCreateCustomer();
 
   const save = () => {
     if (!name.trim()) return;
     create.mutate(
-      { name, phone, email, type, nextDueDate: dueDate || undefined },
+      { name, phone, email, type, nextDueDate: dueDate || undefined, billingCycle },
       {
         onSuccess: () => {
           toast.success(t("Mteja amesajiliwa", "Customer registered"));
@@ -1021,16 +1039,42 @@ function AddCustomerDialog() {
             </div>
           </div>
           {type !== "cash" && (
-            <div className="grid gap-1.5">
-              <Label>{t("Tarehe ya malipo (kikumbusho)", "Payment due date (reminder)")}</Label>
-              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-              <div className="text-[11px] text-muted-foreground">
-                {t(
-                  "Barua pepe itatumwa siku 5 kabla na siku yenyewe ya malipo.",
-                  "An email goes out 5 days before this date and again on the day itself.",
-                )}
+            <>
+              <div className="grid gap-1.5">
+                <Label>{t("Tarehe ya malipo (kikumbusho)", "Payment due date (reminder)")}</Label>
+                <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                <div className="text-[11px] text-muted-foreground">
+                  {t(
+                    "Barua pepe itatumwa siku 5 kabla na siku yenyewe ya malipo.",
+                    "An email goes out 5 days before this date and again on the day itself.",
+                  )}
+                </div>
               </div>
-            </div>
+              <div className="grid gap-1.5">
+                <Label>{t("Anapolipa kila mwezi", "Pays at")}</Label>
+                <Select
+                  value={billingCycle}
+                  onValueChange={(v) => setBillingCycle(v as BillingCycle)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(BILLING_CYCLE_LABEL) as BillingCycle[]).map((bc) => (
+                      <SelectItem key={bc} value={bc}>
+                        {BILLING_CYCLE_LABEL[bc][lang]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="text-[11px] text-muted-foreground">
+                  {t(
+                    "Huamua tarehe ya mwisho ya malipo kwenye ankara za kila mwezi.",
+                    "Determines the due date on this customer's monthly bill invoices.",
+                  )}
+                </div>
+              </div>
+            </>
           )}
         </div>
         <DialogFooter>
@@ -1052,7 +1096,7 @@ function AddCustomerDialog() {
 }
 
 function CustomerActions({ c }: { c: Customer }) {
-  const { t } = useApp();
+  const { t, lang } = useApp();
   const [editOpen, setEditOpen] = useState(false);
   const [name, setName] = useState(c.name);
   const [phone, setPhone] = useState(c.phone);
@@ -1060,6 +1104,7 @@ function CustomerActions({ c }: { c: Customer }) {
   const [type, setType] = useState<CustomerType>(c.type);
   const [reminders, setReminders] = useState(c.remindersEnabled ?? true);
   const [dueDate, setDueDate] = useState(c.nextDueDate ?? "");
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>(c.billingCycle);
   const update = useUpdateCustomer();
   const remove = useDeleteCustomer();
   const suspend = useSetCustomerSuspended();
@@ -1076,6 +1121,7 @@ function CustomerActions({ c }: { c: Customer }) {
         type,
         remindersEnabled: reminders,
         nextDueDate: dueDate || undefined,
+        billingCycle,
       },
       {
         onSuccess: () => {
@@ -1229,6 +1275,30 @@ function CustomerActions({ c }: { c: Customer }) {
                     {t(
                       "Barua pepe itatumwa siku 5 kabla na siku yenyewe ya malipo.",
                       "An email goes out 5 days before this date and again on the day itself.",
+                    )}
+                  </div>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>{t("Anapolipa kila mwezi", "Pays at")}</Label>
+                  <Select
+                    value={billingCycle}
+                    onValueChange={(v) => setBillingCycle(v as BillingCycle)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(BILLING_CYCLE_LABEL) as BillingCycle[]).map((bc) => (
+                        <SelectItem key={bc} value={bc}>
+                          {BILLING_CYCLE_LABEL[bc][lang]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="text-[11px] text-muted-foreground">
+                    {t(
+                      "Huamua tarehe ya mwisho ya malipo kwenye ankara za kila mwezi.",
+                      "Determines the due date on this customer's monthly bill invoices.",
                     )}
                   </div>
                 </div>

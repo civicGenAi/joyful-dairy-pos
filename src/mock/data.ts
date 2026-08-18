@@ -378,6 +378,7 @@ export const CUSTOMERS: Customer[] = customerNames.map((c, i) => {
     outstandingTZS: baseOutstanding,
     lastActivity: `2026-05-${28 - (i % 20)}`,
     status: isOverdue && c.type !== "cash" ? "overdue" : "ok",
+    billingCycle: "month_end" as const,
     monthlyActivity: activities,
     deposits,
   };

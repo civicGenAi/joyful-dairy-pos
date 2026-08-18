@@ -53,6 +53,12 @@ export interface Farmer {
 
 export type CustomerType = "cash" | "credit" | "monthly";
 
+/** When a monthly-credit customer settles: "month_end" (default, a full
+ *  month's grace, due around the end of the following month) or
+ *  "month_start", for the rare customer who pays within the first few days
+ *  of the next month instead. Drives the due date on their bill invoices. */
+export type BillingCycle = "month_end" | "month_start";
+
 export interface Customer {
   id: string;
   name: string;
@@ -66,6 +72,7 @@ export interface Customer {
   suspended?: boolean;
   /** Manual payment due date driving the 5-day + day-of email reminders. */
   nextDueDate?: string;
+  billingCycle: BillingCycle;
   monthlyActivity?: CustomerActivity[];
   deposits?: { id: string; date: string; amountTZS: number; ref: string }[];
 }
