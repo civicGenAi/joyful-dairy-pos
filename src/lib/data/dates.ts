@@ -3,18 +3,13 @@
 // date, so screens can safely use the real "today".
 
 const DAY_MS = 86_400_000;
-// Dairy operates in East Africa Time (UTC+3), the browser's own clock/zone
-// is irrelevant, so "today" is always the EAT calendar date, computed by
-// shifting the epoch forward before truncating to UTC (which then reads as
-// the EAT date). Must match the server's `at time zone 'Africa/Nairobi'`.
-const EAT_OFFSET_MS = 3 * 60 * 60 * 1000;
 
 export function todayISO(): string {
-  return new Date(Date.now() + EAT_OFFSET_MS).toISOString().slice(0, 10);
+  return new Date().toISOString().slice(0, 10);
 }
 
 export function daysAgoISO(days: number): string {
-  return new Date(Date.now() + EAT_OFFSET_MS - days * DAY_MS).toISOString().slice(0, 10);
+  return new Date(Date.now() - days * DAY_MS).toISOString().slice(0, 10);
 }
 
 /** "28 May 2026" style label, localised. */
