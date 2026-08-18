@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VanRouteImport } from './routes/van'
+import { Route as StockCountRouteImport } from './routes/stock-count'
 import { Route as StockRouteImport } from './routes/stock'
 import { Route as StatusRouteImport } from './routes/status'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -46,6 +47,11 @@ import { Route as PayoutFarmerIdRouteImport } from './routes/payout/farmer.$id'
 const VanRoute = VanRouteImport.update({
   id: '/van',
   path: '/van',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StockCountRoute = StockCountRouteImport.update({
+  id: '/stock-count',
+  path: '/stock-count',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StockRoute = StockRouteImport.update({
@@ -234,6 +240,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
   '/stock': typeof StockRoute
+  '/stock-count': typeof StockCountRoute
   '/van': typeof VanRoute
   '/invoice/$id': typeof InvoiceIdRoute
   '/receipt/$id': typeof ReceiptIdRoute
@@ -269,6 +276,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
   '/stock': typeof StockRoute
+  '/stock-count': typeof StockCountRoute
   '/van': typeof VanRoute
   '/invoice/$id': typeof InvoiceIdRoute
   '/receipt/$id': typeof ReceiptIdRoute
@@ -305,6 +313,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
   '/stock': typeof StockRoute
+  '/stock-count': typeof StockCountRoute
   '/van': typeof VanRoute
   '/invoice/$id': typeof InvoiceIdRoute
   '/receipt/$id': typeof ReceiptIdRoute
@@ -342,6 +351,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/status'
     | '/stock'
+    | '/stock-count'
     | '/van'
     | '/invoice/$id'
     | '/receipt/$id'
@@ -377,6 +387,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/status'
     | '/stock'
+    | '/stock-count'
     | '/van'
     | '/invoice/$id'
     | '/receipt/$id'
@@ -412,6 +423,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/status'
     | '/stock'
+    | '/stock-count'
     | '/van'
     | '/invoice/$id'
     | '/receipt/$id'
@@ -448,6 +460,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   StatusRoute: typeof StatusRoute
   StockRoute: typeof StockRoute
+  StockCountRoute: typeof StockCountRoute
   VanRoute: typeof VanRoute
   InvoiceIdRoute: typeof InvoiceIdRoute
   ReceiptIdRoute: typeof ReceiptIdRoute
@@ -466,6 +479,13 @@ declare module '@tanstack/react-router' {
       path: '/van'
       fullPath: '/van'
       preLoaderRoute: typeof VanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stock-count': {
+      id: '/stock-count'
+      path: '/stock-count'
+      fullPath: '/stock-count'
+      preLoaderRoute: typeof StockCountRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/stock': {
@@ -720,6 +740,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   StatusRoute: StatusRoute,
   StockRoute: StockRoute,
+  StockCountRoute: StockCountRoute,
   VanRoute: VanRoute,
   InvoiceIdRoute: InvoiceIdRoute,
   ReceiptIdRoute: ReceiptIdRoute,

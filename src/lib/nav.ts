@@ -74,6 +74,13 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       { to: "/stock", label: "Stock & store", sw: "Ghala", icon: "Boxes", cap: "stock:read" },
       {
+        to: "/stock-count",
+        label: "Morning count",
+        sw: "Hesabu ya asubuhi",
+        icon: "ListChecks",
+        cap: "stock:read",
+      },
+      {
         to: "/reconciliation",
         label: "Day reconciliation",
         sw: "Funga siku",

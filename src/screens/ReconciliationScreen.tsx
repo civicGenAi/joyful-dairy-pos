@@ -4,13 +4,15 @@ import { useApp } from "@/app/context";
 // conservation check is authoritative server-side in the lock_day RPC.
 import { useReconForDate, useDayLock, useDayLocks, useLockDay } from "@/lib/data/hooks/recon";
 import { useCollections } from "@/lib/data/hooks/collections";
+import { useStock } from "@/lib/data/hooks/stock";
+import { useStockCountsForDate } from "@/lib/data/hooks/stockCounts";
 import { todayISO, dateLabel } from "@/lib/data/dates";
 import type { ReconRow } from "@/lib/data/recon";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { num } from "@/lib/format";
-import { Check, X, Lock, Sigma, FileText, History, ClipboardCheck } from "lucide-react";
+import { Check, X, Lock, Sigma, FileText, History, ClipboardCheck, ListChecks } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ExportMenu } from "@/components/ui/ExportMenu";
@@ -27,6 +29,10 @@ export function ReconciliationScreen() {
   const { data: lock } = useDayLock(today);
   const { data: pastLocks = [] } = useDayLocks();
   const { data: collections = [] } = useCollections(today);
+  // Read-only reference from the morning count, purely additive: does not
+  // feed into the conservation check or lock_day, just shown for context.
+  const { data: stockItems = [] } = useStock();
+  const { data: morningCounts = [] } = useStockCountsForDate(today);
   const lockDay = useLockDay();
   // Physical closing counts entered by production/admin; default = ledger value.
   const [physical, setPhysical] = useState<Record<string, number>>({});
@@ -138,6 +144,47 @@ export function ReconciliationScreen() {
           {allBalanced ? t("Sawa", "OK") : t("Hata", "Mismatch")}
         </Pill>
       </div>
+
+      {morningCounts.length > 0 && (
+        <SectionCard
+          title={
+            <div className="flex items-center gap-2">
+              <ListChecks className="h-4 w-4" />
+              {t("Hesabu ya asubuhi (rejea)", "This morning's physical count (reference)")}
+            </div>
+          }
+          className="mb-5"
+        >
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {morningCounts.map((c) => {
+              const item = stockItems.find((i) => i.id === c.stockItemId);
+              const balanced = Math.abs(c.variance) <= 0.5;
+              return (
+                <div
+                  key={c.id}
+                  className="flex items-center justify-between rounded-lg bg-secondary/60 px-3 py-2 text-sm"
+                >
+                  <span className="truncate">{item?.name ?? c.stockItemId}</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="font-num font-semibold">{num(c.countedQty)}</span>
+                    <Pill tone={balanced ? "success" : "warning"}>
+                      {balanced
+                        ? t("Sawa", "OK")
+                        : `${c.variance > 0 ? "+" : ""}${num(c.variance)}`}
+                    </Pill>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-2 text-[11px] text-muted-foreground">
+            {t(
+              "Rejea tu, haiathiri hesabu ya usawazishaji au kufunga siku.",
+              "Reference only, does not feed into the conservation check or day-lock.",
+            )}
+          </div>
+        </SectionCard>
+      )}
 
       {locked && (
         <div className="rounded-2xl border border-[#1D9E75]/30 bg-[#1D9E75]/10 p-4 mb-5 flex items-center gap-3">
