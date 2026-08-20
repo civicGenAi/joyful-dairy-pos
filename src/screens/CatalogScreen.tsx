@@ -32,6 +32,7 @@ const CATEGORY_LABEL: Record<string, { sw: string; en: string }> = {
   cream: { sw: "Krimu", en: "Cream" },
   ghee: { sw: "Samli", en: "Ghee" },
   butter: { sw: "Siagi", en: "Butter" },
+  "fresh-milk": { sw: "Maziwa Fresh", en: "Fresh milk" },
 };
 
 function waLink(message: string): string {

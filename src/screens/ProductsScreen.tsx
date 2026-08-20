@@ -43,13 +43,12 @@ import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
 
-// The real catalogue is Mtindi (cultured), cheese, and yoghurt, that's what
-// this dairy actually makes. "fresh-milk" stays out of this list on
-// purpose: it's not offered when adding a product, but it must never be
-// removed from the database category itself, the system uses a
-// "Fresh milk" product internally to track raw milk moving through
-// collection and production, it's plumbing, not something sold.
-const CATEGORIES: ProductCategory[] = ["cultured", "cheese", "yoghurt"];
+// The real catalogue is Mtindi (cultured), cheese, yoghurt, and fresh milk
+// (sold directly in sized containers, e.g. Fresh milk 3L/5L). Only the one
+// specific "Fresh milk" product (p-fresh) is internal plumbing, tracking
+// raw milk through collection/production, that restriction is on that one
+// product id, not the whole category, other fresh-milk products are real.
+const CATEGORIES: ProductCategory[] = ["cultured", "cheese", "yoghurt", "fresh-milk"];
 
 const TIERS: PriceTier[] = ["own", "bottle", "bulk"];
 
