@@ -45,6 +45,8 @@ import {
   Ban,
   Search,
   Delete,
+  LayoutGrid,
+  ListPlus,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { motion } from "framer-motion";
@@ -95,6 +97,13 @@ export function POSScreen() {
 
   const [cat, setCat] = useState<ProductCategory>("fresh-milk");
   const [tier, setTier] = useState<PriceTier>("own");
+  // "Browse" is the grid of tappable tiles, "List" is a faster pick-product,
+  // type-quantity, add-line flow for ringing up many different products at
+  // once (e.g. summarizing a day's shop sales in one go) instead of tapping
+  // through category tiles one product at a time.
+  const [mode, setMode] = useState<"browse" | "list">("browse");
+  const [listProductId, setListProductId] = useState("");
+  const [listQty, setListQty] = useState<number | "">("");
   // Autosaved draft: a cart in progress survives an accidental refresh,
   // tab close or crash instead of vanishing. Cleared on a completed sale.
   const [cart, setCart] = useLocalStorage<CartLine[]>(`ajd:pos:cart:${user?.id ?? "anon"}`, []);
@@ -163,6 +172,20 @@ export function POSScreen() {
       const ex = c.find((x) => x.productId === pid && x.tier === tier);
       if (ex) return c.map((x) => (x === ex ? { ...x, qty: x.qty + 1 } : x));
       return [...c, { productId: pid, qty: 1, tier }];
+    });
+  };
+  // List mode: adds a specific quantity in one go (merging into an existing
+  // line for the same product+tier) instead of always incrementing by 1.
+  const addQty = (pid: string, qty: number) => {
+    if (qty <= 0) return;
+    if (isOut(pid)) {
+      toast.error(t("Bidhaa imeisha", "Out of stock"));
+      return;
+    }
+    setCart((c) => {
+      const ex = c.find((x) => x.productId === pid && x.tier === tier);
+      if (ex) return c.map((x) => (x === ex ? { ...x, qty: x.qty + qty } : x));
+      return [...c, { productId: pid, qty, tier }];
     });
   };
   // From the quantity keypad: sets the line to an exact amount rather than
@@ -325,97 +348,147 @@ export function POSScreen() {
                 </div>
               </div>
 
-              {/* Step 2: find the product, by category or by typing. */}
-              <div className="px-4 py-2.5 border-b border-border flex flex-wrap items-center gap-2">
-                <div className="relative flex-1 min-w-[160px]">
-                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={productQuery}
-                    onChange={(e) => setProductQuery(e.target.value)}
-                    placeholder={t("Tafuta bidhaa, herufi 2+…", "Search products, 2+ letters…")}
-                    className="h-8 pl-8 text-xs"
-                  />
-                </div>
-                {productQueryNorm.length < 2 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {CATS.map((c) => (
-                      <button
-                        key={c.id}
-                        onClick={() => setCat(c.id)}
-                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${cat === c.id ? "text-white shadow-card" : "bg-secondary text-foreground hover:bg-accent"}`}
-                        style={cat === c.id ? { background: c.color } : undefined}
-                      >
-                        {lang === "sw" ? c.label.sw : c.label.en}
-                      </button>
-                    ))}
-                  </div>
-                )}
+              {/* Browse vs List mode toggle. */}
+              <div className="px-4 py-2 border-b border-border flex items-center gap-1.5">
+                <button
+                  onClick={() => setMode("browse")}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                    mode === "browse"
+                      ? "bg-[#1E7C3F] text-white shadow-card"
+                      : "bg-secondary text-foreground hover:bg-accent"
+                  }`}
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                  {t("Vinjari", "Browse")}
+                </button>
+                <button
+                  onClick={() => setMode("list")}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                    mode === "list"
+                      ? "bg-[#1E7C3F] text-white shadow-card"
+                      : "bg-secondary text-foreground hover:bg-accent"
+                  }`}
+                >
+                  <ListPlus className="h-3.5 w-3.5" />
+                  {t("Orodha, ongeza haraka", "List, add fast")}
+                </button>
               </div>
-              <div className="px-4 pt-2 text-[11px] text-muted-foreground">
-                {t(
-                  "Bonyeza kuongeza 1, shikilia kuweka idadi kamili (mf. lita 20)",
-                  "Tap to add 1, press and hold to enter an exact quantity (e.g. 20L)",
-                )}
-              </div>
-              <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-3">
-                {products.length === 0 && (
-                  <div className="col-span-full py-10 text-center text-sm text-muted-foreground">
-                    {productQueryNorm.length >= 2
-                      ? t("Hakuna bidhaa inayolingana", "No matching product")
-                      : t("Hakuna bidhaa katika kundi hili", "No products in this category")}
-                  </div>
-                )}
-                {products.map((p) => {
-                  const out = isOut(p.id);
-                  const low = isLow(p.id);
-                  const onHand = stockOf(p.id);
-                  const inCart = cartQtyOf(p.id);
-                  const catColor = CATS.find((c) => c.id === p.category)?.color ?? "#1E7C3F";
-                  return (
-                    <motion.button
-                      key={p.id}
-                      whileTap={out ? undefined : { scale: 0.97 }}
-                      disabled={out}
-                      onClick={() => {
-                        if (longPressFired.current) {
-                          longPressFired.current = false;
-                          return;
-                        }
-                        add(p.id);
-                      }}
-                      onPointerDown={() => startPress(p)}
-                      onPointerUp={endPress}
-                      onPointerLeave={endPress}
-                      onContextMenu={(e) => e.preventDefault()}
-                      className={`text-left rounded-xl border bg-background p-3 transition relative ${out ? "border-border opacity-50 cursor-not-allowed" : "border-border hover:border-[#2F9E44] hover:shadow-card"}`}
-                    >
-                      {inCart > 0 && (
-                        <span className="absolute -top-2 -right-2 z-10 grid h-6 min-w-6 place-items-center rounded-full bg-[#1E7C3F] px-1 text-xs font-bold text-white shadow-card">
-                          {num(inCart)}
-                        </span>
-                      )}
-                      <div
-                        className="aspect-[16/9] rounded-lg mb-2 relative overflow-hidden"
-                        style={{
-                          background: `linear-gradient(135deg, ${catColor}30, ${catColor}10)`,
-                        }}
-                      >
-                        <div className="absolute inset-0 grid place-items-center text-3xl">
-                          {p.unit === "L" ? "🥛" : p.unit === "kg" ? "🧀" : "🥤"}
-                        </div>
+
+              {mode === "browse" ? (
+                <>
+                  {/* Step 2: find the product, by category or by typing. */}
+                  <div className="px-4 py-2.5 border-b border-border flex flex-wrap items-center gap-2">
+                    <div className="relative flex-1 min-w-[160px]">
+                      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={productQuery}
+                        onChange={(e) => setProductQuery(e.target.value)}
+                        placeholder={t("Tafuta bidhaa, herufi 2+…", "Search products, 2+ letters…")}
+                        className="h-8 pl-8 text-xs"
+                      />
+                    </div>
+                    {productQueryNorm.length < 2 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {CATS.map((c) => (
+                          <button
+                            key={c.id}
+                            onClick={() => setCat(c.id)}
+                            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${cat === c.id ? "text-white shadow-card" : "bg-secondary text-foreground hover:bg-accent"}`}
+                            style={cat === c.id ? { background: c.color } : undefined}
+                          >
+                            {lang === "sw" ? c.label.sw : c.label.en}
+                          </button>
+                        ))}
                       </div>
-                      <div className="font-medium text-sm">{p.name}</div>
-                      <div className="text-xs text-muted-foreground">{p.swName}</div>
-                      <div className="mt-1.5 flex items-center justify-between">
-                        <span className="font-num font-bold">{num(priceOf(p.id, tier))}</span>
-                        <Pill tone={out ? "danger" : low ? "warning" : "success"}>
-                          {out ? t("Imeisha", "Out") : low ? `${num(onHand)} ${p.unit}` : p.unit}
-                        </Pill>
+                    )}
+                  </div>
+                  <div className="px-4 pt-2 text-[11px] text-muted-foreground">
+                    {t(
+                      "Bonyeza kuongeza 1, shikilia kuweka idadi kamili (mf. lita 20)",
+                      "Tap to add 1, press and hold to enter an exact quantity (e.g. 20L)",
+                    )}
+                  </div>
+                  <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {products.length === 0 && (
+                      <div className="col-span-full py-10 text-center text-sm text-muted-foreground">
+                        {productQueryNorm.length >= 2
+                          ? t("Hakuna bidhaa inayolingana", "No matching product")
+                          : t("Hakuna bidhaa katika kundi hili", "No products in this category")}
                       </div>
-                    </motion.button>
-                  );
-                })}
-              </div>
+                    )}
+                    {products.map((p) => {
+                      const out = isOut(p.id);
+                      const low = isLow(p.id);
+                      const onHand = stockOf(p.id);
+                      const inCart = cartQtyOf(p.id);
+                      const catColor = CATS.find((c) => c.id === p.category)?.color ?? "#1E7C3F";
+                      return (
+                        <motion.button
+                          key={p.id}
+                          whileTap={out ? undefined : { scale: 0.97 }}
+                          disabled={out}
+                          onClick={() => {
+                            if (longPressFired.current) {
+                              longPressFired.current = false;
+                              return;
+                            }
+                            add(p.id);
+                          }}
+                          onPointerDown={() => startPress(p)}
+                          onPointerUp={endPress}
+                          onPointerLeave={endPress}
+                          onContextMenu={(e) => e.preventDefault()}
+                          className={`text-left rounded-xl border bg-background p-3 transition relative ${out ? "border-border opacity-50 cursor-not-allowed" : "border-border hover:border-[#2F9E44] hover:shadow-card"}`}
+                        >
+                          {inCart > 0 && (
+                            <span className="absolute -top-2 -right-2 z-10 grid h-6 min-w-6 place-items-center rounded-full bg-[#1E7C3F] px-1 text-xs font-bold text-white shadow-card">
+                              {num(inCart)}
+                            </span>
+                          )}
+                          <div
+                            className="aspect-[16/9] rounded-lg mb-2 relative overflow-hidden"
+                            style={{
+                              background: `linear-gradient(135deg, ${catColor}30, ${catColor}10)`,
+                            }}
+                          >
+                            <div className="absolute inset-0 grid place-items-center text-3xl">
+                              {p.unit === "L" ? "🥛" : p.unit === "kg" ? "🧀" : "🥤"}
+                            </div>
+                          </div>
+                          <div className="font-medium text-sm">{p.name}</div>
+                          <div className="text-xs text-muted-foreground">{p.swName}</div>
+                          <div className="mt-1.5 flex items-center justify-between">
+                            <span className="font-num font-bold">{num(priceOf(p.id, tier))}</span>
+                            <Pill tone={out ? "danger" : low ? "warning" : "success"}>
+                              {out
+                                ? t("Imeisha", "Out")
+                                : low
+                                  ? `${num(onHand)} ${p.unit}`
+                                  : p.unit}
+                            </Pill>
+                          </div>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <ListEntryPanel
+                  products={allProducts.filter((p) => p.active)}
+                  tier={tier}
+                  priceOf={priceOf}
+                  isOut={isOut}
+                  productId={listProductId}
+                  setProductId={setListProductId}
+                  qty={listQty}
+                  setQty={setListQty}
+                  onAdd={() => {
+                    if (!listProductId || !listQty || Number(listQty) <= 0) return;
+                    addQty(listProductId, Number(listQty));
+                    setListQty("");
+                  }}
+                />
+              )}
             </div>
 
             <div className="rounded-2xl border border-border bg-card shadow-card flex flex-col">
@@ -934,6 +1007,90 @@ export function POSScreen() {
         }}
       />
     </AppShell>
+  );
+}
+
+/** List mode: pick a product, its price at the current tier previews, type
+ *  a quantity, Add joins/merges it into the cart. Faster than tapping
+ *  through category tiles when ringing up several different products. */
+function ListEntryPanel({
+  products,
+  tier,
+  priceOf,
+  isOut,
+  productId,
+  setProductId,
+  qty,
+  setQty,
+  onAdd,
+}: {
+  products: Product[];
+  tier: PriceTier;
+  priceOf: (pid: string, tier: PriceTier) => number;
+  isOut: (pid: string) => boolean;
+  productId: string;
+  setProductId: (id: string) => void;
+  qty: number | "";
+  setQty: (q: number | "") => void;
+  onAdd: () => void;
+}) {
+  const { t } = useApp();
+  const sorted = [...products].sort((a, b) => a.name.localeCompare(b.name));
+  const selected = products.find((p) => p.id === productId);
+  const price = productId ? priceOf(productId, tier) : 0;
+  const out = productId ? isOut(productId) : false;
+
+  return (
+    <div className="p-4 space-y-3">
+      <div className="grid gap-1.5">
+        <Label className="text-xs">{t("Bidhaa", "Product")}</Label>
+        <Select value={productId} onValueChange={setProductId}>
+          <SelectTrigger>
+            <SelectValue placeholder={t("Chagua bidhaa…", "Select a product…")} />
+          </SelectTrigger>
+          <SelectContent>
+            {sorted.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex items-end gap-2">
+        <div className="grid gap-1.5 flex-1">
+          <Label className="text-xs">
+            {t("Idadi", "Qty")}
+            {selected ? ` (${selected.unit})` : ""}
+          </Label>
+          <Input
+            type="number"
+            min={0}
+            value={qty}
+            onChange={(e) => setQty(e.target.value === "" ? "" : Number(e.target.value))}
+            onKeyDown={(e) => e.key === "Enter" && onAdd()}
+            className="font-num"
+          />
+        </div>
+        <Button disabled={!productId || !qty || Number(qty) <= 0 || out} onClick={onAdd}>
+          {t("Ongeza", "Add")}
+        </Button>
+      </div>
+      {productId && (
+        <div className="text-xs text-muted-foreground">
+          {out ? (
+            <span className="text-[#E11B22] font-semibold">
+              {t("Bidhaa imeisha", "Out of stock")}
+            </span>
+          ) : (
+            <>
+              {t("Bei", "Price")}: <span className="font-num font-semibold">{num(price)}</span>/
+              {selected?.unit}
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
