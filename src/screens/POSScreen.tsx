@@ -719,8 +719,12 @@ export function POSScreen() {
                   </tr>
                 ) : (
                   orders.map((r) => {
-                    const line = r.lines?.[0];
-                    const prod = allProducts.find((p) => p.id === line?.productId);
+                    const orderLines = r.lines ?? [];
+                    const names = orderLines
+                      .map(
+                        (l) => allProducts.find((p) => p.id === l.productId)?.name ?? l.productId,
+                      )
+                      .join(", ");
                     return (
                       <tr key={r.id} className="border-b border-border last:border-0">
                         <td className="py-2.5 px-2 font-num text-xs text-muted-foreground">
@@ -729,9 +733,13 @@ export function POSScreen() {
                         <td className="py-2.5 font-medium">
                           {r.customerName ?? t("Mteja wa kupita", "Walk-in")}
                         </td>
-                        <td className="py-2.5">{prod?.name ?? line?.productId}</td>
+                        <td className="py-2.5 max-w-[220px] truncate" title={names}>
+                          {names || "·"}
+                        </td>
                         <td className="py-2.5 text-right font-num">
-                          {line ? `${num(line.qty)} ${line.unit}` : "·"}
+                          {orderLines.length === 1
+                            ? `${num(orderLines[0].qty)} ${orderLines[0].unit}`
+                            : `${orderLines.length} ${t("bidhaa", "items")}`}
                         </td>
                         <td className="py-2.5 text-right font-num font-semibold">
                           {tzs(r.totalTZS)}
@@ -1258,6 +1266,11 @@ function ParkedDropdown({
   );
 }
 
+interface OrderLine {
+  productId: string;
+  qty: number;
+}
+
 function NewOrderDialog({
   customers,
   products,
@@ -1270,27 +1283,78 @@ function NewOrderDialog({
   const { t } = useApp();
   const [open, setOpen] = useState(false);
   const [customerId, setCustomerId] = useState<string>("");
-  const [productId, setProductId] = useState<string>("");
-  const [qty, setQty] = useState(1);
+  const [payment, setPayment] = useState<"stock-issue" | "mpesa">("stock-issue");
+  const [mpesaReceipt, setMpesaReceipt] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [lines, setLines] = useState<OrderLine[]>([]);
+  const [productId, setProductId] = useState("");
+  const [qty, setQty] = useState<number | "">("");
   const complete = useCompleteSale();
 
-  const save = () => {
+  const priceOf = (pid: string) => priceMatrix[pid]?.bulk ?? 0;
+  const total = lines.reduce((a, l) => a + priceOf(l.productId) * l.qty, 0);
+
+  const addLine = () => {
+    if (!productId || !qty || Number(qty) <= 0) return;
+    const q = Number(qty);
+    setLines((ls) => {
+      const i = ls.findIndex((l) => l.productId === productId);
+      if (i >= 0) {
+        const next = [...ls];
+        next[i] = { ...next[i], qty: next[i].qty + q };
+        return next;
+      }
+      return [...ls, { productId, qty: q }];
+    });
+    setQty("");
+  };
+  const removeLine = (i: number) => setLines((ls) => ls.filter((_, idx) => idx !== i));
+
+  const reset = () => {
+    setLines([]);
+    setProductId("");
+    setQty("");
+    setMpesaReceipt(null);
+  };
+
+  const save = async () => {
     const cid = customerId || customers[0]?.id;
-    const pid = productId || products[0]?.id;
-    if (!cid || !pid || qty <= 0) return;
+    if (!cid || lines.length === 0) return;
+    if (payment === "mpesa" && !mpesaReceipt) {
+      toast.error(t("Pakia picha ya risiti ya M-Pesa", "Upload a photo of the M-Pesa receipt"));
+      return;
+    }
+    let receiptUrl: string | undefined;
+    if (payment === "mpesa" && mpesaReceipt) {
+      setUploading(true);
+      try {
+        receiptUrl = await uploadHardCopy(mpesaReceipt, "sale");
+      } catch {
+        toast.error(t("Imeshindikana kupakia risiti", "Could not upload the receipt"));
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    }
     complete.mutate(
       {
         channel: "counter",
-        payment: "stock-issue",
+        payment,
         tier: "bulk",
-        lines: [{ productId: pid, qty, unitPrice: priceMatrix[pid]?.bulk ?? 0 }],
+        lines: lines.map((l) => ({
+          productId: l.productId,
+          qty: l.qty,
+          unitPrice: priceOf(l.productId),
+        })),
         customerId: cid,
         locationId: "loc-main",
+        receiptUrl,
       },
       {
         onSuccess: () => {
           toast.success(t("Order imeundwa", "Order created"));
           setOpen(false);
+          reset();
         },
         onError: () => toast.error(t("Imeshindikana kuunda order", "Could not create order")),
       },
@@ -1298,7 +1362,13 @@ function NewOrderDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) reset();
+      }}
+    >
       <DialogTrigger asChild>
         <Button
           size="sm"
@@ -1308,35 +1378,73 @@ function NewOrderDialog({
           <Plus className="h-3.5 w-3.5 mr-1" /> {t("Order mpya", "New order")}
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ReceiptIcon className="h-4 w-4" />
-            {t("Unda order ya kutoa kwa stock", "Create stock-issue order")}
+            {t("Unda order", "Create order")}
           </DialogTitle>
         </DialogHeader>
         <div className="grid gap-3">
-          <div className="grid gap-1.5">
-            <Label>{t("Mteja", "Customer")}</Label>
-            <Select value={customerId || customers[0]?.id} onValueChange={setCustomerId}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {customers.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
-              <Label>{t("Bidhaa", "Product")}</Label>
-              <Select value={productId || products[0]?.id} onValueChange={setProductId}>
+              <Label>{t("Mteja", "Customer")}</Label>
+              <Select value={customerId || customers[0]?.id} onValueChange={setCustomerId}>
                 <SelectTrigger>
                   <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{t("Malipo", "Payment")}</Label>
+              <Select
+                value={payment}
+                onValueChange={(v) => setPayment(v as "stock-issue" | "mpesa")}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="stock-issue">{t("Utoaji wa stock", "Stock issue")}</SelectItem>
+                  <SelectItem value="mpesa">M-Pesa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {payment === "mpesa" && (
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">
+                {t("Picha ya risiti ya M-Pesa", "Photo of the M-Pesa receipt")}
+              </Label>
+              <Input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => setMpesaReceipt(e.target.files?.[0] ?? null)}
+                className="h-9 text-xs"
+              />
+              {mpesaReceipt && (
+                <div className="text-[11px] text-muted-foreground truncate">
+                  {mpesaReceipt.name}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="rounded-lg border border-border p-3 space-y-2">
+            <Label>{t("Ongeza bidhaa", "Add a product")}</Label>
+            <div className="flex items-end gap-2">
+              <Select value={productId} onValueChange={setProductId}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder={t("Chagua bidhaa…", "Select a product…")} />
                 </SelectTrigger>
                 <SelectContent>
                   {products.map((p) => (
@@ -1346,11 +1454,68 @@ function NewOrderDialog({
                   ))}
                 </SelectContent>
               </Select>
+              <Input
+                type="number"
+                min={0}
+                placeholder={t("Idadi", "Qty")}
+                value={qty}
+                onChange={(e) => setQty(e.target.value === "" ? "" : Number(e.target.value))}
+                className="w-24 font-num"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!productId || !qty || Number(qty) <= 0}
+                onClick={addLine}
+              >
+                {t("Ongeza", "Add")}
+              </Button>
             </div>
-            <div className="grid gap-1.5">
-              <Label>{t("Idadi", "Qty")}</Label>
-              <Input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} />
+          </div>
+
+          {lines.length === 0 ? (
+            <div className="text-center text-sm text-muted-foreground py-6">
+              {t("Bado hakuna bidhaa", "No products added yet")}
             </div>
+          ) : (
+            <div className="max-h-56 overflow-y-auto rounded-lg border border-border">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-card">
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                    <th className="py-2 px-2">{t("Bidhaa", "Product")}</th>
+                    <th className="text-right px-2">{t("Idadi", "Qty")}</th>
+                    <th className="text-right px-2">{t("Jumla", "Amount")}</th>
+                    <th className="w-8"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((l, i) => (
+                    <tr key={l.productId} className="border-b border-border last:border-0">
+                      <td className="py-1.5 px-2">
+                        {products.find((p) => p.id === l.productId)?.name}
+                      </td>
+                      <td className="py-1.5 px-2 text-right font-num">{l.qty}</td>
+                      <td className="py-1.5 px-2 text-right font-num font-semibold">
+                        {num(l.qty * priceOf(l.productId))}
+                      </td>
+                      <td className="py-1.5 px-1 text-right">
+                        <button
+                          onClick={() => removeLine(i)}
+                          className="text-muted-foreground hover:text-[#E11B22]"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between rounded-lg bg-secondary/60 px-3 py-2 text-sm font-semibold">
+            <span>{t("Jumla", "Total")}</span>
+            <span className="font-num">{tzs(total)}</span>
           </div>
         </div>
         <DialogFooter>
@@ -1359,11 +1524,15 @@ function NewOrderDialog({
           </Button>
           <Button
             onClick={save}
-            disabled={complete.isPending}
+            disabled={complete.isPending || uploading || lines.length === 0}
             className="text-white"
             style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
           >
-            {complete.isPending ? t("Inaunda…", "Creating…") : t("Unda", "Create")}
+            {uploading
+              ? t("Inapakia risiti…", "Uploading receipt…")
+              : complete.isPending
+                ? t("Inaunda…", "Creating…")
+                : t("Unda", "Create")}
           </Button>
         </DialogFooter>
       </DialogContent>
