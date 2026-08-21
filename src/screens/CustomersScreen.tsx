@@ -320,14 +320,31 @@ function CustomerDrawer({ c }: { c: Customer }) {
   const canInvoice = can("customers:write") || can("finance:write");
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(MONTHS[0].id);
+  // Arrears: a one-off amount owed from before this customer had any sales
+  // history in the system (e.g. carried over from the paper ledger),
+  // entered only when issuing this invoice, not a change to their tracked
+  // balance anywhere else in the app.
+  const [showArrears, setShowArrears] = useState(false);
+  const [arrearsAmount, setArrearsAmount] = useState<number | "">("");
+  const [arrearsMonth, setArrearsMonth] = useState(MONTHS[1]?.id ?? MONTHS[0].id);
   const issueBill = useIssueBillInvoice();
 
   const issueInvoiceForMonth = () => {
     const [y, m] = month.split("-").map(Number);
     const periodStart = `${month}-01`;
     const periodEnd = new Date(y, m, 0).toISOString().slice(0, 10); // last day of month
+    const arrearsTZS = showArrears && arrearsAmount ? Number(arrearsAmount) : 0;
+    const arrearsNote =
+      arrearsTZS > 0 ? MONTHS.find((mo) => mo.id === arrearsMonth)?.label : undefined;
     issueBill.mutate(
-      { customerId: c.id, periodStart, periodEnd, termsDays: TERMS_DAYS_BY_CYCLE[c.billingCycle] },
+      {
+        customerId: c.id,
+        periodStart,
+        periodEnd,
+        termsDays: TERMS_DAYS_BY_CYCLE[c.billingCycle],
+        arrearsTZS,
+        arrearsNote,
+      },
       {
         onSuccess: (inv) => nav({ to: "/invoice/$id", params: { id: inv.id } }),
         onError: () =>
@@ -542,6 +559,61 @@ function CustomerDrawer({ c }: { c: Customer }) {
                   ))}
                 </div>
               </div>
+
+              {canInvoice && (
+                <div className="mt-4 rounded-xl border border-border p-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowArrears((v) => !v)}
+                    className="flex items-center justify-between w-full text-xs font-semibold"
+                  >
+                    <span>{t("Ongeza deni la nyuma (hiari)", "Add prior arrears (optional)")}</span>
+                    <span className="text-muted-foreground">
+                      {showArrears ? t("Ficha", "Hide") : t("Onyesha", "Show")}
+                    </span>
+                  </button>
+                  {showArrears && (
+                    <div className="mt-2.5 grid grid-cols-2 gap-2">
+                      <div className="grid gap-1">
+                        <Label className="text-[11px]">{t("Kiasi (TZS)", "Amount (TZS)")}</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={arrearsAmount}
+                          onChange={(e) =>
+                            setArrearsAmount(e.target.value === "" ? "" : Number(e.target.value))
+                          }
+                          placeholder="0"
+                          className="h-8 text-xs font-num"
+                        />
+                      </div>
+                      <div className="grid gap-1">
+                        <Label className="text-[11px]">
+                          {t("Deni ni la mwezi gani", "From which month")}
+                        </Label>
+                        <Select value={arrearsMonth} onValueChange={setArrearsMonth}>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {MONTHS.map((m) => (
+                              <SelectItem key={m.id} value={m.id}>
+                                {m.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-2 text-[11px] text-muted-foreground">
+                        {t(
+                          "Itaonekana kama mstari mwishoni mwa ankara hii pekee, haibadilishi deni la mteja kwingineko.",
+                          "Shows as a line at the bottom of this invoice only, doesn't change the customer's balance anywhere else.",
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="mt-4 flex gap-2">
                 <Button

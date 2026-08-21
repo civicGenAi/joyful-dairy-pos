@@ -191,6 +191,15 @@ function InvoiceDocument({
               <span className="text-muted-foreground">{t("Amana", "Deposits")}</span>
               <span className="font-num">-{tzs(invoice.depositsTZS)}</span>
             </div>
+            {invoice.arrearsTZS > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">
+                  {t("Deni la nyuma", "Prior arrears")}
+                  {invoice.arrearsNote ? ` (${invoice.arrearsNote})` : ""}
+                </span>
+                <span className="font-num">{tzs(invoice.arrearsTZS)}</span>
+              </div>
+            )}
           </div>
         </div>
       )}

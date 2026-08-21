@@ -26,6 +26,12 @@ export interface Invoice {
   openingTZS: number;
   takingsTZS: number;
   depositsTZS: number;
+  /** A one-off amount owed from before this system tracked the customer's
+   *  activity, entered manually at issue time, shown as its own line at
+   *  the bottom of the invoice. Does not affect the customer's balance
+   *  anywhere else in the app, only this specific invoice. */
+  arrearsTZS: number;
+  arrearsNote: string | null;
   balanceDueTZS: number;
   termsDays: number;
   dueDate: string;
@@ -44,6 +50,8 @@ interface InvoiceRow {
   opening_tzs: number;
   takings_tzs: number;
   deposits_tzs: number;
+  arrears_tzs: number;
+  arrears_note: string | null;
   balance_due_tzs: number;
   terms_days: number;
   due_date: string;
@@ -63,6 +71,8 @@ function toInvoice(r: InvoiceRow): Invoice {
     openingTZS: Number(r.opening_tzs),
     takingsTZS: Number(r.takings_tzs),
     depositsTZS: Number(r.deposits_tzs),
+    arrearsTZS: Number(r.arrears_tzs ?? 0),
+    arrearsNote: r.arrears_note ?? null,
     balanceDueTZS: Number(r.balance_due_tzs),
     termsDays: r.terms_days,
     dueDate: r.due_date,
@@ -127,12 +137,17 @@ export const invoicesRepo = {
     periodStart: string;
     periodEnd: string;
     termsDays?: number;
+    /** One-off arrears line, this invoice only, see the note on Invoice.arrearsTZS. */
+    arrearsTZS?: number;
+    arrearsNote?: string;
   }): Promise<Invoice> {
     const { data, error } = await supabase.rpc("issue_bill_invoice", {
       p_customer_id: input.customerId,
       p_period_start: input.periodStart,
       p_period_end: input.periodEnd,
       p_terms_days: input.termsDays ?? 30,
+      p_arrears_tzs: input.arrearsTZS ?? 0,
+      p_arrears_note: input.arrearsNote ?? null,
     });
     if (error) throw new Error(error.message);
     return toInvoice(data as InvoiceRow);
