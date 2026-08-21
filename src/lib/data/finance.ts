@@ -97,6 +97,23 @@ function toExpense(r: ExpenseRow): ExpenseWithRefs {
   };
 }
 
+export const expenseCategoriesRepo = {
+  async list(): Promise<string[]> {
+    const rows = unwrap(await supabase.from("expense_categories").select("name").order("name")) as {
+      name: string;
+    }[];
+    return rows.map((r) => r.name);
+  },
+
+  /** Adds a new category so it's offered again next time. Safe to call
+   *  with an already-existing name, just does nothing. */
+  async create(name: string): Promise<void> {
+    unwrap(
+      await supabase.from("expense_categories").upsert({ name }, { onConflict: "name" }).select(),
+    );
+  },
+};
+
 export const expensesRepo = {
   async list(limit = 100): Promise<ExpenseWithRefs[]> {
     const rows = unwrap(
@@ -128,6 +145,9 @@ export const expensesRepo = {
       .select("id")
       .eq("auth_user_id", me.user?.id ?? "")
       .maybeSingle();
+    // Remembers a newly-typed category for next time, a no-op if it
+    // already exists.
+    await expenseCategoriesRepo.create(input.category);
     unwrap(
       await supabase
         .from("expenses")

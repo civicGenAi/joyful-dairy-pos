@@ -2,7 +2,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
 // BACKEND: data now flows through src/lib/data/finance (was @/mock/data).
 import type { ExpenseCategory } from "@/mock/data";
-import { useExpenses, useCreateExpense } from "@/lib/data/hooks/finance";
+import { useExpenses, useCreateExpense, useExpenseCategories } from "@/lib/data/hooks/finance";
 import { uploadHardCopy } from "@/lib/data/uploads";
 import { todayISO } from "@/lib/data/dates";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
@@ -63,23 +63,32 @@ import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
 
-const CATEGORY_META: Record<
-  ExpenseCategory,
-  { icon: typeof Fuel; sw: string; en: string; color: string }
-> = {
-  fuel: { icon: Fuel, sw: "Mafuta", en: "Fuel", color: "#1E7C3F" },
-  packaging: { icon: Box, sw: "Vifungashio", en: "Packaging", color: "#2F9E44" },
-  repairs: { icon: Wrench, sw: "Marekebisho", en: "Repairs", color: "#E5A100" },
-  wages: { icon: Users, sw: "Mishahara", en: "Wages", color: "#6FBF59" },
-  utilities: { icon: Zap, sw: "Huduma", en: "Utilities", color: "#8CC63F" },
-  transport: { icon: Truck, sw: "Usafiri", en: "Transport", color: "#1D9E75" },
-  office: { icon: Briefcase, sw: "Ofisi", en: "Office", color: "#14532D" },
-  other: { icon: HelpCircle, sw: "Nyingine", en: "Other", color: "#6B776E" },
-};
+const CATEGORY_META: Record<string, { icon: typeof Fuel; sw: string; en: string; color: string }> =
+  {
+    fuel: { icon: Fuel, sw: "Mafuta", en: "Fuel", color: "#1E7C3F" },
+    packaging: { icon: Box, sw: "Vifungashio", en: "Packaging", color: "#2F9E44" },
+    repairs: { icon: Wrench, sw: "Marekebisho", en: "Repairs", color: "#E5A100" },
+    wages: { icon: Users, sw: "Mishahara", en: "Wages", color: "#6FBF59" },
+    utilities: { icon: Zap, sw: "Huduma", en: "Utilities", color: "#8CC63F" },
+    transport: { icon: Truck, sw: "Usafiri", en: "Transport", color: "#1D9E75" },
+    office: { icon: Briefcase, sw: "Ofisi", en: "Office", color: "#14532D" },
+    other: { icon: HelpCircle, sw: "Nyingine", en: "Other", color: "#6B776E" },
+  };
+// A custom, staff-typed category has no icon/color polish assigned to it,
+// falls back to a plain receipt icon and its own literal text as the label.
+const DEFAULT_CATEGORY_META = { icon: Receipt, sw: "", en: "", color: "#6B776E" };
+function categoryMeta(cat: string) {
+  return CATEGORY_META[cat] ?? DEFAULT_CATEGORY_META;
+}
+function categoryLabel(cat: string, lang: "sw" | "en") {
+  const meta = CATEGORY_META[cat];
+  return meta ? (lang === "sw" ? meta.sw : meta.en) : cat;
+}
 
 export function ExpensesScreen() {
   const { t, lang, can } = useApp();
   const { data: expenses = [], isPending } = useExpenses();
+  const { data: categories = [] } = useExpenseCategories();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<ExpenseCategory | "all">("all");
 
@@ -107,11 +116,8 @@ export function ExpensesScreen() {
     return Object.entries(map).map(([category, value]) => ({
       category,
       value,
-      label:
-        lang === "sw"
-          ? CATEGORY_META[category as ExpenseCategory].sw
-          : CATEGORY_META[category as ExpenseCategory].en,
-      color: CATEGORY_META[category as ExpenseCategory].color,
+      label: categoryLabel(category, lang),
+      color: categoryMeta(category).color,
     }));
   }, [expenses, lang]);
 
@@ -182,9 +188,9 @@ export function ExpensesScreen() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{t("Kategoria zote", "All categories")}</SelectItem>
-                    {(Object.keys(CATEGORY_META) as ExpenseCategory[]).map((k) => (
+                    {categories.map((k) => (
                       <SelectItem key={k} value={k}>
-                        {lang === "sw" ? CATEGORY_META[k].sw : CATEGORY_META[k].en}
+                        {categoryLabel(k, lang)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -243,7 +249,7 @@ export function ExpensesScreen() {
                 </thead>
                 <tbody>
                   {filtered.map((e) => {
-                    const meta = CATEGORY_META[e.category];
+                    const meta = categoryMeta(e.category);
                     const Icon = meta.icon;
                     return (
                       <tr
@@ -256,7 +262,7 @@ export function ExpensesScreen() {
                         <td className="py-2.5">
                           <Pill tone="info">
                             <Icon className="h-3 w-3" />
-                            {lang === "sw" ? meta.sw : meta.en}
+                            {categoryLabel(e.category, lang)}
                           </Pill>
                         </td>
                         <td className="py-2.5 font-medium">{e.vendor}</td>
@@ -368,11 +374,15 @@ export function ExpensesScreen() {
   );
 }
 
+const NEW_CATEGORY = "__new__";
+
 function AddExpenseDialog() {
   const { t, lang } = useApp();
+  const { data: categories = [] } = useExpenseCategories();
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(todayISO());
-  const [category, setCategory] = useState<ExpenseCategory>("fuel");
+  const [category, setCategory] = useState<string>("fuel");
+  const [newCategory, setNewCategory] = useState("");
   const [vendor, setVendor] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState(0);
@@ -382,9 +392,11 @@ function AddExpenseDialog() {
   const [saving, setSaving] = useState(false);
 
   const create = useCreateExpense();
+  const isNewCategory = category === NEW_CATEGORY;
+  const finalCategory = isNewCategory ? newCategory.trim().toLowerCase() : category;
 
   const save = async () => {
-    if (!vendor.trim() || !amount) return;
+    if (!vendor.trim() || !amount || !finalCategory) return;
     setSaving(true);
     try {
       let attachmentUrl: string | undefined;
@@ -393,7 +405,7 @@ function AddExpenseDialog() {
       create.mutate(
         {
           date,
-          category,
+          category: finalCategory,
           vendor,
           description,
           amountTZS: amount,
@@ -410,6 +422,7 @@ function AddExpenseDialog() {
             setAmount(0);
             setInvoiceRef("");
             setFile(null);
+            setNewCategory("");
           },
           onError: () => toast.error(t("Imeshindikana kurekodi", "Could not record expense")),
           onSettled: () => setSaving(false),
@@ -445,20 +458,39 @@ function AddExpenseDialog() {
             </div>
             <div className="grid gap-1.5">
               <Label>{t("Kategoria", "Category")}</Label>
-              <Select value={category} onValueChange={(v) => setCategory(v as ExpenseCategory)}>
+              <Select value={category} onValueChange={setCategory}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(CATEGORY_META) as ExpenseCategory[]).map((k) => (
+                  {categories.map((k) => (
                     <SelectItem key={k} value={k}>
-                      {lang === "sw" ? CATEGORY_META[k].sw : CATEGORY_META[k].en}
+                      {categoryLabel(k, lang)}
                     </SelectItem>
                   ))}
+                  <SelectItem value={NEW_CATEGORY}>
+                    + {t("Kategoria mpya", "New category")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
+          {isNewCategory && (
+            <div className="grid gap-1.5">
+              <Label>{t("Jina la kategoria mpya", "New category name")}</Label>
+              <Input
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                placeholder={t("mf. Bima ya gari", "e.g. Vehicle insurance")}
+              />
+              <div className="text-[11px] text-muted-foreground">
+                {t(
+                  "Itakumbukwa na kupatikana wakati mwingine.",
+                  "It'll be remembered and available next time.",
+                )}
+              </div>
+            </div>
+          )}
           <div className="grid gap-1.5">
             <Label>{t("Muuzaji", "Vendor")}</Label>
             <Input
@@ -532,7 +564,7 @@ function AddExpenseDialog() {
           </Button>
           <Button
             onClick={save}
-            disabled={saving || create.isPending}
+            disabled={saving || create.isPending || (isNewCategory && !newCategory.trim())}
             className="text-white"
             style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
           >

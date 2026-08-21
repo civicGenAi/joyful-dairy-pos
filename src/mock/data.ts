@@ -1209,16 +1209,10 @@ export const AUDIT_LOG: AuditEntry[] = [
   },
 ];
 
-// Expense tracking, simple typed ledger for finance.
-export type ExpenseCategory =
-  | "fuel"
-  | "packaging"
-  | "repairs"
-  | "wages"
-  | "utilities"
-  | "transport"
-  | "office"
-  | "other";
+// Expense tracking, simple typed ledger for finance. Categories are no
+// longer a fixed enum, staff can add their own (expense_categories table),
+// this stays a string so custom categories type-check like the built-ins.
+export type ExpenseCategory = string;
 
 export interface Expense {
   id: string;

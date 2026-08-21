@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { expensesRepo, financeKeys, financeRepo } from "@/lib/data/finance";
+import { expenseCategoriesRepo, expensesRepo, financeKeys, financeRepo } from "@/lib/data/finance";
+
+const expenseCategoryKey = ["expenseCategories"] as const;
 
 // BACKEND: react-query wrappers for finance + expenses.
 
@@ -29,8 +31,15 @@ export function useCreateExpense() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: expensesRepo.create,
-    onSuccess: () => qc.invalidateQueries({ queryKey: financeKeys.all }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: financeKeys.all });
+      qc.invalidateQueries({ queryKey: expenseCategoryKey });
+    },
   });
+}
+
+export function useExpenseCategories() {
+  return useQuery({ queryKey: expenseCategoryKey, queryFn: expenseCategoriesRepo.list });
 }
 
 export function useDeleteExpense() {
