@@ -46,6 +46,7 @@ import { Route as StatementCustomerIdRouteImport } from './routes/statement/cust
 import { Route as ReportDayCloseDateRouteImport } from './routes/report/day-close.$date'
 import { Route as ReceiptDepositIdRouteImport } from './routes/receipt/deposit.$id'
 import { Route as PayoutFarmerIdRouteImport } from './routes/payout/farmer.$id'
+import { Route as PaymentsFarmerIdRouteImport } from './routes/payments/farmer.$id'
 
 const VanRoute = VanRouteImport.update({
   id: '/van',
@@ -232,6 +233,11 @@ const PayoutFarmerIdRoute = PayoutFarmerIdRouteImport.update({
   path: '/payout/farmer/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PaymentsFarmerIdRoute = PaymentsFarmerIdRouteImport.update({
+  id: '/payments/farmer/$id',
+  path: '/payments/farmer/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -266,6 +272,7 @@ export interface FileRoutesByFullPath {
   '/invoice/$id': typeof InvoiceIdRoute
   '/receipt/$id': typeof ReceiptIdRoute
   '/verify/$id': typeof VerifyIdRoute
+  '/payments/farmer/$id': typeof PaymentsFarmerIdRoute
   '/payout/farmer/$id': typeof PayoutFarmerIdRoute
   '/receipt/deposit/$id': typeof ReceiptDepositIdRoute
   '/report/day-close/$date': typeof ReportDayCloseDateRoute
@@ -305,6 +312,7 @@ export interface FileRoutesByTo {
   '/invoice/$id': typeof InvoiceIdRoute
   '/receipt/$id': typeof ReceiptIdRoute
   '/verify/$id': typeof VerifyIdRoute
+  '/payments/farmer/$id': typeof PaymentsFarmerIdRoute
   '/payout/farmer/$id': typeof PayoutFarmerIdRoute
   '/receipt/deposit/$id': typeof ReceiptDepositIdRoute
   '/report/day-close/$date': typeof ReportDayCloseDateRoute
@@ -345,6 +353,7 @@ export interface FileRoutesById {
   '/invoice/$id': typeof InvoiceIdRoute
   '/receipt/$id': typeof ReceiptIdRoute
   '/verify/$id': typeof VerifyIdRoute
+  '/payments/farmer/$id': typeof PaymentsFarmerIdRoute
   '/payout/farmer/$id': typeof PayoutFarmerIdRoute
   '/receipt/deposit/$id': typeof ReceiptDepositIdRoute
   '/report/day-close/$date': typeof ReportDayCloseDateRoute
@@ -386,6 +395,7 @@ export interface FileRouteTypes {
     | '/invoice/$id'
     | '/receipt/$id'
     | '/verify/$id'
+    | '/payments/farmer/$id'
     | '/payout/farmer/$id'
     | '/receipt/deposit/$id'
     | '/report/day-close/$date'
@@ -425,6 +435,7 @@ export interface FileRouteTypes {
     | '/invoice/$id'
     | '/receipt/$id'
     | '/verify/$id'
+    | '/payments/farmer/$id'
     | '/payout/farmer/$id'
     | '/receipt/deposit/$id'
     | '/report/day-close/$date'
@@ -464,6 +475,7 @@ export interface FileRouteTypes {
     | '/invoice/$id'
     | '/receipt/$id'
     | '/verify/$id'
+    | '/payments/farmer/$id'
     | '/payout/farmer/$id'
     | '/receipt/deposit/$id'
     | '/report/day-close/$date'
@@ -504,6 +516,7 @@ export interface RootRouteChildren {
   InvoiceIdRoute: typeof InvoiceIdRoute
   ReceiptIdRoute: typeof ReceiptIdRoute
   VerifyIdRoute: typeof VerifyIdRoute
+  PaymentsFarmerIdRoute: typeof PaymentsFarmerIdRoute
   PayoutFarmerIdRoute: typeof PayoutFarmerIdRoute
   ReceiptDepositIdRoute: typeof ReceiptDepositIdRoute
   ReportDayCloseDateRoute: typeof ReportDayCloseDateRoute
@@ -772,6 +785,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PayoutFarmerIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/payments/farmer/$id': {
+      id: '/payments/farmer/$id'
+      path: '/payments/farmer/$id'
+      fullPath: '/payments/farmer/$id'
+      preLoaderRoute: typeof PaymentsFarmerIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -808,6 +828,7 @@ const rootRouteChildren: RootRouteChildren = {
   InvoiceIdRoute: InvoiceIdRoute,
   ReceiptIdRoute: ReceiptIdRoute,
   VerifyIdRoute: VerifyIdRoute,
+  PaymentsFarmerIdRoute: PaymentsFarmerIdRoute,
   PayoutFarmerIdRoute: PayoutFarmerIdRoute,
   ReceiptDepositIdRoute: ReceiptDepositIdRoute,
   ReportDayCloseDateRoute: ReportDayCloseDateRoute,

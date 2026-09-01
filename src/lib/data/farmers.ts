@@ -255,14 +255,14 @@ export const farmersRepo = {
     return lastActive === -1 ? [] : rows.slice(0, lastActive + 1);
   },
 
-  async payouts(farmerId: string): Promise<PayoutEntry[]> {
+  async payouts(farmerId: string, limit = 12): Promise<PayoutEntry[]> {
     const rows = unwrap(
       await supabase
         .from("payouts")
         .select("id, date, amount_tzs, method, ref")
         .eq("farmer_id", farmerId)
         .order("date", { ascending: false })
-        .limit(12),
+        .limit(limit),
     ) as { id: string; date: string; amount_tzs: number; method: string; ref: string | null }[];
     return rows.map((r) => ({
       id: r.id,

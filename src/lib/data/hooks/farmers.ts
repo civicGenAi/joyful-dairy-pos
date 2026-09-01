@@ -28,10 +28,10 @@ export function useFarmerMonthlySummary(farmerId: string | null, months = 12) {
   });
 }
 
-export function useFarmerPayouts(id: string | null) {
+export function useFarmerPayouts(id: string | null, limit = 12) {
   return useQuery({
-    queryKey: farmerKeys.payouts(id ?? ""),
-    queryFn: () => farmersRepo.payouts(id!),
+    queryKey: [...farmerKeys.payouts(id ?? ""), limit],
+    queryFn: () => farmersRepo.payouts(id!, limit),
     enabled: !!id,
   });
 }

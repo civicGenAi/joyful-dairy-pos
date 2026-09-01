@@ -63,7 +63,6 @@ import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Ske
 import { RowActions } from "@/components/ui/RowActions";
 import { PaginationBar } from "@/components/ui/PaginationBar";
 import { usePagination } from "@/hooks/use-pagination";
-import { ImportCollectionsDialog } from "@/screens/ImportCollectionsDialog";
 import type { Farmer } from "@/mock/types";
 
 const VILLAGES = ["Olasiti", "Sakina", "Kisongo", "Ngaramtoni", "Tengeru", "Usa River"];
@@ -197,7 +196,6 @@ export function FarmersScreen() {
               })}
             />
             {canWrite && <AddFarmerDialog />}
-            {can("collection:write") && <ImportCollectionsDialog farmers={farmers} />}
             {can("collection:write") && <RecordCollectionDialog farmers={farmers} />}
           </div>
         }
@@ -244,8 +242,18 @@ export function FarmersScreen() {
                     <td className="py-2.5 px-3 text-right font-num font-semibold">
                       {tzs(f.currentBalanceTZS)}
                     </td>
-                    <td className="py-2.5 px-3 text-xs text-muted-foreground">
-                      {f.lastPaymentDate || "–"}
+                    <td className="py-2.5 px-3 text-xs">
+                      {f.lastPaymentDate ? (
+                        <Link
+                          to="/payments/farmer/$id"
+                          params={{ id: f.id }}
+                          className="text-[#1E7C3F] hover:underline font-num"
+                        >
+                          {f.lastPaymentDate}
+                        </Link>
+                      ) : (
+                        <span className="text-muted-foreground">–</span>
+                      )}
                     </td>
                     <td className="py-2.5 px-3">
                       <Pill
@@ -1290,6 +1298,16 @@ function RequestAdjustmentDialog({ farmer }: { farmer: Farmer }) {
               onChange={(e) => setDelta(Number(e.target.value))}
             />
           </div>
+          {delta !== 0 && (
+            <div className="rounded-xl bg-[#1E7C3F]/10 p-3 flex justify-between text-sm">
+              <span className="text-[#1E7C3F]">
+                {t("Salio jipya likikubaliwa", "New balance if approved")}
+              </span>
+              <span className="font-num font-bold text-[#1E7C3F]">
+                {tzs(farmer.currentBalanceTZS + delta)}
+              </span>
+            </div>
+          )}
           <div className="grid gap-1.5">
             <Label>{t("Sababu (lazima)", "Reason (required)")}</Label>
             <Input
