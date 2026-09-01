@@ -735,8 +735,14 @@ export function FarmerPayoutSlipScreen() {
   }
 
   const litres = f.litresThisCycle;
-  // Farmers are paid in full, no cooperative deduction of any kind.
-  const payable = litres * f.ratePerL;
+  // The authoritative figure is the farmer's actual accumulated balance,
+  // not litres-this-cycle × today's rate: if the rate ever changed mid-
+  // cycle that recalculation would drift from what was really earned.
+  // current_balance_tzs is also the exact number record_payout() itself
+  // validates a payment against, so it can never disagree with what's
+  // actually payable. Farmers are paid in full, no deduction of any kind.
+  const payable = f.currentBalanceTZS;
+  const rateMayHaveChanged = Math.round(litres * f.ratePerL) !== Math.round(payable);
 
   return (
     <PrintShell backTo="/farmers" title={t("Karatasi ya malipo", "Payout slip")} subtitle={cycle}>
@@ -787,14 +793,22 @@ export function FarmerPayoutSlipScreen() {
           "No deductions, the farmer is paid the full amount.",
         )}
       </div>
+      {rateMayHaveChanged && (
+        <div className="text-[11px] text-[#8a5a00] mt-1 text-center">
+          {t(
+            "Kumbuka: bei ilibadilika wakati wa mzunguko huu, kiasi hapo juu ni salio halisi la mfugaji.",
+            "Note: the rate changed at some point during this cycle, the amount above is the farmer's real accumulated balance.",
+          )}
+        </div>
+      )}
 
       <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
         <div className="rounded-xl border border-border p-3">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {t("Njia ya malipo iliyopendekezwa", "Suggested pay method")}
+            {t("Malipo ya mwisho", "Last payment")}
           </div>
-          <div className="font-semibold">M-Pesa</div>
-          <div className="text-xs text-muted-foreground">{f.phone}</div>
+          <div className="font-semibold font-num">{tzs(f.lastPaymentTZS)}</div>
+          <div className="text-xs text-muted-foreground">{f.lastPaymentDate || "–"}</div>
         </div>
         <div className="rounded-xl border border-border p-3">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
