@@ -735,71 +735,63 @@ export function FarmerPayoutSlipScreen() {
   }
 
   const litres = f.litresThisCycle;
-  const gross = litres * f.ratePerL;
-  // 2% Sacco contribution, the cooperative's standing deduction.
-  const deductions = Math.round(gross * 0.02);
-  const net = gross - deductions;
+  // Farmers are paid in full, no cooperative deduction of any kind.
+  const payable = litres * f.ratePerL;
 
   return (
-    <PrintShell
-      backTo="/farmers"
-      title={t("Karatasi ya malipo", "Payout slip")}
-      subtitle={`${f.name} · ${f.village} · ${cycle}`}
-    >
-      <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
-        <div className="rounded-xl bg-secondary/60 p-3">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {t("Mfugaji", "Farmer")}
+    <PrintShell backTo="/farmers" title={t("Karatasi ya malipo", "Payout slip")} subtitle={cycle}>
+      <div className="flex items-center justify-between rounded-xl border border-border bg-secondary/40 px-4 py-3 mb-6">
+        <div>
+          <div className="font-display text-lg font-bold">{f.name}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            {f.village} · {f.phone}
           </div>
-          <div className="font-semibold">{f.name}</div>
-          <div className="text-xs text-muted-foreground">{f.phone}</div>
         </div>
-        <div className="rounded-xl bg-secondary/60 p-3 text-right">
+        <div className="text-right">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
             {t("Mzunguko", "Cycle")}
           </div>
-          <div className="font-semibold">{cycle}</div>
-          <div className="text-xs text-muted-foreground">{f.village}</div>
+          <div className="font-semibold text-sm">{cycle}</div>
         </div>
       </div>
 
-      <table className="w-full text-sm font-num">
+      <table className="w-full text-sm font-num rounded-xl overflow-hidden border border-border">
         <tbody>
-          <tr className="border-b border-border">
-            <td className="py-2.5 text-muted-foreground">
+          <tr style={{ background: "#E4EFE4" }}>
+            <td className="py-2.5 px-3 font-sans text-[11px] uppercase tracking-wider text-muted-foreground">
               {t("Litre zilizokusanywa", "Litres collected")}
             </td>
-            <td className="py-2.5 text-right">{num(litres)} L</td>
+            <td className="py-2.5 px-3 text-right font-semibold">{num(litres)} L</td>
           </tr>
-          <tr className="border-b border-border">
-            <td className="py-2.5 text-muted-foreground">{t("Bei", "Rate")}</td>
-            <td className="py-2.5 text-right">{num(f.ratePerL)} / L</td>
-          </tr>
-          <tr className="border-b border-border">
-            <td className="py-2.5 font-sans text-muted-foreground">{t("Jumla ghafi", "Gross")}</td>
-            <td className="py-2.5 text-right font-semibold">{tzs(gross)}</td>
-          </tr>
-          <tr className="border-b border-border text-[#E11B22]">
-            <td className="py-2.5 font-sans">
-              {t("Mchango wa Sacco (2%)", "Sacco contribution (2%)")}
+          <tr className="border-t border-border">
+            <td className="py-2.5 px-3 font-sans text-[11px] uppercase tracking-wider text-muted-foreground">
+              {t("Bei kwa lita", "Rate per litre")}
             </td>
-            <td className="py-2.5 text-right">-{tzs(deductions)}</td>
+            <td className="py-2.5 px-3 text-right font-semibold">{tzs(f.ratePerL)}/L</td>
           </tr>
         </tbody>
-        <tfoot>
-          <tr className="border-t-2 border-border">
-            <td className="py-3 font-sans font-bold text-base">
-              {t("Malipo halisi", "Net payable")}
-            </td>
-            <td className="py-3 text-right font-bold text-base text-[#1E7C3F]">{tzs(net)}</td>
-          </tr>
-        </tfoot>
       </table>
+
+      <div
+        className="flex items-center justify-between rounded-xl px-4 py-3 mt-3 border-t-2"
+        style={{ borderColor: "#1E6B3A", background: "#F4F6F2" }}
+      >
+        <div className="font-sans font-bold text-base">
+          {t("Kiasi cha kulipwa", "Amount payable")}
+        </div>
+        <div className="font-num text-2xl font-extrabold text-[#1E7C3F]">{tzs(payable)}</div>
+      </div>
+      <div className="text-[11px] text-muted-foreground mt-1.5 text-center">
+        {t(
+          "Hakuna makato, mfugaji analipwa kiasi kamili.",
+          "No deductions, the farmer is paid the full amount.",
+        )}
+      </div>
 
       <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
         <div className="rounded-xl border border-border p-3">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {t("Njia ya malipo", "Pay method")}
+            {t("Njia ya malipo iliyopendekezwa", "Suggested pay method")}
           </div>
           <div className="font-semibold">M-Pesa</div>
           <div className="text-xs text-muted-foreground">{f.phone}</div>
@@ -812,19 +804,20 @@ export function FarmerPayoutSlipScreen() {
         </div>
       </div>
 
-      <div className="mt-10 grid grid-cols-2 gap-6 text-sm">
+      <div className="mt-10 grid grid-cols-2 gap-8 text-xs text-muted-foreground">
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-8">
-            {t("Saini, mfugaji", "Farmer signature")}
+          <div className="border-t border-border pt-1.5">
+            {t("Sahihi ya mfugaji", "Farmer's signature")}
           </div>
-          <div className="border-t border-border pt-1 text-xs text-muted-foreground">{f.name}</div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-8">
-            {t("Saini, Finance", "Finance signature")}
+          <div className="border-t border-border pt-1.5">
+            {t("Sahihi ya fedha", "Finance signature")}
           </div>
-          <div className="border-t border-border pt-1 text-xs text-muted-foreground">Finance</div>
         </div>
+      </div>
+      <div className="mt-6 text-center text-[10px] text-muted-foreground">
+        {t("Imetengenezwa tarehe", "Generated on")} {dateLabel(todayISO())}
       </div>
     </PrintShell>
   );
