@@ -64,6 +64,7 @@ import { usePagination } from "@/hooks/use-pagination";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useIssueBillInvoice } from "@/lib/data/hooks/invoices";
 import { ReceiptText } from "lucide-react";
+import { uploadHardCopy } from "@/lib/data/uploads";
 
 // Last 12 months from today, newest first, generated live so the current
 // month is always selectable instead of a fixed list going stale.
@@ -964,17 +965,40 @@ function RecordDepositDialog({ customerId }: { customerId: string }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(150000);
   const [method, setMethod] = useState<"cash" | "mpesa" | "bank">("cash");
-  const [ref, setRef] = useState(`RCT-${1000 + Math.floor(Math.random() * 9000)}`);
+  // Mpesa/bank: the scanned receipt is the single source of truth, same
+  // rule already used for POS/Route mobile-money sales, no typed reference.
+  // Reference itself is never typed at all, the server auto-generates a
+  // traceable AJD-DEP-YYMMDD-seq number for every deposit.
+  const [receipt, setReceipt] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const record = useRecordCustomerDeposit();
+  const needsReceipt = method !== "cash";
 
-  const save = () => {
+  const save = async () => {
     if (amount <= 0) return;
+    if (needsReceipt && !receipt) {
+      toast.error(t("Pakia picha ya risiti", "Upload a photo of the receipt"));
+      return;
+    }
+    let attachmentUrl: string | undefined;
+    if (receipt) {
+      setUploading(true);
+      try {
+        attachmentUrl = await uploadHardCopy(receipt, "deposit");
+      } catch {
+        toast.error(t("Imeshindikana kupakia risiti", "Could not upload the receipt"));
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    }
     record.mutate(
-      { customerId, amountTZS: amount, method, ref },
+      { customerId, amountTZS: amount, method, attachmentUrl },
       {
         onSuccess: () => {
           toast.success(t("Amana imerekodiwa", "Deposit recorded"));
           setOpen(false);
+          setReceipt(null);
         },
         onError: (e) =>
           toast.error(
@@ -1005,7 +1029,13 @@ function RecordDepositDialog({ customerId }: { customerId: string }) {
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Njia", "Method")}</Label>
-            <Select value={method} onValueChange={(v) => setMethod(v as typeof method)}>
+            <Select
+              value={method}
+              onValueChange={(v) => {
+                setMethod(v as typeof method);
+                setReceipt(null);
+              }}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -1025,17 +1055,38 @@ function RecordDepositDialog({ customerId }: { customerId: string }) {
               onChange={(e) => setAmount(Number(e.target.value))}
             />
           </div>
-          <div className="grid gap-1.5">
-            <Label>{t("Rejea", "Reference")}</Label>
-            <Input value={ref} onChange={(e) => setRef(e.target.value)} />
-          </div>
+          {needsReceipt && (
+            <div className="grid gap-1.5">
+              <Label>
+                {method === "mpesa"
+                  ? t("Picha ya risiti ya M-Pesa", "Photo of the M-Pesa receipt")
+                  : t("Picha ya risiti ya benki", "Photo of the bank slip")}
+              </Label>
+              <Input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => setReceipt(e.target.files?.[0] ?? null)}
+              />
+              {receipt && (
+                <div className="text-[11px] text-muted-foreground truncate">{receipt.name}</div>
+              )}
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
-          <Button onClick={save} disabled={record.isPending}>
-            {record.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
+          <Button
+            onClick={save}
+            disabled={record.isPending || uploading || (needsReceipt && !receipt)}
+          >
+            {uploading
+              ? t("Inapakia risiti…", "Uploading receipt…")
+              : record.isPending
+                ? t("Inahifadhi…", "Saving…")
+                : t("Hifadhi", "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>

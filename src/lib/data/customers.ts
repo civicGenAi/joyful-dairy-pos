@@ -217,14 +217,14 @@ export const customersRepo = {
     customerId: string;
     amountTZS: number;
     method: "cash" | "mpesa" | "bank";
-    ref?: string;
+    attachmentUrl?: string;
   }): Promise<void> {
     const { error } = await supabase.rpc("record_deposit", {
       p_source: "customer",
       p_method: input.method,
       p_amount: input.amountTZS,
       p_customer_id: input.customerId,
-      p_ref: input.ref ?? null,
+      p_attachment_url: input.attachmentUrl ?? null,
     });
     if (error) throw new Error(error.message);
   },
