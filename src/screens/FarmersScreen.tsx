@@ -52,6 +52,9 @@ import {
   FileText,
   Users,
   UserPlus,
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -521,6 +524,7 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
               <Label>{t("Asubuhi (L)", "Morning (L)")}</Label>
               <Input
                 type="number"
+                step="any"
                 min={0}
                 value={morningLitres}
                 onChange={(e) => setMorningLitres(Math.max(0, Number(e.target.value)))}
@@ -530,6 +534,7 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
               <Label>{t("Jioni (L)", "Evening (L)")}</Label>
               <Input
                 type="number"
+                step="any"
                 min={0}
                 value={eveningLitres}
                 onChange={(e) => setEveningLitres(Math.max(0, Number(e.target.value)))}
@@ -574,22 +579,35 @@ function FarmerDetailDrawer({
   const { t, lang, can } = useApp();
   const canPay = can("payout:write");
   const canAdjust = can("farmers:write") || can("payout:write");
-  const monthStart = `${todayISO().slice(0, 8)}01`;
+  const canEditCollection = can("collection:write");
+  const currentMonth = todayISO().slice(0, 7);
+  // The calendar used to always show the real current month regardless of
+  // which month a farmer's activity actually happened in, so a new month
+  // starting made every past day read as 0 with no way to reach it.
+  const [viewMonth, setViewMonth] = useState(currentMonth);
+  const [viewYear, viewMon] = viewMonth.split("-").map(Number);
+  const daysInMonth = new Date(viewYear, viewMon, 0).getDate();
+  const monthStart = `${viewMonth}-01`;
+  const monthEnd = `${viewMonth}-${String(daysInMonth).padStart(2, "0")}`;
   const { data: monthCollections = [] } = useQuery({
-    queryKey: collectionKeys.byFarmer(f.id, monthStart),
-    queryFn: () => collectionsRepo.listByFarmer(f.id, monthStart),
+    queryKey: [...collectionKeys.byFarmer(f.id, monthStart), monthEnd],
+    queryFn: () => collectionsRepo.listByFarmer(f.id, monthStart, monthEnd),
   });
   const { data: payouts = [] } = useFarmerPayouts(f.id);
   const { data: monthly = [] } = useFarmerMonthlySummary(f.id, 6);
+  const recordDay = useRecordCollectionDay();
 
   // Morning and evening tracked separately so a specific day can show both,
   // not just one combined number, the calendar cell still shows the total.
+  // Also keeps whichever location the day was actually recorded at, needed
+  // to resubmit a correction through the same RPC.
   const bySessionByDay = useMemo(() => {
-    const map: Record<number, { morning: number; evening: number }> = {};
+    const map: Record<number, { morning: number; evening: number; locationId?: string }> = {};
     for (const c of monthCollections) {
       const d = Number(c.date.slice(8, 10));
       const row = (map[d] ??= { morning: 0, evening: 0 });
       row[c.session] += c.litres;
+      row.locationId = c.locationId;
     }
     return map;
   }, [monthCollections]);
@@ -601,12 +619,32 @@ function FarmerDetailDrawer({
     return map;
   }, [bySessionByDay]);
   const todayDay = new Date().getDate();
-  const [selectedDay, setSelectedDay] = useState(todayDay);
+  const [selectedDay, setSelectedDay] = useState(viewMonth === currentMonth ? todayDay : 1);
   const selected = bySessionByDay[selectedDay] ?? { morning: 0, evening: 0 };
-  const monthLabel = new Date().toLocaleDateString(lang === "sw" ? "sw-TZ" : "en-GB", {
-    month: "long",
-    year: "numeric",
-  });
+  const selectedDate = `${viewMonth}-${String(selectedDay).padStart(2, "0")}`;
+
+  // Edit state for the selected day, re-seeded whenever the selection moves.
+  const [editKey, setEditKey] = useState("");
+  const [editMorning, setEditMorning] = useState(0);
+  const [editEvening, setEditEvening] = useState(0);
+  const dayKey = `${f.id}:${selectedDate}`;
+  if (editKey !== dayKey) {
+    setEditKey(dayKey);
+    setEditMorning(selected.morning);
+    setEditEvening(selected.evening);
+  }
+  const dayChanged = editMorning !== selected.morning || editEvening !== selected.evening;
+
+  const monthLabel = new Date(`${monthStart}T00:00:00`).toLocaleDateString(
+    lang === "sw" ? "sw-TZ" : "en-GB",
+    { month: "long", year: "numeric" },
+  );
+
+  const shiftMonth = (delta: number) => {
+    const d = new Date(viewYear, viewMon - 1 + delta, 1);
+    setViewMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    setSelectedDay(1);
+  };
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
@@ -655,9 +693,29 @@ function FarmerDetailDrawer({
         </div>
 
         <div className="mt-5">
-          <div className="text-xs font-semibold mb-2 flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5" />{" "}
-            {t(`Ukusanyaji wa mwezi, ${monthLabel}`, `Monthly collection, ${monthLabel}`)}
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-semibold flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5" />
+              {t("Ukusanyaji wa mwezi", "Monthly collection")}
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => shiftMonth(-1)}
+                className="grid h-6 w-6 place-items-center rounded-md hover:bg-accent"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <span className="text-xs font-semibold w-28 text-center">{monthLabel}</span>
+              <button
+                type="button"
+                onClick={() => shiftMonth(1)}
+                disabled={viewMonth >= currentMonth}
+                className="grid h-6 w-6 place-items-center rounded-md hover:bg-accent disabled:opacity-30"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-7 gap-1">
             {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
@@ -668,10 +726,10 @@ function FarmerDetailDrawer({
                 {d}
               </div>
             ))}
-            {Array.from({ length: 31 }).map((_, i) => {
+            {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
               const v = litresByDay[day] ?? 0;
-              const isToday = day === todayDay;
+              const isToday = viewMonth === currentMonth && day === todayDay;
               const isSelected = day === selectedDay;
               return (
                 <button
@@ -688,7 +746,7 @@ function FarmerDetailDrawer({
                   title={`Day ${day}: ${v} L`}
                 >
                   <span className="text-[9px] opacity-70">{day}</span>
-                  <span className="text-right text-[10px]">{v > 0 ? v : ""}</span>
+                  <span className="text-right text-[10px]">{v > 0 ? num(v) : ""}</span>
                 </button>
               );
             })}
@@ -701,31 +759,101 @@ function FarmerDetailDrawer({
           </div>
 
           <div className="mt-3 rounded-xl border border-border bg-secondary/40 p-3">
-            <div className="text-xs font-semibold mb-2">
-              {t(`Siku ya ${selectedDay}`, `Day ${selectedDay}`)}
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold">
+                {t(`Siku ya ${selectedDay}`, `Day ${selectedDay}`)}
+              </div>
+              {dayChanged && <Pill tone="warning">{t("Haijahifadhiwa", "Unsaved")}</Pill>}
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-lg bg-card p-2.5 text-center">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {t("Asubuhi", "Morning")}
+            {canEditCollection ? (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="grid gap-1">
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground text-center">
+                    {t("Asubuhi (L)", "Morning (L)")}
+                  </label>
+                  <Input
+                    type="number"
+                    step="any"
+                    min={0}
+                    value={editMorning}
+                    onChange={(e) => setEditMorning(Math.max(0, Number(e.target.value)))}
+                    className="font-num text-center h-9"
+                  />
                 </div>
-                <div className="font-num font-bold">{L(selected.morning)}</div>
+                <div className="grid gap-1">
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground text-center">
+                    {t("Jioni (L)", "Evening (L)")}
+                  </label>
+                  <Input
+                    type="number"
+                    step="any"
+                    min={0}
+                    value={editEvening}
+                    onChange={(e) => setEditEvening(Math.max(0, Number(e.target.value)))}
+                    className="font-num text-center h-9"
+                  />
+                </div>
               </div>
-              <div className="rounded-lg bg-card p-2.5 text-center">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {t("Jioni", "Evening")}
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg bg-card p-2.5 text-center">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {t("Asubuhi", "Morning")}
+                  </div>
+                  <div className="font-num font-bold">{L(selected.morning)}</div>
                 </div>
-                <div className="font-num font-bold">{L(selected.evening)}</div>
+                <div className="rounded-lg bg-card p-2.5 text-center">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {t("Jioni", "Evening")}
+                  </div>
+                  <div className="font-num font-bold">{L(selected.evening)}</div>
+                </div>
               </div>
-              <div className="rounded-lg bg-card p-2.5 text-center">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {t("Jumla", "Total")}
-                </div>
-                <div className="font-num font-bold text-[#1E7C3F]">
-                  {L(selected.morning + selected.evening)}
-                </div>
-              </div>
+            )}
+            <div className="mt-2 rounded-lg bg-card p-2.5 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">{t("Jumla", "Total")}</span>
+              <span className="font-num font-bold text-[#1E7C3F]">
+                {L(
+                  (canEditCollection ? editMorning : selected.morning) +
+                    (canEditCollection ? editEvening : selected.evening),
+                )}
+              </span>
             </div>
+            {canEditCollection && (
+              <Button
+                size="sm"
+                disabled={!dayChanged || recordDay.isPending}
+                onClick={() =>
+                  recordDay.mutate(
+                    {
+                      farmerId: f.id,
+                      date: selectedDate,
+                      locationId: selected.locationId ?? "loc-main",
+                      morningLitres: editMorning,
+                      eveningLitres: editEvening,
+                    },
+                    {
+                      onSuccess: () => toast.success(t("Siku imesahihishwa", "Day corrected")),
+                      onError: (e) =>
+                        toast.error(
+                          e.message.includes("day-locked")
+                            ? t("Siku hii imefungwa", "This day is locked")
+                            : e.message.includes("empty-collection")
+                              ? t("Weka angalau lita moja", "Enter at least some litres")
+                              : t("Imeshindikana kusahihisha", "Could not save the correction"),
+                        ),
+                    },
+                  )
+                }
+                className="w-full mt-2 text-white"
+                style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+              >
+                <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                {recordDay.isPending
+                  ? t("Inahifadhi…", "Saving…")
+                  : t("Hifadhi marekebisho", "Save correction")}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -902,7 +1030,12 @@ function AddFarmerDialog() {
           </div>
           <div className="grid gap-1.5">
             <Label>{t("Bei (TZS/L)", "Rate (TZS/L)")}</Label>
-            <Input type="number" value={rate} onChange={(e) => setRate(Number(e.target.value))} />
+            <Input
+              type="number"
+              step="any"
+              value={rate}
+              onChange={(e) => setRate(Number(e.target.value))}
+            />
           </div>
         </div>
         <DialogFooter>
@@ -978,7 +1111,12 @@ function EditFarmerDialog({ farmer, onClose }: { farmer: Farmer; onClose: () => 
           </div>
           <div className="grid gap-1.5">
             <Label>{t("Bei (TZS/L)", "Rate (TZS/L)")}</Label>
-            <Input type="number" value={rate} onChange={(e) => setRate(Number(e.target.value))} />
+            <Input
+              type="number"
+              step="any"
+              value={rate}
+              onChange={(e) => setRate(Number(e.target.value))}
+            />
           </div>
         </div>
         <DialogFooter>
@@ -1046,6 +1184,7 @@ function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
             <Label>{t("Kiasi (TZS)", "Amount (TZS)")}</Label>
             <Input
               type="number"
+              step="any"
               value={amount}
               onChange={(e) => setAmount(Number(e.target.value))}
             />
@@ -1144,7 +1283,12 @@ function RequestAdjustmentDialog({ farmer }: { farmer: Farmer }) {
                 "Amount (TZS, positive to add, negative to subtract)",
               )}
             </Label>
-            <Input type="number" value={delta} onChange={(e) => setDelta(Number(e.target.value))} />
+            <Input
+              type="number"
+              step="any"
+              value={delta}
+              onChange={(e) => setDelta(Number(e.target.value))}
+            />
           </div>
           <div className="grid gap-1.5">
             <Label>{t("Sababu (lazima)", "Reason (required)")}</Label>
