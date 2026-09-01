@@ -640,6 +640,7 @@ function TransferDialog({
             <Label>{t("Litre", "Litres")}</Label>
             <Input
               type="number"
+              step="any"
               value={litres}
               onChange={(e) => setLitres(Number(e.target.value))}
             />

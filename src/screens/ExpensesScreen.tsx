@@ -513,6 +513,7 @@ function AddExpenseDialog() {
               <Label>{t("Kiasi (TZS)", "Amount (TZS)")}</Label>
               <Input
                 type="number"
+                step="any"
                 value={amount}
                 onChange={(e) => setAmount(Number(e.target.value))}
               />

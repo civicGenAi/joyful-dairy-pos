@@ -627,6 +627,7 @@ export function RouteScreen() {
                         {line.selected && (
                           <Input
                             type="number"
+                            step="any"
                             min={0}
                             value={line.qty || ""}
                             placeholder="0"
@@ -1147,6 +1148,7 @@ export function RouteScreen() {
                 <Label>{t("Pesa iliyowekwa kwa Finance", "Deposited to finance (TZS)")}</Label>
                 <Input
                   type="number"
+                  step="any"
                   value={deposit}
                   onChange={(e) => setDeposit(Number(e.target.value))}
                   className="font-num"
@@ -1289,6 +1291,7 @@ function ReturnOverrideForm({
       <div className="flex items-center gap-2">
         <Input
           type="number"
+          step="any"
           min={0}
           value={qty}
           onChange={(e) => setQty(Number(e.target.value))}

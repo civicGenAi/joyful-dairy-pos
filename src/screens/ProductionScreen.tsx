@@ -383,6 +383,7 @@ function RecordBatchDialog({ products }: { products: Product[] }) {
               <Label>{t("Maziwa (L)", "Raw milk (L)")}</Label>
               <Input
                 type="number"
+                step="any"
                 value={input}
                 onChange={(e) => setInput(Number(e.target.value))}
               />
@@ -391,6 +392,7 @@ function RecordBatchDialog({ products }: { products: Product[] }) {
               <Label>{t("Toleo", "Output")}</Label>
               <Input
                 type="number"
+                step="any"
                 value={auto ? autoOutput : output}
                 readOnly={auto}
                 disabled={auto}
@@ -410,6 +412,7 @@ function RecordBatchDialog({ products }: { products: Product[] }) {
             <Label>{t("Wastage (L)", "Wastage (L)")}</Label>
             <Input
               type="number"
+              step="any"
               value={auto ? autoWastage : wastage}
               readOnly={auto}
               disabled={auto}
@@ -502,7 +505,12 @@ function RecordSpoilageDialog({ stock }: { stock: StockItem[] }) {
           </div>
           <div className="grid gap-1.5">
             <Label>{t("Idadi", "Qty")}</Label>
-            <Input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} />
+            <Input
+              type="number"
+              step="any"
+              value={qty}
+              onChange={(e) => setQty(Number(e.target.value))}
+            />
           </div>
           <div className="grid gap-1.5">
             <Label>{t("Sababu", "Reason")}</Label>

@@ -578,6 +578,7 @@ function CustomerDrawer({ c }: { c: Customer }) {
                         <Label className="text-[11px]">{t("Kiasi (TZS)", "Amount (TZS)")}</Label>
                         <Input
                           type="number"
+                          step="any"
                           min={0}
                           value={arrearsAmount}
                           onChange={(e) =>
@@ -859,6 +860,7 @@ function RecordIntakeDialog({ customerId }: { customerId: string }) {
               </Select>
               <Input
                 type="number"
+                step="any"
                 min={0}
                 placeholder={t("Idadi", "Qty")}
                 value={pendingQty}
@@ -1018,6 +1020,7 @@ function RecordDepositDialog({ customerId }: { customerId: string }) {
             <Label>{t("Kiasi (TZS)", "Amount (TZS)")}</Label>
             <Input
               type="number"
+              step="any"
               value={amount}
               onChange={(e) => setAmount(Number(e.target.value))}
             />

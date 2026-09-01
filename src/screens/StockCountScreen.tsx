@@ -171,6 +171,7 @@ function CountRow({
               </label>
               <Input
                 type="number"
+                step="any"
                 min={0}
                 disabled={!canWrite}
                 value={containers[p.id] ?? ""}
@@ -197,6 +198,7 @@ function CountRow({
             </label>
             <Input
               type="number"
+              step="any"
               min={0}
               disabled={!canWrite}
               value={qty}

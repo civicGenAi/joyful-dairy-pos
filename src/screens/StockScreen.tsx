@@ -278,6 +278,7 @@ export function StockScreen() {
                             {writable ? (
                               <Input
                                 type="number"
+                                step="any"
                                 defaultValue={s.reorder}
                                 onBlur={(e) => {
                                   const val = Number(e.target.value);
@@ -627,6 +628,7 @@ function StoreItemDialog({ category, item }: { category: "raw" | "consumable"; i
               <Label>{t("Kiwango cha chini (reorder)", "Reorder level")}</Label>
               <Input
                 type="number"
+                step="any"
                 min={0}
                 value={reorder}
                 onChange={(e) => setReorder(Number(e.target.value))}
@@ -749,6 +751,7 @@ function PackSizesDialog({ item }: { item: StockItem }) {
               </Label>
               <Input
                 type="number"
+                step="any"
                 min={0}
                 value={qty}
                 onChange={(e) => setQty(e.target.value === "" ? "" : Number(e.target.value))}
@@ -923,7 +926,12 @@ function ReceiveDialog({ items: allItems }: { items: StockItem[] }) {
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label>{t("Idadi", "Qty")}</Label>
-              <Input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} />
+              <Input
+                type="number"
+                step="any"
+                value={qty}
+                onChange={(e) => setQty(Number(e.target.value))}
+              />
             </div>
             <div className="grid gap-1.5">
               <Label>{t("Batch", "Batch / lot")}</Label>
@@ -941,7 +949,12 @@ function ReceiveDialog({ items: allItems }: { items: StockItem[] }) {
             </div>
             <div className="grid gap-1.5">
               <Label>{t("Gharama (TZS)", "Cost (TZS)")}</Label>
-              <Input type="number" value={cost} onChange={(e) => setCost(Number(e.target.value))} />
+              <Input
+                type="number"
+                step="any"
+                value={cost}
+                onChange={(e) => setCost(Number(e.target.value))}
+              />
             </div>
           </div>
         </div>
@@ -1045,7 +1058,12 @@ function AdjustDialog({ items: allItems }: { items: StockItem[] }) {
                     "Delta (positive to add, negative to remove)",
                   )}
             </Label>
-            <Input type="number" value={delta} onChange={(e) => setDelta(Number(e.target.value))} />
+            <Input
+              type="number"
+              step="any"
+              value={delta}
+              onChange={(e) => setDelta(Number(e.target.value))}
+            />
           </div>
           <div className="grid gap-1.5">
             <Label>{t("Sababu", "Reason")}</Label>
@@ -1123,6 +1141,7 @@ function SendToProductionDialog({ rawItems: allRaw }: { rawItems: StockItem[] })
             <Label>{t("Litre", "Litres")}</Label>
             <Input
               type="number"
+              step="any"
               value={litres}
               onChange={(e) => setLitres(Number(e.target.value))}
             />

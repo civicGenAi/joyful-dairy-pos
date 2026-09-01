@@ -1073,6 +1073,7 @@ function ListEntryPanel({
           </Label>
           <Input
             type="number"
+            step="any"
             min={0}
             value={qty}
             onChange={(e) => setQty(e.target.value === "" ? "" : Number(e.target.value))}
@@ -1456,6 +1457,7 @@ function NewOrderDialog({
               </Select>
               <Input
                 type="number"
+                step="any"
                 min={0}
                 placeholder={t("Idadi", "Qty")}
                 value={qty}

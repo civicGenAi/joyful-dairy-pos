@@ -1389,6 +1389,7 @@ function AlertThresholdsTab() {
             <div className="flex-1 text-sm">{t(x.sw, x.en)}</div>
             <Input
               type="number"
+              step="any"
               value={val(x.key, x.fallback)}
               onChange={(e) => setForm((f) => ({ ...f, [x.key]: Number(e.target.value) }))}
               className="w-28 font-num text-right"

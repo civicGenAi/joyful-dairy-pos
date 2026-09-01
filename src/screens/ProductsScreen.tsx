@@ -536,6 +536,7 @@ function AddProductDialog() {
               <Label>{t("Mavuno % (hiari)", "Default yield % (optional)")}</Label>
               <Input
                 type="number"
+                step="any"
                 min={0}
                 max={100}
                 value={yieldPct}
@@ -794,6 +795,7 @@ function ProductSheet({ product: p, onClose }: { product: Product; onClose: () =
                 <Label>{t("Mavuno % (hiari)", "Default yield % (optional)")}</Label>
                 <Input
                   type="number"
+                  step="any"
                   min={0}
                   max={100}
                   value={yieldPct}
@@ -842,6 +844,7 @@ function ProductSheet({ product: p, onClose }: { product: Product; onClose: () =
                 </div>
                 <Input
                   type="number"
+                  step="any"
                   value={priceOf(tier)}
                   onChange={(e) => setTierEdits((x) => ({ ...x, [tier]: Number(e.target.value) }))}
                   readOnly={!canPrice}
