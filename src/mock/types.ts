@@ -101,6 +101,9 @@ export interface CollectionEntry {
   /** Real source of truth; `point` is a legacy alias for the two seed points. */
   locationId?: string;
   qualityNote?: string;
+  /** The rate that actually applied on this day, captured historically so
+   *  a later rate change never distorts what an old statement line shows. */
+  ratePerL?: number;
 }
 
 export interface StockItem {

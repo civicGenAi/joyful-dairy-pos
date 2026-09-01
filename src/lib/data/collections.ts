@@ -11,6 +11,7 @@ interface CollectionRow {
   session: "morning" | "evening";
   litres: number;
   location_id: string;
+  rate_per_l?: number;
   quality_note: string | null;
   created_at?: string;
   farmers?: { name: string } | null;
@@ -31,6 +32,7 @@ function toEntry(r: CollectionRow): CollectionWithFarmer {
     litres: Number(r.litres),
     point: r.location_id === "loc-field-a" ? "field-a" : "main",
     locationId: r.location_id,
+    ratePerL: r.rate_per_l !== undefined ? Number(r.rate_per_l) : undefined,
     qualityNote: r.quality_note ?? undefined,
     farmerName: r.farmers?.name,
     createdAt: r.created_at,

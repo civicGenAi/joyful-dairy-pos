@@ -435,7 +435,7 @@ export function FarmerStatementPrintScreen() {
               <td className="py-1.5 text-xs">{d.date}</td>
               <td className="py-1.5 capitalize">{d.session}</td>
               <td className="py-1.5 text-right">{num(d.litres)}</td>
-              <td className="py-1.5 text-right">{num(d.litres * f.ratePerL)}</td>
+              <td className="py-1.5 text-right">{num(d.litres * (d.ratePerL ?? f.ratePerL))}</td>
             </tr>
           ))}
         </tbody>
