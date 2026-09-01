@@ -1154,9 +1154,12 @@ function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
   const [uploading, setUploading] = useState(false);
   const pay = usePayFarmer();
   const needsReceipt = method !== "cash";
+  // Server already refuses this (amount-exceeds-balance), this just catches
+  // it before a round trip instead of only after clicking Pay now.
+  const exceedsBalance = amount > farmer.currentBalanceTZS;
 
   const save = async () => {
-    if (amount <= 0) return;
+    if (amount <= 0 || exceedsBalance) return;
     if (needsReceipt && !receipt) {
       toast.error(t("Pakia picha ya risiti", "Upload a photo of the receipt"));
       return;
@@ -1217,9 +1220,19 @@ function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
             <Input
               type="number"
               step="any"
+              max={farmer.currentBalanceTZS}
               value={amount}
               onChange={(e) => setAmount(Number(e.target.value))}
+              className={exceedsBalance ? "border-[#E11B22] focus-visible:ring-[#E11B22]" : ""}
             />
+            {exceedsBalance && (
+              <div className="text-[11px] text-[#E11B22] font-medium">
+                {t(
+                  "Kiasi kinazidi salio la sasa, huwezi kulipa zaidi ya hilo.",
+                  "Amount exceeds the current balance, you can't pay more than that.",
+                )}
+              </div>
+            )}
           </div>
           <div className="grid gap-1.5">
             <Label>{t("Njia", "Method")}</Label>
@@ -1265,7 +1278,13 @@ function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
           </Button>
           <Button
             onClick={save}
-            disabled={pay.isPending || uploading || (needsReceipt && !receipt)}
+            disabled={
+              pay.isPending ||
+              uploading ||
+              (needsReceipt && !receipt) ||
+              exceedsBalance ||
+              amount <= 0
+            }
             className="text-white"
             style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
           >
