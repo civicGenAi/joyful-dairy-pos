@@ -38,6 +38,7 @@ export interface PayoutEntry {
   amountTZS: number;
   method: string;
   ref: string | null;
+  attachmentUrl?: string | null;
 }
 
 export const farmerKeys = {
@@ -174,18 +175,21 @@ export const farmersRepo = {
     await recordAudit("delete", "farmers", `Amefuta mfugaji (${name})`, `Deleted farmer (${name})`);
   },
 
-  /** Pays a farmer against their accrued balance. Audited server-side. */
+  /** Pays a farmer against their accrued balance. Audited server-side.
+   *  No typed reference, payouts.id is already a real system-generated
+   *  sequential reference (e.g. "PAY-2241"); mpesa/bank instead take an
+   *  optional receipt photo, the single source of truth for that payment. */
   async pay(input: {
     farmerId: string;
     amountTZS: number;
     method: "cash" | "mpesa" | "bank";
-    ref?: string;
+    attachmentUrl?: string;
   }): Promise<void> {
     const { error } = await supabase.rpc("record_payout", {
       p_farmer_id: input.farmerId,
       p_amount: input.amountTZS,
       p_method: input.method,
-      p_ref: input.ref ?? null,
+      p_attachment_url: input.attachmentUrl ?? null,
     });
     if (error) throw new Error(error.message);
   },
@@ -259,17 +263,25 @@ export const farmersRepo = {
     const rows = unwrap(
       await supabase
         .from("payouts")
-        .select("id, date, amount_tzs, method, ref")
+        .select("id, date, amount_tzs, method, ref, attachment_url")
         .eq("farmer_id", farmerId)
         .order("date", { ascending: false })
         .limit(limit),
-    ) as { id: string; date: string; amount_tzs: number; method: string; ref: string | null }[];
+    ) as {
+      id: string;
+      date: string;
+      amount_tzs: number;
+      method: string;
+      ref: string | null;
+      attachment_url: string | null;
+    }[];
     return rows.map((r) => ({
       id: r.id,
       date: r.date,
       amountTZS: Number(r.amount_tzs),
       method: r.method,
       ref: r.ref,
+      attachmentUrl: r.attachment_url,
     }));
   },
 };

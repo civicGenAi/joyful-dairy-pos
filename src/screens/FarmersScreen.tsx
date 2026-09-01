@@ -19,6 +19,7 @@ import { useLocations } from "@/lib/data/hooks/locations";
 import { useQuery } from "@tanstack/react-query";
 import { collectionKeys, collectionsRepo } from "@/lib/data/collections";
 import { todayISO, dateLabel } from "@/lib/data/dates";
+import { uploadHardCopy } from "@/lib/data/uploads";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { tzs, L, num } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -1145,17 +1146,40 @@ function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(farmer.currentBalanceTZS);
   const [method, setMethod] = useState<"cash" | "mpesa" | "bank">("mpesa");
-  const [ref, setRef] = useState(`PAY-${Date.now().toString().slice(-4)}`);
+  // No typed reference: the payout's own id (e.g. "PAY-2241") is already a
+  // real system-generated, sequential, traceable reference. Mpesa/bank
+  // instead need a receipt photo, the single source of truth for that
+  // payment, same rule already used everywhere else money changes hands.
+  const [receipt, setReceipt] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const pay = usePayFarmer();
+  const needsReceipt = method !== "cash";
 
-  const save = () => {
+  const save = async () => {
     if (amount <= 0) return;
+    if (needsReceipt && !receipt) {
+      toast.error(t("Pakia picha ya risiti", "Upload a photo of the receipt"));
+      return;
+    }
+    let attachmentUrl: string | undefined;
+    if (receipt) {
+      setUploading(true);
+      try {
+        attachmentUrl = await uploadHardCopy(receipt, "payout");
+      } catch {
+        toast.error(t("Imeshindikana kupakia risiti", "Could not upload the receipt"));
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    }
     pay.mutate(
-      { farmerId: farmer.id, amountTZS: amount, method, ref },
+      { farmerId: farmer.id, amountTZS: amount, method, attachmentUrl },
       {
         onSuccess: () => {
           toast.success(t(`Malipo ${tzs(amount)} yamerekodiwa`, `Payment ${tzs(amount)} recorded`));
           setOpen(false);
+          setReceipt(null);
         },
         onError: (e) =>
           toast.error(
@@ -1197,25 +1221,43 @@ function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
               onChange={(e) => setAmount(Number(e.target.value))}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
-              <Label>{t("Njia", "Method")}</Label>
-              <Select value={method} onValueChange={(v) => setMethod(v as typeof method)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mpesa">M-Pesa</SelectItem>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="bank">Bank transfer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-1.5">
-              <Label>{t("Rejea", "Reference")}</Label>
-              <Input value={ref} onChange={(e) => setRef(e.target.value)} />
-            </div>
+          <div className="grid gap-1.5">
+            <Label>{t("Njia", "Method")}</Label>
+            <Select
+              value={method}
+              onValueChange={(v) => {
+                setMethod(v as typeof method);
+                setReceipt(null);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mpesa">M-Pesa</SelectItem>
+                <SelectItem value="cash">Cash</SelectItem>
+                <SelectItem value="bank">Bank transfer</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+          {needsReceipt && (
+            <div className="grid gap-1.5">
+              <Label>
+                {method === "mpesa"
+                  ? t("Picha ya risiti ya M-Pesa", "Photo of the M-Pesa receipt")
+                  : t("Picha ya risiti ya benki", "Photo of the bank slip")}
+              </Label>
+              <Input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => setReceipt(e.target.files?.[0] ?? null)}
+              />
+              {receipt && (
+                <div className="text-[11px] text-muted-foreground truncate">{receipt.name}</div>
+              )}
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
@@ -1223,11 +1265,15 @@ function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
           </Button>
           <Button
             onClick={save}
-            disabled={pay.isPending}
+            disabled={pay.isPending || uploading || (needsReceipt && !receipt)}
             className="text-white"
             style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
           >
-            {pay.isPending ? t("Inalipa…", "Paying…") : t("Lipa sasa", "Pay now")}
+            {uploading
+              ? t("Inapakia risiti…", "Uploading receipt…")
+              : pay.isPending
+                ? t("Inalipa…", "Paying…")
+                : t("Lipa sasa", "Pay now")}
           </Button>
         </DialogFooter>
       </DialogContent>

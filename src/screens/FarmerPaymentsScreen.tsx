@@ -97,7 +97,7 @@ export function FarmerPaymentsScreen() {
                 {paged.map((p) => (
                   <tr key={p.id} className="border-b border-border last:border-0">
                     <td className="py-2.5 px-3 font-num text-xs text-muted-foreground">{p.date}</td>
-                    <td className="py-2.5 font-num text-xs">{p.ref ?? "·"}</td>
+                    <td className="py-2.5 font-num text-xs">{p.ref ?? p.id}</td>
                     <td className="py-2.5 capitalize">{p.method}</td>
                     <td className="py-2.5 px-3 text-right font-num font-semibold">
                       {tzs(p.amountTZS)}
