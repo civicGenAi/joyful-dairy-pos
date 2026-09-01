@@ -345,6 +345,13 @@ const STATUS_LABEL: Record<string, { sw: string; en: string }> = {
   none: { sw: "Hakuna", en: "None" },
 };
 
+const STATUS_COLOR: Record<string, string> = {
+  paid: "#1E7C3F",
+  partial: "#E5A100",
+  unpaid: "#E11B22",
+  none: "#6B776E",
+};
+
 export function FarmerStatementPrintScreen() {
   const { t } = useApp();
   const { id } = useParams({ from: "/statement/farmer/$id" });
@@ -387,68 +394,103 @@ export function FarmerStatementPrintScreen() {
     year: "numeric",
   });
 
+  const statusColor = STATUS_COLOR[status] ?? "#6B776E";
+
   return (
     <PrintShell
       backTo="/farmers"
       title={t("Statimenti ya mfugaji", "Farmer statement")}
-      subtitle={`${f.name} · ${f.village} · ${monthLabel}`}
+      subtitle={monthLabel}
     >
-      <div className="grid grid-cols-4 gap-3 mb-6 text-sm">
-        <div className="rounded-xl bg-secondary/60 p-3">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {t("Litre", "Litres")}
+      <div className="flex items-center justify-between rounded-xl border border-border bg-secondary/40 px-4 py-3 mb-6">
+        <div>
+          <div className="font-display text-lg font-bold">{f.name}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            {f.village} · {f.phone}
           </div>
-          <div className="font-num font-semibold">{L(total)}</div>
         </div>
-        <div className="rounded-xl bg-secondary/60 p-3">
+        <div className="text-right">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {t("Alipata", "Earned")}
+            {t("Bei kwa lita", "Rate per litre")}
           </div>
-          <div className="font-num font-semibold text-[#1E7C3F]">{tzs(earnings)}</div>
-        </div>
-        <div className="rounded-xl bg-secondary/60 p-3">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {t("Alilipwa", "Paid")}
-          </div>
-          <div className="font-num font-semibold">{tzs(paid)}</div>
-        </div>
-        <div className="rounded-xl bg-secondary/60 p-3">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {t("Hali", "Status")}
-          </div>
-          <div className="font-semibold">{t(STATUS_LABEL[status].sw, STATUS_LABEL[status].en)}</div>
+          <div className="font-num font-semibold">{tzs(f.ratePerL)}/L</div>
         </div>
       </div>
 
-      <table className="w-full text-sm font-num">
+      <div className="grid grid-cols-4 gap-3 mb-6 text-sm">
+        {[
+          { label: t("Litre", "Litres"), value: L(total), color: "#2F9E44" },
+          { label: t("Alipata", "Earned"), value: tzs(earnings), color: "#1E7C3F" },
+          { label: t("Alilipwa", "Paid"), value: tzs(paid), color: "#1D9E75" },
+          {
+            label: t("Hali", "Status"),
+            value: t(STATUS_LABEL[status].sw, STATUS_LABEL[status].en),
+            color: statusColor,
+          },
+        ].map((card) => (
+          <div key={card.label} className="rounded-xl border border-border overflow-hidden bg-card">
+            <div className="h-1" style={{ background: card.color }} />
+            <div className="p-3">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                {card.label}
+              </div>
+              <div className="font-num font-bold text-base mt-0.5" style={{ color: card.color }}>
+                {card.value}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+        {t("Ukusanyaji wa mwezi", "Collections this month")}
+      </div>
+      <table className="w-full text-sm font-num rounded-xl overflow-hidden border border-border">
         <thead>
-          <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-            <th className="py-2">{t("Tarehe", "Date")}</th>
-            <th>{t("Kipindi", "Session")}</th>
-            <th className="text-right">{t("Litre", "Litres")}</th>
-            <th className="text-right">{t("Kiasi", "Amount")}</th>
+          <tr
+            className="text-left text-[11px] uppercase tracking-wider text-muted-foreground"
+            style={{ background: "#E4EFE4" }}
+          >
+            <th className="py-2 px-3 font-sans">{t("Tarehe", "Date")}</th>
+            <th className="font-sans">{t("Kipindi", "Session")}</th>
+            <th className="text-right font-sans">{t("Litre", "Litres")}</th>
+            <th className="text-right px-3 font-sans">{t("Kiasi", "Amount")}</th>
           </tr>
         </thead>
         <tbody>
-          {collections.map((d) => (
-            <tr key={d.id} className="border-b border-border last:border-0">
-              <td className="py-1.5 text-xs">{d.date}</td>
-              <td className="py-1.5 capitalize">{d.session}</td>
-              <td className="py-1.5 text-right">{num(d.litres)}</td>
-              <td className="py-1.5 text-right">{num(d.litres * (d.ratePerL ?? f.ratePerL))}</td>
+          {collections.length === 0 ? (
+            <tr>
+              <td colSpan={4} className="py-8 text-center font-sans text-muted-foreground">
+                {t(
+                  "Hakuna ukusanyaji uliorekodiwa mwezi huu.",
+                  "No collections recorded this month yet.",
+                )}
+              </td>
             </tr>
-          ))}
+          ) : (
+            collections.map((d) => (
+              <tr key={d.id} className="border-t border-border">
+                <td className="py-1.5 px-3 text-xs">{d.date}</td>
+                <td className="py-1.5 capitalize">{d.session}</td>
+                <td className="py-1.5 text-right">{num(d.litres)}</td>
+                <td className="py-1.5 px-3 text-right">
+                  {num(d.litres * (d.ratePerL ?? f.ratePerL))}
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
-        <tfoot>
-          <tr className="border-t-2 border-border">
-            <td colSpan={2} className="py-3 font-semibold">
-              {t("Jumla", "Total")}
-            </td>
-            <td className="py-3 text-right font-bold">{num(total)} L</td>
-            <td className="py-3 text-right font-bold text-[#1E7C3F]">{tzs(earnings)}</td>
-          </tr>
-        </tfoot>
       </table>
+      <div
+        className="flex items-center justify-between rounded-xl px-4 py-3 mt-3 border-t-2"
+        style={{ borderColor: "#1E6B3A", background: "#F4F6F2" }}
+      >
+        <div className="font-sans font-semibold">
+          {t("Jumla ya mwezi", "Total this month")}
+          <span className="ml-2 font-num text-muted-foreground text-sm">{num(total)} L</span>
+        </div>
+        <div className="font-num text-xl font-extrabold text-[#1E7C3F]">{tzs(earnings)}</div>
+      </div>
 
       <div className="mt-6 text-sm grid grid-cols-2 gap-3">
         <div className="rounded-xl bg-secondary/60 p-3">
@@ -456,7 +498,7 @@ export function FarmerStatementPrintScreen() {
             {t("Malipo ya mwisho", "Last payment")}
           </div>
           <div className="font-num font-semibold">{tzs(f.lastPaymentTZS)}</div>
-          <div className="text-xs text-muted-foreground">{f.lastPaymentDate}</div>
+          <div className="text-xs text-muted-foreground">{f.lastPaymentDate || "–"}</div>
         </div>
         <div className="rounded-xl bg-secondary/60 p-3">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -464,6 +506,22 @@ export function FarmerStatementPrintScreen() {
           </div>
           <div className="font-num font-semibold text-[#E11B22]">{tzs(f.currentBalanceTZS)}</div>
         </div>
+      </div>
+
+      <div className="mt-8 grid grid-cols-2 gap-8 text-xs text-muted-foreground">
+        <div>
+          <div className="border-t border-border pt-1.5">
+            {t("Sahihi ya mfugaji", "Farmer's signature")}
+          </div>
+        </div>
+        <div>
+          <div className="border-t border-border pt-1.5">
+            {t("Sahihi ya wakala", "Agent's signature")}
+          </div>
+        </div>
+      </div>
+      <div className="mt-6 text-center text-[10px] text-muted-foreground">
+        {t("Imetengenezwa tarehe", "Generated on")} {dateLabel(todayISO())}
       </div>
     </PrintShell>
   );
