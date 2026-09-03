@@ -14,6 +14,15 @@ import {
   useSetOpeningBalances,
 } from "@/lib/data/hooks/ledger";
 import type { LedgerAccount } from "@/lib/data/ledger";
+import { useAssetSchedule, useCreateAsset, usePostDepreciation } from "@/lib/data/hooks/assets";
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { todayISO } from "@/lib/data/dates";
 import { SectionCard, StatCard, Pill } from "@/components/ui/data-bits";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,7 +33,16 @@ import { tzs } from "@/lib/format";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
-import { ChevronLeft, ChevronRight, BookOpen, RefreshCw, Scale, Wand2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  BookOpen,
+  RefreshCw,
+  Scale,
+  Wand2,
+  Plus,
+  Truck,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -158,6 +176,7 @@ export function BooksScreen() {
             <TabsTrigger value="bs">{t("Mizania", "Balance sheet")}</TabsTrigger>
             <TabsTrigger value="tb">{t("Salio la majaribio", "Trial balance")}</TabsTrigger>
             <TabsTrigger value="vat">{t("VAT", "VAT return")}</TabsTrigger>
+            <TabsTrigger value="assets">{t("Mali za kudumu", "Fixed assets")}</TabsTrigger>
             <TabsTrigger value="opening">{t("Salio la kuanzia", "Opening balances")}</TabsTrigger>
           </TabsList>
 
@@ -375,6 +394,11 @@ export function BooksScreen() {
               </div>
             </SectionCard>
           </TabsContent>
+          {/* ---- Fixed assets ---- */}
+          <TabsContent value="assets" className="mt-4">
+            <FixedAssetsTab month={from} monthLabel={monthLabel} />
+          </TabsContent>
+
           {/* ---- Opening balances ---- */}
           <TabsContent value="opening" className="mt-4">
             <OpeningBalancesTab />
@@ -382,6 +406,286 @@ export function BooksScreen() {
         </Tabs>
       )}
     </AppShell>
+  );
+}
+
+// The fixed-asset register plus this month's depreciation. Buying a van is
+// not a cost, it is swapping cash for something worth the same; the cost is
+// the value it loses each month, which is what gets posted here.
+function FixedAssetsTab({ month, monthLabel }: { month: string; monthLabel: string }) {
+  const { t, lang, can } = useApp();
+  const canWrite = can("finance:write");
+  const { data: rows = [], isPending } = useAssetSchedule(month);
+  const post = usePostDepreciation();
+
+  const monthCharge = rows.reduce((s, r) => s + r.chargeTZS, 0);
+  const totalCost = rows.reduce((s, r) => s + r.costTZS, 0);
+  const totalBook = rows.reduce((s, r) => s + r.bookValueTZS, 0);
+  const nameOf = (r: { name: string; swName: string }) => (lang === "sw" ? r.swName : r.name);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        <StatCard
+          label={t("Gharama ya awali", "Original cost")}
+          value={tzs(totalCost)}
+          accent="info"
+        />
+        <StatCard
+          label={t("Thamani ya sasa", "Current book value")}
+          value={tzs(totalBook)}
+          accent="green"
+        />
+        <StatCard
+          label={t("Uchakavu wa mwezi", "This month's depreciation")}
+          value={tzs(monthCharge)}
+          accent="amber"
+        />
+      </div>
+
+      <SectionCard
+        title={t("Daftari la mali", "Asset register")}
+        action={
+          <div className="flex items-center gap-2">
+            {canWrite && monthCharge > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs"
+                disabled={post.isPending}
+                onClick={() =>
+                  post.mutate(month, {
+                    onSuccess: (r) =>
+                      toast.success(
+                        r.posted > 0
+                          ? t(
+                              `Uchakavu wa ${tzs(r.amount)} umewekwa vitabuni`,
+                              `Posted ${tzs(r.amount)} of depreciation`,
+                            )
+                          : t("Mwezi huu ulikuwa tayari umewekwa", "This month was already posted"),
+                      ),
+                    onError: () =>
+                      toast.error(t("Imeshindikana kuweka", "Could not post depreciation")),
+                  })
+                }
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 mr-1.5 ${post.isPending ? "animate-spin" : ""}`}
+                />
+                {t("Weka uchakavu wa mwezi", "Post this month's depreciation")}
+              </Button>
+            )}
+            {canWrite && <AddAssetSheet />}
+          </div>
+        }
+      >
+        {isPending ? (
+          <TableSkeleton rows={4} cols={5} />
+        ) : rows.length === 0 ? (
+          <EmptyState
+            icon={Truck}
+            title={t("Hakuna mali za kudumu bado", "No fixed assets yet")}
+            description={t(
+              "Ongeza gari, friji au kifaa chochote kinachodumu zaidi ya mwaka.",
+              "Add a van, chiller or anything else that lasts more than a year.",
+            )}
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                  <th className="py-2 px-3">{t("Mali", "Asset")}</th>
+                  <th>{t("Ilianza kutumika", "In service")}</th>
+                  <th className="text-right">{t("Gharama", "Cost")}</th>
+                  <th className="text-right">{t("Uchakavu wa mwezi", "Monthly")}</th>
+                  <th className="text-right">{t("Uchakavu wote", "Accumulated")}</th>
+                  <th className="text-right px-3">{t("Thamani ya sasa", "Book value")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id} className="border-b border-border last:border-0">
+                    <td className="py-2.5 px-3 font-medium">{nameOf(r)}</td>
+                    <td className="py-2.5 font-num text-xs text-muted-foreground">
+                      {r.inServiceOn} · {r.usefulLifeMonths} {t("miezi", "mo")}
+                    </td>
+                    <td className="py-2.5 text-right font-num">{tzs(r.costTZS, false)}</td>
+                    <td className="py-2.5 text-right font-num">
+                      {r.chargeTZS > 0 ? tzs(r.chargeTZS, false) : "-"}
+                    </td>
+                    <td className="py-2.5 text-right font-num text-muted-foreground">
+                      {tzs(r.accumulatedTZS, false)}
+                    </td>
+                    <td className="py-2.5 text-right px-3 font-num font-semibold">
+                      {tzs(r.bookValueTZS, false)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div className="mt-3 text-[11px] text-muted-foreground">
+          {t(
+            `Uchakavu unagawanywa sawa kwa kila mwezi wa maisha ya mali. Mwezi wa mwisho unachukua senti zilizobaki, ili mali imalizie hasa kwenye thamani yake ya mwisho. Unaonyesha ${monthLabel}.`,
+            `Depreciation is spread evenly across the asset's life. The final month absorbs the rounding, so an asset lands exactly on its salvage value rather than a few shillings off. Showing ${monthLabel}.`,
+          )}
+        </div>
+      </SectionCard>
+    </div>
+  );
+}
+
+function AddAssetSheet() {
+  const { t } = useApp();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [swName, setSwName] = useState("");
+  const [cost, setCost] = useState(0);
+  const [acquired, setAcquired] = useState(todayISO());
+  const [inService, setInService] = useState(todayISO());
+  const [years, setYears] = useState(5);
+  const [salvage, setSalvage] = useState(0);
+  const create = useCreateAsset();
+
+  const save = () => {
+    if (!name.trim() || cost <= 0) return;
+    if (salvage >= cost) {
+      toast.error(
+        t(
+          "Thamani ya mwisho lazima iwe chini ya gharama",
+          "Salvage value must be less than the cost",
+        ),
+      );
+      return;
+    }
+    create.mutate(
+      {
+        name,
+        swName,
+        category: "equipment",
+        costTZS: cost,
+        acquiredOn: acquired,
+        inServiceOn: inService,
+        usefulLifeMonths: Math.max(1, Math.round(years * 12)),
+        salvageTZS: salvage,
+      },
+      {
+        onSuccess: () => {
+          toast.success(t("Mali imeongezwa", "Asset added"));
+          setOpen(false);
+          setName("");
+          setSwName("");
+          setCost(0);
+          setSalvage(0);
+        },
+        onError: () => toast.error(t("Imeshindikana kuongeza", "Could not add the asset")),
+      },
+    );
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button
+          size="sm"
+          className="h-8 text-white"
+          style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+        >
+          <Plus className="h-3.5 w-3.5 mr-1" />
+          {t("Mali mpya", "Add asset")}
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Ongeza mali ya kudumu", "Add a fixed asset")}</SheetTitle>
+        </SheetHeader>
+        <div className="grid gap-3">
+          <div className="rounded-xl bg-secondary/60 px-3 py-2.5 text-[11px] text-muted-foreground">
+            {t(
+              "Kitu kinachodumu zaidi ya mwaka: gari, friji, mashine. Kununua siyo gharama, gharama ni kupungua kwa thamani kila mwezi.",
+              "Something that lasts more than a year: a van, a chiller, a machine. Buying it is not a cost, the cost is the value it loses each month.",
+            )}
+          </div>
+          <div className="grid gap-1.5">
+            <Label>{t("Jina", "Name")}</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Delivery van"
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>{t("Jina kwa Kiswahili", "Swahili name")}</Label>
+            <Input
+              value={swName}
+              onChange={(e) => setSwName(e.target.value)}
+              placeholder="Gari la usambazaji"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>{t("Gharama (TZS)", "Cost (TZS)")}</Label>
+              <Input
+                type="number"
+                step="any"
+                value={cost}
+                onChange={(e) => setCost(Number(e.target.value))}
+                className="font-num"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{t("Thamani ya mwisho", "Salvage value")}</Label>
+              <Input
+                type="number"
+                step="any"
+                value={salvage}
+                onChange={(e) => setSalvage(Number(e.target.value))}
+                className="font-num"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>{t("Ilinunuliwa", "Acquired on")}</Label>
+              <Input type="date" value={acquired} onChange={(e) => setAcquired(e.target.value)} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{t("Ilianza kutumika", "In service from")}</Label>
+              <Input type="date" value={inService} onChange={(e) => setInService(e.target.value)} />
+            </div>
+          </div>
+          <div className="grid gap-1.5">
+            <Label>{t("Itadumu miaka mingapi", "Useful life (years)")}</Label>
+            <Input
+              type="number"
+              step="any"
+              min={1}
+              value={years}
+              onChange={(e) => setYears(Number(e.target.value))}
+              className="font-num"
+            />
+            {cost > 0 && years > 0 && salvage < cost && (
+              <div className="text-[11px] text-muted-foreground">
+                {t("Uchakavu wa kila mwezi", "Monthly depreciation")}:{" "}
+                <span className="font-num font-semibold">
+                  {tzs((cost - salvage) / Math.max(1, Math.round(years * 12)))}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+        <SheetFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            {t("Ghairi", "Cancel")}
+          </Button>
+          <Button onClick={save} disabled={create.isPending || !name.trim() || cost <= 0}>
+            {create.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
