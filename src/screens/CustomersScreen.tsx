@@ -64,6 +64,8 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useIssueBillInvoice } from "@/lib/data/hooks/invoices";
 import { ReceiptText } from "lucide-react";
 import { uploadHardCopy } from "@/lib/data/uploads";
+import { useFormDraft } from "@/hooks/use-form-draft";
+import { DraftNotice } from "@/components/ui/DraftNotice";
 
 // Last 12 months from today, newest first, generated live so the current
 // month is always selectable instead of a fixed list going stale.
@@ -971,14 +973,13 @@ function RecordDepositDialog({ customerId }: { customerId: string }) {
   const [receipt, setReceipt] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const record = useRecordCustomerDeposit();
+  // Encouraged for mpesa/bank, never required: a paper receipt often
+  // turns up long after the money moved, and blocking the entry until
+  // then just means the deposit goes unrecorded.
   const needsReceipt = method !== "cash";
 
   const save = async () => {
     if (amount <= 0) return;
-    if (needsReceipt && !receipt) {
-      toast.error(t("Pakia picha ya risiti", "Upload a photo of the receipt"));
-      return;
-    }
     let attachmentUrl: string | undefined;
     if (receipt) {
       setUploading(true);
@@ -1058,8 +1059,8 @@ function RecordDepositDialog({ customerId }: { customerId: string }) {
             <div className="grid gap-1.5">
               <Label>
                 {method === "mpesa"
-                  ? t("Picha ya risiti ya M-Pesa", "Photo of the M-Pesa receipt")
-                  : t("Picha ya risiti ya benki", "Photo of the bank slip")}
+                  ? t("Picha ya risiti ya M-Pesa (hiari)", "Photo of the M-Pesa receipt (optional)")
+                  : t("Picha ya risiti ya benki (hiari)", "Photo of the bank slip (optional)")}
               </Label>
               <Input
                 type="file"
@@ -1070,6 +1071,12 @@ function RecordDepositDialog({ customerId }: { customerId: string }) {
               {receipt && (
                 <div className="text-[11px] text-muted-foreground truncate">{receipt.name}</div>
               )}
+              <div className="text-[11px] text-muted-foreground">
+                {t(
+                  "Unaweza kuhifadhi sasa na kupakia risiti baadaye ikifika.",
+                  "You can save now and attach the receipt later when it arrives.",
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1077,10 +1084,7 @@ function RecordDepositDialog({ customerId }: { customerId: string }) {
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
-          <Button
-            onClick={save}
-            disabled={record.isPending || uploading || (needsReceipt && !receipt)}
-          >
+          <Button onClick={save} disabled={record.isPending || uploading}>
             {uploading
               ? t("Inapakia risiti…", "Uploading receipt…")
               : record.isPending
@@ -1104,6 +1108,20 @@ function AddCustomerDialog() {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("month_end");
   const create = useCreateCustomer();
 
+  const draft = useFormDraft({
+    key: "add-customer",
+    enabled: open,
+    value: { name, phone, email, type, dueDate, billingCycle },
+    onRestore: (v) => {
+      setName(v.name);
+      setPhone(v.phone);
+      setEmail(v.email);
+      setType(v.type);
+      setDueDate(v.dueDate);
+      setBillingCycle(v.billingCycle);
+    },
+  });
+
   const save = () => {
     if (!name.trim()) return;
     create.mutate(
@@ -1111,6 +1129,7 @@ function AddCustomerDialog() {
       {
         onSuccess: () => {
           toast.success(t("Mteja amesajiliwa", "Customer registered"));
+          draft.clear();
           setOpen(false);
           setName("");
           setPhone("");
@@ -1131,6 +1150,15 @@ function AddCustomerDialog() {
         <SheetHeader>
           <SheetTitle>{t("Sajili mteja mpya", "Register a new customer")}</SheetTitle>
         </SheetHeader>
+        <DraftNotice
+          show={draft.restored}
+          onDiscard={() => {
+            draft.clear();
+            setName("");
+            setPhone("");
+            setEmail("");
+          }}
+        />
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Jina", "Name")}</Label>

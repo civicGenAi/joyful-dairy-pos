@@ -71,6 +71,8 @@ import {
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
+import { useFormDraft } from "@/hooks/use-form-draft";
+import { DraftNotice } from "@/components/ui/DraftNotice";
 
 const CATEGORY_META: Record<string, { icon: typeof Fuel; sw: string; en: string; color: string }> =
   {
@@ -529,6 +531,38 @@ function AddExpenseSheet() {
   const [saving, setSaving] = useState(false);
 
   const create = useCreateExpense();
+
+  // Autosaved while open: an expense with a long description is exactly
+  // the kind of entry nobody wants to type twice.
+  const draft = useFormDraft({
+    key: "add-expense",
+    enabled: open,
+    value: {
+      date,
+      category,
+      newCategory,
+      site,
+      newSite,
+      vendor,
+      description,
+      amount,
+      method,
+      invoiceRef,
+    },
+    onRestore: (v) => {
+      setDate(v.date);
+      setCategory(v.category);
+      setNewCategory(v.newCategory);
+      setSite(v.site);
+      setNewSite(v.newSite);
+      setVendor(v.vendor);
+      setDescription(v.description);
+      setAmount(v.amount);
+      setMethod(v.method);
+      setInvoiceRef(v.invoiceRef);
+    },
+  });
+
   const isNewCategory = category === NEW_CATEGORY;
   const finalCategory = isNewCategory ? newCategory.trim().toLowerCase() : category;
   const isNewSite = site === NEW_SITE;
@@ -556,6 +590,7 @@ function AddExpenseSheet() {
         {
           onSuccess: () => {
             toast.success(t("Matumizi yamerekodiwa", "Expense recorded"));
+            draft.clear();
             setOpen(false);
             setVendor("");
             setDescription("");
@@ -591,6 +626,16 @@ function AddExpenseSheet() {
         <SheetHeader>
           <SheetTitle>{t("Rekodi matumizi", "Record an expense")}</SheetTitle>
         </SheetHeader>
+        <DraftNotice
+          show={draft.restored}
+          onDiscard={() => {
+            draft.clear();
+            setVendor("");
+            setDescription("");
+            setAmount(0);
+            setInvoiceRef("");
+          }}
+        />
         <div className="grid gap-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">

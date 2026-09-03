@@ -1163,7 +1163,7 @@ export function RouteScreen() {
               <div className="grid gap-1.5">
                 <Label className="flex items-center gap-1.5">
                   <Paperclip className="h-3.5 w-3.5" />
-                  {t("Risiti ya benki (lazima kwa cash)", "Bank deposit slip (required for cash)")}
+                  {t("Risiti ya benki (hiari)", "Bank deposit slip (optional)")}
                 </Label>
                 <Input
                   type="file"
@@ -1186,15 +1186,6 @@ export function RouteScreen() {
                   const amount = deposit || expectedDeposit;
                   if (amount <= 0) {
                     toast.error(t("Hakuna cash ya kuhifadhi", "No cash to deposit yet"));
-                    return;
-                  }
-                  if (cashTotal > 0 && !slipFile) {
-                    toast.error(
-                      t(
-                        "Pakia risiti ya benki kwanza, ni lazima kwa mauzo ya cash",
-                        "Upload the bank slip first, it is required for cash sales",
-                      ),
-                    );
                     return;
                   }
                   setDeposit(amount);

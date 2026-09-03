@@ -65,6 +65,8 @@ import { RowActions } from "@/components/ui/RowActions";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { PaginationBar } from "@/components/ui/PaginationBar";
 import { usePagination } from "@/hooks/use-pagination";
+import { useFormDraft } from "@/hooks/use-form-draft";
+import { DraftNotice } from "@/components/ui/DraftNotice";
 import type { Farmer } from "@/mock/types";
 
 const VILLAGES = ["Olasiti", "Sakina", "Kisongo", "Ngaramtoni", "Tengeru", "Usa River"];
@@ -403,6 +405,22 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
   const record = useRecordCollectionDay();
   const total = morningLitres + eveningLitres;
 
+  // Autosaved while open, so a closed tab or a stray click never costs a
+  // half-entered day of collection.
+  const draft = useFormDraft({
+    key: "record-collection",
+    enabled: open,
+    value: { farmerId, date, morningLitres, eveningLitres, locationId, note },
+    onRestore: (v) => {
+      setFarmerId(v.farmerId);
+      setDate(v.date);
+      setMorningLitres(v.morningLitres);
+      setEveningLitres(v.eveningLitres);
+      setLocationId(v.locationId);
+      setNote(v.note);
+    },
+  });
+
   // Search the farmer list once at least two letters are typed, matching
   // the start of the full name or any word in it (so "Ma" finds both
   // "Mary..." and "John Mwakalinga").
@@ -433,6 +451,7 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
       {
         onSuccess: () => {
           toast.success(t("Ukusanyaji umerekodiwa", "Collection recorded"));
+          draft.clear();
           setOpen(false);
           setNote("");
           setMorningLitres(0);
@@ -472,6 +491,15 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
         <SheetHeader>
           <SheetTitle>{t("Rekodi ukusanyaji wa maziwa", "Record milk collection")}</SheetTitle>
         </SheetHeader>
+        <DraftNotice
+          show={draft.restored}
+          onDiscard={() => {
+            draft.clear();
+            setMorningLitres(0);
+            setEveningLitres(0);
+            setNote("");
+          }}
+        />
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Mfugaji", "Farmer")}</Label>
@@ -1027,6 +1055,18 @@ function AddFarmerDialog() {
   const [rate, setRate] = useState(1200);
   const create = useCreateFarmer();
 
+  const draft = useFormDraft({
+    key: "add-farmer",
+    enabled: open,
+    value: { name, phone, village, rate },
+    onRestore: (v) => {
+      setName(v.name);
+      setPhone(v.phone);
+      setVillage(v.village);
+      setRate(v.rate);
+    },
+  });
+
   const save = () => {
     if (!name.trim()) return;
     create.mutate(
@@ -1034,6 +1074,7 @@ function AddFarmerDialog() {
       {
         onSuccess: () => {
           toast.success(t("Mfugaji ameongezwa", "Farmer added"));
+          draft.clear();
           setOpen(false);
           setName("");
           setPhone("");
@@ -1054,6 +1095,14 @@ function AddFarmerDialog() {
         <SheetHeader>
           <SheetTitle>{t("Sajili mfugaji mpya", "Register a new farmer")}</SheetTitle>
         </SheetHeader>
+        <DraftNotice
+          show={draft.restored}
+          onDiscard={() => {
+            draft.clear();
+            setName("");
+            setPhone("");
+          }}
+        />
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Jina kamili", "Full name")}</Label>
@@ -1200,6 +1249,8 @@ function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
   const [receipt, setReceipt] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const pay = usePayFarmer();
+  // Encouraged for mpesa/bank, never required: the receipt often arrives
+  // long after the payment, and blocking on it just delays the record.
   const needsReceipt = method !== "cash";
   // Server already refuses this (amount-exceeds-balance), this just catches
   // it before a round trip instead of only after clicking Pay now.
@@ -1207,10 +1258,6 @@ function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
 
   const save = async () => {
     if (amount <= 0 || exceedsBalance) return;
-    if (needsReceipt && !receipt) {
-      toast.error(t("Pakia picha ya risiti", "Upload a photo of the receipt"));
-      return;
-    }
     let attachmentUrl: string | undefined;
     if (receipt) {
       setUploading(true);
@@ -1304,8 +1351,8 @@ function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
             <div className="grid gap-1.5">
               <Label>
                 {method === "mpesa"
-                  ? t("Picha ya risiti ya M-Pesa", "Photo of the M-Pesa receipt")
-                  : t("Picha ya risiti ya benki", "Photo of the bank slip")}
+                  ? t("Picha ya risiti ya M-Pesa (hiari)", "Photo of the M-Pesa receipt (optional)")
+                  : t("Picha ya risiti ya benki (hiari)", "Photo of the bank slip (optional)")}
               </Label>
               <Input
                 type="file"
@@ -1316,6 +1363,12 @@ function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
               {receipt && (
                 <div className="text-[11px] text-muted-foreground truncate">{receipt.name}</div>
               )}
+              <div className="text-[11px] text-muted-foreground">
+                {t(
+                  "Unaweza kuhifadhi sasa na kupakia risiti baadaye ikifika.",
+                  "You can save now and attach the receipt later when it arrives.",
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1325,13 +1378,7 @@ function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
           </Button>
           <Button
             onClick={save}
-            disabled={
-              pay.isPending ||
-              uploading ||
-              (needsReceipt && !receipt) ||
-              exceedsBalance ||
-              amount <= 0
-            }
+            disabled={pay.isPending || uploading || exceedsBalance || amount <= 0}
             className="text-white"
             style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
           >

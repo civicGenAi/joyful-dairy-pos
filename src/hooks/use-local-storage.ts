@@ -20,7 +20,6 @@ export function useLocalStorage<T>(key: string, initial: T) {
     } catch {
       /* unreadable value, keep the default */
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
   useEffect(() => {
