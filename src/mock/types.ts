@@ -70,6 +70,8 @@ export interface Customer {
   email?: string;
   type: CustomerType;
   outstandingTZS: number;
+  /** Ceiling on what they may owe on credit. Undefined means no limit. */
+  creditLimitTZS?: number;
   lastActivity: string;
   status: "active" | "overdue" | "ok";
   remindersEnabled?: boolean;

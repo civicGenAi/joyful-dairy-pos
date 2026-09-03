@@ -12,6 +12,7 @@ interface CustomerRow {
   email?: string | null;
   type: CustomerType;
   outstanding_tzs: number;
+  credit_limit_tzs?: number | null;
   last_activity: string | null;
   status: "active" | "overdue" | "ok";
   reminders_enabled?: boolean;
@@ -28,6 +29,7 @@ function toCustomer(r: CustomerRow): Customer {
     email: r.email ?? "",
     type: r.type,
     outstandingTZS: Number(r.outstanding_tzs),
+    creditLimitTZS: r.credit_limit_tzs != null ? Number(r.credit_limit_tzs) : undefined,
     lastActivity: r.last_activity ?? "",
     status: r.status,
     remindersEnabled: r.reminders_enabled ?? true,
@@ -137,6 +139,8 @@ export const customersRepo = {
     type: CustomerType;
     nextDueDate?: string;
     billingCycle?: BillingCycle;
+    /** Null or omitted means no ceiling on what they may owe. */
+    creditLimitTZS?: number | null;
   }): Promise<Customer> {
     const row = unwrap(
       await supabase
@@ -148,6 +152,7 @@ export const customersRepo = {
           type: input.type,
           next_due_date: input.nextDueDate || null,
           billing_cycle: input.billingCycle ?? "month_end",
+          credit_limit_tzs: input.creditLimitTZS ?? null,
         })
         .select("*")
         .single(),
@@ -170,6 +175,7 @@ export const customersRepo = {
     remindersEnabled?: boolean;
     nextDueDate?: string;
     billingCycle?: BillingCycle;
+    creditLimitTZS?: number | null;
   }): Promise<void> {
     unwrap(
       await supabase
@@ -182,6 +188,7 @@ export const customersRepo = {
           reminders_enabled: input.remindersEnabled ?? true,
           next_due_date: input.nextDueDate || null,
           billing_cycle: input.billingCycle ?? "month_end",
+          credit_limit_tzs: input.creditLimitTZS ?? null,
         })
         .eq("id", input.id)
         .select("id"),

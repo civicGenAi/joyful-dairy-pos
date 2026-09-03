@@ -367,7 +367,16 @@ export function RouteScreen() {
               ? t("Mteja ana deni lililochelewa", "Customer is overdue, credit blocked")
               : e.message.includes("day-locked")
                 ? t("Siku hii imefungwa", "This day is locked")
-                : t("Imeshindikana kurekodi mauzo", "Could not record the sale"),
+                : e.message.includes("insufficient-stock")
+                  ? t("Hakuna bidhaa za kutosha ghalani", "Not enough stock for this sale")
+                  : e.message.includes("exceeds-van-load")
+                    ? t("Umezidi kilichopakiwa kwenye gari", "More than was loaded onto the van")
+                    : e.message.includes("credit-limit-exceeded")
+                      ? t(
+                          "Mteja amefikia kikomo cha mkopo",
+                          "Customer has reached their credit limit",
+                        )
+                      : t("Imeshindikana kurekodi mauzo", "Could not record the sale"),
           ),
       },
     );

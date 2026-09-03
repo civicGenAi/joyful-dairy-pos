@@ -1106,12 +1106,15 @@ function AddCustomerDialog() {
   const [type, setType] = useState<CustomerType>("cash");
   const [dueDate, setDueDate] = useState("");
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("month_end");
+  // Blank means no ceiling, which is the honest default: inventing a limit
+  // for an existing customer would start refusing sales that are fine.
+  const [creditLimit, setCreditLimit] = useState<number | "">("");
   const create = useCreateCustomer();
 
   const draft = useFormDraft({
     key: "add-customer",
     enabled: open,
-    value: { name, phone, email, type, dueDate, billingCycle },
+    value: { name, phone, email, type, dueDate, billingCycle, creditLimit },
     onRestore: (v) => {
       setName(v.name);
       setPhone(v.phone);
@@ -1119,13 +1122,22 @@ function AddCustomerDialog() {
       setType(v.type);
       setDueDate(v.dueDate);
       setBillingCycle(v.billingCycle);
+      setCreditLimit(v.creditLimit);
     },
   });
 
   const save = () => {
     if (!name.trim()) return;
     create.mutate(
-      { name, phone, email, type, nextDueDate: dueDate || undefined, billingCycle },
+      {
+        name,
+        phone,
+        email,
+        type,
+        nextDueDate: dueDate || undefined,
+        billingCycle,
+        creditLimitTZS: creditLimit === "" ? null : creditLimit,
+      },
       {
         onSuccess: () => {
           toast.success(t("Mteja amesajiliwa", "Customer registered"));
@@ -1205,6 +1217,26 @@ function AddCustomerDialog() {
           {type !== "cash" && (
             <>
               <div className="grid gap-1.5">
+                <Label>{t("Kikomo cha mkopo (hiari)", "Credit limit (optional)")}</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  min={0}
+                  value={creditLimit}
+                  placeholder={t("Hakuna kikomo", "No limit")}
+                  onChange={(e) =>
+                    setCreditLimit(e.target.value === "" ? "" : Number(e.target.value))
+                  }
+                  className="font-num"
+                />
+                <div className="text-[11px] text-muted-foreground">
+                  {t(
+                    "Mauzo ya mkopo yatakataliwa yakizidi kiasi hiki. Ukiacha wazi, hakuna kikomo.",
+                    "A credit sale is refused once their balance would pass this. Leave blank for no limit.",
+                  )}
+                </div>
+              </div>
+              <div className="grid gap-1.5">
                 <Label>{t("Tarehe ya malipo (kikumbusho)", "Payment due date (reminder)")}</Label>
                 <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
                 <div className="text-[11px] text-muted-foreground">
@@ -1269,6 +1301,7 @@ function CustomerActions({ c }: { c: Customer }) {
   const [reminders, setReminders] = useState(c.remindersEnabled ?? true);
   const [dueDate, setDueDate] = useState(c.nextDueDate ?? "");
   const [billingCycle, setBillingCycle] = useState<BillingCycle>(c.billingCycle);
+  const [creditLimit, setCreditLimit] = useState<number | "">(c.creditLimitTZS ?? "");
   const update = useUpdateCustomer();
   const remove = useDeleteCustomer();
   const suspend = useSetCustomerSuspended();
@@ -1286,6 +1319,7 @@ function CustomerActions({ c }: { c: Customer }) {
         remindersEnabled: reminders,
         nextDueDate: dueDate || undefined,
         billingCycle,
+        creditLimitTZS: creditLimit === "" ? null : creditLimit,
       },
       {
         onSuccess: () => {
@@ -1442,6 +1476,26 @@ function CustomerActions({ c }: { c: Customer }) {
                     {t(
                       "Barua pepe itatumwa siku 5 kabla na siku yenyewe ya malipo.",
                       "An email goes out 5 days before this date and again on the day itself.",
+                    )}
+                  </div>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>{t("Kikomo cha mkopo (hiari)", "Credit limit (optional)")}</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    min={0}
+                    value={creditLimit}
+                    placeholder={t("Hakuna kikomo", "No limit")}
+                    onChange={(e) =>
+                      setCreditLimit(e.target.value === "" ? "" : Number(e.target.value))
+                    }
+                    className="font-num"
+                  />
+                  <div className="text-[11px] text-muted-foreground">
+                    {t(
+                      `Anadaiwa ${tzs(c.outstandingTZS)} sasa. Ukiacha wazi, hakuna kikomo.`,
+                      `Owes ${tzs(c.outstandingTZS)} right now. Leave blank for no limit.`,
                     )}
                   </div>
                 </div>

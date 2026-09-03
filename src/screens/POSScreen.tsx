@@ -163,9 +163,18 @@ export function POSScreen() {
   const selectedCustomer = customer === "walkin" ? null : customers.find((c) => c.id === customer);
   const isCreditBlocked = pay === "credit" && selectedCustomer?.status === "overdue";
 
+  // The server refuses a sale bigger than stock (insufficient-stock), so the
+  // cart has to refuse it first: discovering it at checkout, after a queue of
+  // customers has formed, is the worst moment to find out.
+  const remainingOf = (pid: string) => stockOf(pid) - cartQtyOf(pid, tier);
+
   const add = (pid: string) => {
     if (isOut(pid)) {
       toast.error(t("Bidhaa imeisha", "Out of stock"));
+      return;
+    }
+    if (remainingOf(pid) <= 0) {
+      toast.error(t(`Kuna ${num(stockOf(pid))} tu ghalani`, `Only ${num(stockOf(pid))} in stock`));
       return;
     }
     setCart((c) => {
@@ -178,6 +187,10 @@ export function POSScreen() {
   // line for the same product+tier) instead of always incrementing by 1.
   const addQty = (pid: string, qty: number) => {
     if (qty <= 0) return;
+    if (qty > remainingOf(pid)) {
+      toast.error(t(`Kuna ${num(stockOf(pid))} tu ghalani`, `Only ${num(stockOf(pid))} in stock`));
+      return;
+    }
     if (isOut(pid)) {
       toast.error(t("Bidhaa imeisha", "Out of stock"));
       return;
@@ -254,7 +267,16 @@ export function POSScreen() {
               ? t("Mteja ana deni lililochelewa", "Customer is overdue, credit blocked")
               : e.message.includes("day-locked")
                 ? t("Siku hii imefungwa", "This day is locked")
-                : t("Imeshindikana kukamilisha mauzo", "Could not complete the sale"),
+                : e.message.includes("insufficient-stock")
+                  ? t("Hakuna bidhaa za kutosha ghalani", "Not enough stock for this sale")
+                  : e.message.includes("exceeds-van-load")
+                    ? t("Umezidi kilichopakiwa kwenye gari", "More than was loaded onto the van")
+                    : e.message.includes("credit-limit-exceeded")
+                      ? t(
+                          "Mteja amefikia kikomo cha mkopo",
+                          "Customer has reached their credit limit",
+                        )
+                      : t("Imeshindikana kukamilisha mauzo", "Could not complete the sale"),
           ),
       },
     );
