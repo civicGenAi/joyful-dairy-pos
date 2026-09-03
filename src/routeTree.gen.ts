@@ -22,6 +22,7 @@ import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ProductsRouteImport } from './routes/products'
 import { Route as ProductionRouteImport } from './routes/production'
 import { Route as PosRouteImport } from './routes/pos'
+import { Route as PayrollRouteImport } from './routes/payroll'
 import { Route as OfflineRouteImport } from './routes/offline'
 import { Route as MaintenanceRouteImport } from './routes/maintenance'
 import { Route as HelpRouteImport } from './routes/help'
@@ -114,6 +115,11 @@ const ProductionRoute = ProductionRouteImport.update({
 const PosRoute = PosRouteImport.update({
   id: '/pos',
   path: '/pos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PayrollRoute = PayrollRouteImport.update({
+  id: '/payroll',
+  path: '/payroll',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OfflineRoute = OfflineRouteImport.update({
@@ -276,6 +282,7 @@ export interface FileRoutesByFullPath {
   '/help': typeof HelpRoute
   '/maintenance': typeof MaintenanceRoute
   '/offline': typeof OfflineRoute
+  '/payroll': typeof PayrollRoute
   '/pos': typeof PosRoute
   '/production': typeof ProductionRoute
   '/products': typeof ProductsRoute
@@ -319,6 +326,7 @@ export interface FileRoutesByTo {
   '/help': typeof HelpRoute
   '/maintenance': typeof MaintenanceRoute
   '/offline': typeof OfflineRoute
+  '/payroll': typeof PayrollRoute
   '/pos': typeof PosRoute
   '/production': typeof ProductionRoute
   '/products': typeof ProductsRoute
@@ -363,6 +371,7 @@ export interface FileRoutesById {
   '/help': typeof HelpRoute
   '/maintenance': typeof MaintenanceRoute
   '/offline': typeof OfflineRoute
+  '/payroll': typeof PayrollRoute
   '/pos': typeof PosRoute
   '/production': typeof ProductionRoute
   '/products': typeof ProductsRoute
@@ -408,6 +417,7 @@ export interface FileRouteTypes {
     | '/help'
     | '/maintenance'
     | '/offline'
+    | '/payroll'
     | '/pos'
     | '/production'
     | '/products'
@@ -451,6 +461,7 @@ export interface FileRouteTypes {
     | '/help'
     | '/maintenance'
     | '/offline'
+    | '/payroll'
     | '/pos'
     | '/production'
     | '/products'
@@ -494,6 +505,7 @@ export interface FileRouteTypes {
     | '/help'
     | '/maintenance'
     | '/offline'
+    | '/payroll'
     | '/pos'
     | '/production'
     | '/products'
@@ -538,6 +550,7 @@ export interface RootRouteChildren {
   HelpRoute: typeof HelpRoute
   MaintenanceRoute: typeof MaintenanceRoute
   OfflineRoute: typeof OfflineRoute
+  PayrollRoute: typeof PayrollRoute
   PosRoute: typeof PosRoute
   ProductionRoute: typeof ProductionRoute
   ProductsRoute: typeof ProductsRoute
@@ -653,6 +666,13 @@ declare module '@tanstack/react-router' {
       path: '/pos'
       fullPath: '/pos'
       preLoaderRoute: typeof PosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payroll': {
+      id: '/payroll'
+      path: '/payroll'
+      fullPath: '/payroll'
+      preLoaderRoute: typeof PayrollRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/offline': {
@@ -884,6 +904,7 @@ const rootRouteChildren: RootRouteChildren = {
   HelpRoute: HelpRoute,
   MaintenanceRoute: MaintenanceRoute,
   OfflineRoute: OfflineRoute,
+  PayrollRoute: PayrollRoute,
   PosRoute: PosRoute,
   ProductionRoute: ProductionRoute,
   ProductsRoute: ProductsRoute,

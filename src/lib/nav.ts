@@ -109,6 +109,13 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: "BookOpen",
         cap: "finance:read",
       },
+      {
+        to: "/payroll",
+        label: "Payroll",
+        sw: "Mishahara",
+        icon: "Users",
+        cap: "finance:read",
+      },
     ],
   },
   {
