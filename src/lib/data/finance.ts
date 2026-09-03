@@ -69,6 +69,7 @@ interface ExpenseRow {
   id: string;
   date: string;
   category: ExpenseCategory;
+  site?: string | null;
   vendor: string;
   description: string;
   amount_tzs: number;
@@ -85,6 +86,9 @@ function toExpense(r: ExpenseRow): ExpenseWithRefs {
     id: r.id,
     date: r.date,
     category: r.category,
+    // Null on rows recorded before sites existed, they group under
+    // "Unassigned" rather than being guessed into a real site's total.
+    site: r.site ?? undefined,
     vendor: r.vendor,
     description: r.description,
     amountTZS: Number(r.amount_tzs),
@@ -114,6 +118,23 @@ export const expenseCategoriesRepo = {
   },
 };
 
+// Which part of the business an expense belongs to: Kiwanda (main plant),
+// Madam (the owner's own), Shamba (the farm). An open set, so another site
+// can be added by typing it once.
+export const expenseSitesRepo = {
+  async list(): Promise<string[]> {
+    const rows = unwrap(await supabase.from("expense_sites").select("name").order("name")) as {
+      name: string;
+    }[];
+    return rows.map((r) => r.name);
+  },
+
+  /** Safe to call with an already-existing name, just does nothing. */
+  async create(name: string): Promise<void> {
+    unwrap(await supabase.from("expense_sites").upsert({ name }, { onConflict: "name" }).select());
+  },
+};
+
 export const expensesRepo = {
   async list(limit = 100): Promise<ExpenseWithRefs[]> {
     const rows = unwrap(
@@ -131,6 +152,7 @@ export const expensesRepo = {
   async create(input: {
     date: string;
     category: ExpenseCategory;
+    site?: string;
     vendor: string;
     description: string;
     amountTZS: number;
@@ -145,15 +167,17 @@ export const expensesRepo = {
       .select("id")
       .eq("auth_user_id", me.user?.id ?? "")
       .maybeSingle();
-    // Remembers a newly-typed category for next time, a no-op if it
+    // Remembers a newly-typed category/site for next time, a no-op if it
     // already exists.
     await expenseCategoriesRepo.create(input.category);
+    if (input.site) await expenseSitesRepo.create(input.site);
     unwrap(
       await supabase
         .from("expenses")
         .insert({
           date: input.date,
           category: input.category,
+          site: input.site ?? null,
           vendor: input.vendor,
           description: input.description,
           amount_tzs: input.amountTZS,

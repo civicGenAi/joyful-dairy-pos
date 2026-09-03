@@ -2,7 +2,12 @@ import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
 // BACKEND: data now flows through src/lib/data/finance (was @/mock/data).
 import type { ExpenseCategory } from "@/mock/data";
-import { useExpenses, useCreateExpense, useExpenseCategories } from "@/lib/data/hooks/finance";
+import {
+  useExpenses,
+  useCreateExpense,
+  useExpenseCategories,
+  useExpenseSites,
+} from "@/lib/data/hooks/finance";
 import { uploadHardCopy } from "@/lib/data/uploads";
 import { todayISO } from "@/lib/data/dates";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
@@ -19,13 +24,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetFooter,
+} from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   PieChart,
@@ -58,6 +63,10 @@ import {
   Briefcase,
   HelpCircle,
   Paperclip,
+  Factory,
+  Crown,
+  Sprout,
+  MapPin,
 } from "lucide-react";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -85,17 +94,37 @@ function categoryLabel(cat: string, lang: "sw" | "en") {
   return meta ? (lang === "sw" ? meta.sw : meta.en) : cat;
 }
 
+// Which part of the business an expense belongs to. Kiwanda is the main
+// plant, Madam is the owner's own spending, Shamba is the farm. A site
+// staff add themselves gets a plain pin icon and its own literal name.
+const SITE_META: Record<string, { icon: typeof Factory; sw: string; en: string; color: string }> = {
+  kiwanda: { icon: Factory, sw: "Kiwanda", en: "Kiwanda (main plant)", color: "#1E7C3F" },
+  madam: { icon: Crown, sw: "Madam", en: "Madam (owner)", color: "#E5A100" },
+  shamba: { icon: Sprout, sw: "Shamba", en: "Shamba (farm)", color: "#8CC63F" },
+};
+const UNASSIGNED = "__unassigned__";
+function siteMeta(site: string) {
+  return SITE_META[site] ?? { icon: MapPin, sw: "", en: "", color: "#6B776E" };
+}
+function siteLabel(site: string, lang: "sw" | "en") {
+  const meta = SITE_META[site];
+  return meta ? (lang === "sw" ? meta.sw : meta.en) : site;
+}
+
 export function ExpensesScreen() {
   const { t, lang, can } = useApp();
   const { data: expenses = [], isPending } = useExpenses();
   const { data: categories = [] } = useExpenseCategories();
+  const { data: sites = [] } = useExpenseSites();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<ExpenseCategory | "all">("all");
+  const [site, setSite] = useState<string>("all");
 
   const filtered = useMemo(
     () =>
       expenses.filter((e) => {
         if (cat !== "all" && e.category !== cat) return false;
+        if (site !== "all" && (e.site ?? UNASSIGNED) !== site) return false;
         if (q) {
           const needle = q.toLowerCase();
           const text =
@@ -104,7 +133,7 @@ export function ExpensesScreen() {
         }
         return true;
       }),
-    [expenses, q, cat],
+    [expenses, q, cat, site],
   );
 
   const total = expenses.reduce((a, e) => a + e.amountTZS, 0);
@@ -120,6 +149,23 @@ export function ExpensesScreen() {
       color: categoryMeta(category).color,
     }));
   }, [expenses, lang]);
+
+  // One row per site with its own total, plus whatever was recorded before
+  // sites existed grouped under "Unassigned" (never folded into a real
+  // site's number), so the parts always add back up to the grand total.
+  const bySite = useMemo(() => {
+    const totals: Record<string, { total: number; count: number }> = {};
+    for (const key of sites) totals[key] = { total: 0, count: 0 };
+    for (const e of expenses) {
+      const key = e.site ?? UNASSIGNED;
+      const row = (totals[key] ??= { total: 0, count: 0 });
+      row.total += e.amountTZS;
+      row.count += 1;
+    }
+    return Object.entries(totals)
+      .filter(([key, v]) => key !== UNASSIGNED || v.count > 0)
+      .map(([key, v]) => ({ site: key, ...v }));
+  }, [expenses, sites]);
 
   if (isPending) {
     return (
@@ -162,6 +208,58 @@ export function ExpensesScreen() {
         />
       </div>
 
+      <SectionCard
+        title={
+          <span className="flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            {t("Matumizi kwa mahali", "Spend by place")}
+          </span>
+        }
+        className="mb-5"
+      >
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {bySite.map(({ site: key, total: siteTotal, count }) => {
+            const meta = siteMeta(key);
+            const Icon = meta.icon;
+            const active = site === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setSite(active ? "all" : key)}
+                className={`rounded-xl border p-3 text-left transition ${
+                  active ? "border-[#1E7C3F] bg-[#1E7C3F]/5" : "border-border hover:bg-accent/40"
+                }`}
+              >
+                <div className="flex items-center gap-1.5 text-xs font-semibold">
+                  <Icon className="h-3.5 w-3.5" style={{ color: meta.color }} />
+                  {key === UNASSIGNED ? t("Hayajapangwa", "Unassigned") : siteLabel(key, lang)}
+                </div>
+                <div className="font-num font-bold text-lg mt-0.5">{tzs(siteTotal)}</div>
+                <div className="text-[11px] text-muted-foreground">
+                  {count} {t("rekodi", "entries")}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        <div
+          className="mt-3 rounded-xl border-2 p-3.5 flex items-center justify-between bg-[#F4F6F2]"
+          style={{ borderColor: "#1E6B3A" }}
+        >
+          <span className="text-sm font-semibold">{t("Jumla kuu", "Grand total")}</span>
+          <span className="font-num font-bold text-lg">{tzs(total)}</span>
+        </div>
+        {site !== "all" && (
+          <div className="mt-2 text-[11px] text-muted-foreground">
+            {t(
+              "Orodha hapo chini inaonyesha mahali ulipochagua tu, bonyeza tena kuondoa kichujio.",
+              "The list below is filtered to the selected place, click it again to clear.",
+            )}
+          </div>
+        )}
+      </SectionCard>
+
       <Tabs defaultValue="list">
         <TabsList>
           <TabsTrigger value="list">{t("Orodha", "List")}</TabsTrigger>
@@ -195,6 +293,20 @@ export function ExpensesScreen() {
                     ))}
                   </SelectContent>
                 </Select>
+                <Select value={site} onValueChange={setSite}>
+                  <SelectTrigger className="h-8 w-36 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("Mahali pote", "All places")}</SelectItem>
+                    {sites.map((k) => (
+                      <SelectItem key={k} value={k}>
+                        {siteLabel(k, lang)}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value={UNASSIGNED}>{t("Hayajapangwa", "Unassigned")}</SelectItem>
+                  </SelectContent>
+                </Select>
                 <ExportMenu
                   formats={["csv", "excel", "pdf"]}
                   filename="expenses"
@@ -204,6 +316,7 @@ export function ExpensesScreen() {
                       "Ref",
                       "Date",
                       "Category",
+                      "Place",
                       "Vendor",
                       "Description",
                       "Invoice",
@@ -214,6 +327,7 @@ export function ExpensesScreen() {
                       e.refNo ?? "",
                       e.date,
                       e.category,
+                      e.site ?? "",
                       e.vendor,
                       e.description,
                       e.invoiceRef ?? "",
@@ -222,7 +336,7 @@ export function ExpensesScreen() {
                     ]),
                   })}
                 />
-                {can("finance:write") && <AddExpenseDialog />}
+                {can("finance:write") && <AddExpenseSheet />}
               </div>
             }
           >
@@ -241,6 +355,7 @@ export function ExpensesScreen() {
                   <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
                     <th className="py-2 px-3">{t("Tarehe", "Date")}</th>
                     <th>{t("Kategoria", "Category")}</th>
+                    <th>{t("Mahali", "Place")}</th>
                     <th>{t("Muuzaji", "Vendor")}</th>
                     <th>{t("Maelezo", "Description")}</th>
                     <th>{t("Njia", "Method")}</th>
@@ -264,6 +379,24 @@ export function ExpensesScreen() {
                             <Icon className="h-3 w-3" />
                             {categoryLabel(e.category, lang)}
                           </Pill>
+                        </td>
+                        <td className="py-2.5">
+                          {e.site ? (
+                            <span className="inline-flex items-center gap-1 text-xs">
+                              {(() => {
+                                const SiteIcon = siteMeta(e.site).icon;
+                                return (
+                                  <SiteIcon
+                                    className="h-3 w-3"
+                                    style={{ color: siteMeta(e.site).color }}
+                                  />
+                                );
+                              })()}
+                              {siteLabel(e.site, lang)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
                         </td>
                         <td className="py-2.5 font-medium">{e.vendor}</td>
                         <td className="py-2.5 text-xs text-muted-foreground">
@@ -310,7 +443,7 @@ export function ExpensesScreen() {
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2 border-border">
-                    <td colSpan={5} className="py-3 px-3 font-semibold">
+                    <td colSpan={6} className="py-3 px-3 font-semibold">
                       {t("Jumla", "Total")}
                     </td>
                     <td className="py-3 text-right font-num font-bold">
@@ -375,14 +508,18 @@ export function ExpensesScreen() {
 }
 
 const NEW_CATEGORY = "__new__";
+const NEW_SITE = "__new_site__";
 
-function AddExpenseDialog() {
+function AddExpenseSheet() {
   const { t, lang } = useApp();
   const { data: categories = [] } = useExpenseCategories();
+  const { data: sites = [] } = useExpenseSites();
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(todayISO());
   const [category, setCategory] = useState<string>("fuel");
   const [newCategory, setNewCategory] = useState("");
+  const [site, setSite] = useState<string>("kiwanda");
+  const [newSite, setNewSite] = useState("");
   const [vendor, setVendor] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState(0);
@@ -394,9 +531,11 @@ function AddExpenseDialog() {
   const create = useCreateExpense();
   const isNewCategory = category === NEW_CATEGORY;
   const finalCategory = isNewCategory ? newCategory.trim().toLowerCase() : category;
+  const isNewSite = site === NEW_SITE;
+  const finalSite = isNewSite ? newSite.trim().toLowerCase() : site;
 
   const save = async () => {
-    if (!vendor.trim() || !amount || !finalCategory) return;
+    if (!vendor.trim() || !amount || !finalCategory || !finalSite) return;
     setSaving(true);
     try {
       let attachmentUrl: string | undefined;
@@ -406,6 +545,7 @@ function AddExpenseDialog() {
         {
           date,
           category: finalCategory,
+          site: finalSite,
           vendor,
           description,
           amountTZS: amount,
@@ -423,6 +563,7 @@ function AddExpenseDialog() {
             setInvoiceRef("");
             setFile(null);
             setNewCategory("");
+            setNewSite("");
           },
           onError: () => toast.error(t("Imeshindikana kurekodi", "Could not record expense")),
           onSettled: () => setSaving(false),
@@ -435,8 +576,8 @@ function AddExpenseDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button
           size="sm"
           className="h-8 text-white"
@@ -445,12 +586,12 @@ function AddExpenseDialog() {
           <Plus className="h-3.5 w-3.5 mr-1" />
           {t("Matumizi mapya", "New expense")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Rekodi matumizi", "Record an expense")}</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-3">
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>{t("Rekodi matumizi", "Record an expense")}</SheetTitle>
+        </SheetHeader>
+        <div className="grid gap-3 mt-5">
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label>{t("Tarehe", "Date")}</Label>
@@ -489,6 +630,38 @@ function AddExpenseDialog() {
                   "It'll be remembered and available next time.",
                 )}
               </div>
+            </div>
+          )}
+          <div className="grid gap-1.5">
+            <Label>{t("Mahali", "Place")}</Label>
+            <Select value={site} onValueChange={setSite}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {sites.map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {siteLabel(k, lang)}
+                  </SelectItem>
+                ))}
+                <SelectItem value={NEW_SITE}>+ {t("Mahali papya", "New place")}</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="text-[11px] text-muted-foreground">
+              {t(
+                "Matumizi haya ni ya sehemu gani ya biashara.",
+                "Which part of the business this spend belongs to.",
+              )}
+            </div>
+          </div>
+          {isNewSite && (
+            <div className="grid gap-1.5">
+              <Label>{t("Jina la mahali papya", "New place name")}</Label>
+              <Input
+                value={newSite}
+                onChange={(e) => setNewSite(e.target.value)}
+                placeholder={t("mf. Duka la Njiro", "e.g. Njiro shop")}
+              />
             </div>
           )}
           <div className="grid gap-1.5">
@@ -559,20 +732,25 @@ function AddExpenseDialog() {
             )}
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter className="mt-5">
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
           <Button
             onClick={save}
-            disabled={saving || create.isPending || (isNewCategory && !newCategory.trim())}
+            disabled={
+              saving ||
+              create.isPending ||
+              (isNewCategory && !newCategory.trim()) ||
+              (isNewSite && !newSite.trim())
+            }
             className="text-white"
             style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
           >
             {saving || create.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }

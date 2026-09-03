@@ -1218,6 +1218,9 @@ export interface Expense {
   id: string;
   date: string;
   category: ExpenseCategory;
+  /** Which part of the business it belongs to: kiwanda, madam, shamba, ...
+   *  Undefined on rows recorded before sites existed. */
+  site?: string;
   vendor: string;
   description: string;
   amountTZS: number;
