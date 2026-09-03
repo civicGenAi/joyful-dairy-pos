@@ -18,6 +18,7 @@ import { todayISO } from "@/lib/data/dates";
 import type { StockItem } from "@/mock/types";
 import type { StockMovement } from "@/lib/data/stock";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
+import { useStockValuation } from "@/lib/data/hooks/stock";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,7 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { num } from "@/lib/format";
+import { num, tzs } from "@/lib/format";
 import {
   AlertTriangle,
   PackagePlus,
@@ -92,6 +93,8 @@ export function StockScreen() {
   const { t, can } = useApp();
   const writable = can("stock:write");
   const { data: items = [], isPending, isError, refetch } = useStock();
+  const { data: valuation = [] } = useStockValuation();
+  const stockValue = valuation.reduce((a, v) => a + v.valueTZS, 0);
   const MOVEMENTS_PAGE_SIZE = 50;
   const [movementsPage, setMovementsPage] = useState(0);
   const { data: movements = [] } = useStockMovements(movementsPage, MOVEMENTS_PAGE_SIZE);
@@ -176,8 +179,9 @@ export function StockScreen() {
           accent="info"
         />
         <StatCard
-          label={t("Vifaa ghala", "Consumables")}
-          value={items.filter((s) => s.category === "consumable").length}
+          label={t("Thamani ya ghala", "Stock value")}
+          value={tzs(stockValue)}
+          sub={t("Kwa gharama ya wastani", "At weighted average cost")}
           accent="amber"
         />
         <StatCard

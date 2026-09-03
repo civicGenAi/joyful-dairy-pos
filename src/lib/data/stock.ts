@@ -93,7 +93,47 @@ function toMovement(r: MovementRow): StockMovement {
   };
 }
 
+export interface StockValuationRow {
+  id: string;
+  name: string;
+  swName: string;
+  category: string;
+  unit: string;
+  onHand: number;
+  avgCostTZS: number;
+  valueTZS: number;
+}
+
 export const stockRepo = {
+  /** What the stock on hand is actually worth, at weighted average cost.
+   *  The same figure the month-end closing-stock adjustment posts, so the
+   *  screen and the balance sheet cannot disagree. */
+  async valuation(): Promise<StockValuationRow[]> {
+    const { data, error } = await supabase.rpc("stock_valuation");
+    if (error) throw new Error(error.message);
+    return (
+      data as {
+        id: string;
+        name: string;
+        sw_name: string;
+        category: string;
+        unit: string;
+        on_hand: number;
+        avg_cost_tzs: number;
+        value_tzs: number;
+      }[]
+    ).map((r) => ({
+      id: r.id,
+      name: r.name,
+      swName: r.sw_name,
+      category: r.category,
+      unit: r.unit,
+      onHand: Number(r.on_hand),
+      avgCostTZS: Number(r.avg_cost_tzs),
+      valueTZS: Number(r.value_tzs),
+    }));
+  },
+
   async list(): Promise<StockItem[]> {
     const rows = unwrap(
       await supabase

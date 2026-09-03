@@ -98,3 +98,7 @@ export function useSetReorder() {
     onSuccess: () => qc.invalidateQueries({ queryKey: stockKeys.all }),
   });
 }
+
+export function useStockValuation() {
+  return useQuery({ queryKey: [...stockKeys.all, "valuation"], queryFn: stockRepo.valuation });
+}
