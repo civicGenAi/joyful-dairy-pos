@@ -85,3 +85,56 @@ export function useUnlockPeriod() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ledgerKeys.all }),
   });
 }
+
+export function useBankRecLines(account: string, asAt: string) {
+  return useQuery({
+    queryKey: ledgerKeys.bankRec(account, asAt),
+    queryFn: async () => ({
+      lines: await ledgerRepo.bankRecLines(account, asAt),
+      summary: await ledgerRepo.bankRecSummary(account, asAt),
+    }),
+  });
+}
+
+export function useManualEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      date,
+      memo,
+      lines,
+    }: {
+      date: string;
+      memo: string;
+      lines: { account: string; debit: number; credit: number; memo?: string }[];
+    }) => ledgerRepo.manualEntry(date, memo, lines),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ledgerKeys.all }),
+  });
+}
+
+export function useSetCleared() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ lineIds, cleared }: { lineIds: string[]; cleared: boolean }) =>
+      ledgerRepo.setCleared(lineIds, cleared),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ledgerKeys.all }),
+  });
+}
+
+export function useCloseBankRec() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      account,
+      statementDate,
+      statementBalance,
+      note,
+    }: {
+      account: string;
+      statementDate: string;
+      statementBalance: number;
+      note?: string;
+    }) => ledgerRepo.closeBankRec(account, statementDate, statementBalance, note),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ledgerKeys.all }),
+  });
+}

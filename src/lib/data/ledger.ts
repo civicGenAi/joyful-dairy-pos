@@ -96,6 +96,23 @@ export interface LockedPeriod {
   note: string | null;
 }
 
+export interface BankRecLine {
+  lineId: string;
+  entryDate: string;
+  memo: string;
+  sourceKind: string;
+  debit: number;
+  credit: number;
+  cleared: boolean;
+}
+
+export interface BankRecSummary {
+  ledgerBalance: number;
+  clearedBalance: number;
+  unclearedTotal: number;
+  unclearedCount: number;
+}
+
 export const ledgerKeys = {
   all: ["ledger"] as const,
   trial: (from: string, to: string) => ["ledger", "trial", from, to] as const,
@@ -107,6 +124,7 @@ export const ledgerKeys = {
   cashFlow: (from: string, to: string) => ["ledger", "cashFlow", from, to] as const,
   status: () => ["ledger", "status"] as const,
   locks: () => ["ledger", "locks"] as const,
+  bankRec: (account: string, asAt: string) => ["ledger", "bankRec", account, asAt] as const,
 };
 
 export const ledgerRepo = {
@@ -146,6 +164,89 @@ export const ledgerRepo = {
   },
 
   /** How current the books are, so a gap is visible rather than inferred. */
+  /** An accrual, a prepayment, a correction: the entries an accountant
+   *  needs that no posting engine can produce. */
+  async manualEntry(
+    date: string,
+    memo: string,
+    lines: { account: string; debit: number; credit: number; memo?: string }[],
+  ): Promise<void> {
+    const { error } = await supabase.rpc("gl_manual_entry", {
+      p_date: date,
+      p_memo: memo,
+      p_lines: lines,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  async bankRecLines(account: string, asAt: string): Promise<BankRecLine[]> {
+    const { data, error } = await supabase.rpc("bank_rec_lines", {
+      p_account: account,
+      p_as_at: asAt,
+    });
+    if (error) throw new Error(error.message);
+    return (
+      data as {
+        line_id: string;
+        entry_date: string;
+        memo: string;
+        source_kind: string;
+        debit: number;
+        credit: number;
+        cleared: boolean;
+      }[]
+    ).map((r) => ({
+      lineId: r.line_id,
+      entryDate: r.entry_date,
+      memo: r.memo,
+      sourceKind: r.source_kind,
+      debit: Number(r.debit),
+      credit: Number(r.credit),
+      cleared: r.cleared,
+    }));
+  },
+
+  async bankRecSummary(account: string, asAt: string): Promise<BankRecSummary> {
+    const { data, error } = await supabase.rpc("bank_rec_summary", {
+      p_account: account,
+      p_as_at: asAt,
+    });
+    if (error) throw new Error(error.message);
+    const r = (data ?? {}) as Record<string, unknown>;
+    return {
+      ledgerBalance: Number(r.ledgerBalance ?? 0),
+      clearedBalance: Number(r.clearedBalance ?? 0),
+      unclearedTotal: Number(r.unclearedTotal ?? 0),
+      unclearedCount: Number(r.unclearedCount ?? 0),
+    };
+  },
+
+  async setCleared(lineIds: string[], cleared: boolean): Promise<void> {
+    const { error } = await supabase.rpc("bank_rec_set_cleared", {
+      p_line_ids: lineIds,
+      p_cleared: cleared,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  /** A difference is stored rather than refused: finding one is the point,
+   *  and refusing to save it would mean nobody records the day they did. */
+  async closeBankRec(
+    account: string,
+    statementDate: string,
+    statementBalance: number,
+    note?: string,
+  ): Promise<{ difference: number }> {
+    const { data, error } = await supabase.rpc("bank_rec_close", {
+      p_account: account,
+      p_statement_date: statementDate,
+      p_statement_balance: statementBalance,
+      p_note: note ?? null,
+    });
+    if (error) throw new Error(error.message);
+    return { difference: Number((data as Record<string, unknown>).difference ?? 0) };
+  },
+
   async postingStatus(): Promise<PostingStatus> {
     const { data, error } = await supabase.rpc("gl_posting_status");
     if (error) throw new Error(error.message);

@@ -17,6 +17,10 @@ import {
   useLockedPeriods,
   useLockPeriod,
   useUnlockPeriod,
+  useBankRecLines,
+  useManualEntry,
+  useSetCleared,
+  useCloseBankRec,
 } from "@/lib/data/hooks/ledger";
 import type { LedgerAccount } from "@/lib/data/ledger";
 import { useAssetSchedule, useCreateAsset, usePostDepreciation } from "@/lib/data/hooks/assets";
@@ -34,7 +38,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { tzs } from "@/lib/format";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { tzs, num } from "@/lib/format";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -279,6 +290,7 @@ export function BooksScreen() {
             <TabsTrigger value="bs">{t("Mizania", "Balance sheet")}</TabsTrigger>
             <TabsTrigger value="tb">{t("Salio la majaribio", "Trial balance")}</TabsTrigger>
             <TabsTrigger value="cash">{t("Mtiririko wa fedha", "Cash flow")}</TabsTrigger>
+            <TabsTrigger value="bank">{t("Kulinganisha benki", "Bank rec")}</TabsTrigger>
             <TabsTrigger value="vat">{t("VAT", "VAT return")}</TabsTrigger>
             <TabsTrigger value="assets">{t("Mali za kudumu", "Fixed assets")}</TabsTrigger>
             <TabsTrigger value="opening">{t("Salio la kuanzia", "Opening balances")}</TabsTrigger>
@@ -393,15 +405,18 @@ export function BooksScreen() {
             <SectionCard
               title={t(`Salio la majaribio, ${monthLabel}`, `Trial balance, ${monthLabel}`)}
               action={
-                <ExportMenu
-                  formats={["csv", "excel", "pdf"]}
-                  filename={`trial-balance-${viewMonth}`}
-                  data={() => ({
-                    title: t(`Salio la majaribio, ${monthLabel}`, `Trial balance, ${monthLabel}`),
-                    headers: ["Code", "Account", "Debit", "Credit"],
-                    rows: tb.map((a) => [a.code, nameOf(a), a.debit ?? 0, a.credit ?? 0]),
-                  })}
-                />
+                <div className="flex items-center gap-2">
+                  {canPost && <ManualEntrySheet accounts={tb} />}
+                  <ExportMenu
+                    formats={["csv", "excel", "pdf"]}
+                    filename={`trial-balance-${viewMonth}`}
+                    data={() => ({
+                      title: t(`Salio la majaribio, ${monthLabel}`, `Trial balance, ${monthLabel}`),
+                      headers: ["Code", "Account", "Debit", "Credit"],
+                      rows: tb.map((a) => [a.code, nameOf(a), a.debit ?? 0, a.credit ?? 0]),
+                    })}
+                  />
+                </div>
               }
             >
               {tb.length === 0 ? (
@@ -503,6 +518,11 @@ export function BooksScreen() {
             <CashFlowTab from={from} to={to} monthLabel={monthLabel} />
           </TabsContent>
 
+          {/* ---- Bank reconciliation ---- */}
+          <TabsContent value="bank" className="mt-4">
+            <BankRecTab to={to} />
+          </TabsContent>
+
           {/* ---- Fixed assets ---- */}
           <TabsContent value="assets" className="mt-4">
             <FixedAssetsTab month={from} monthLabel={monthLabel} />
@@ -515,6 +535,345 @@ export function BooksScreen() {
         </Tabs>
       )}
     </AppShell>
+  );
+}
+// A manual journal: the accrual, prepayment or correction that no posting
+// engine can produce. Deliberately plain, two lines minimum, and it will
+// not save until the two sides agree, which is the same rule the database
+// enforces underneath.
+function ManualEntrySheet({ accounts }: { accounts: LedgerAccount[] }) {
+  const { t, lang } = useApp();
+  const [open, setOpen] = useState(false);
+  const [date, setDate] = useState(todayISO());
+  const [memo, setMemo] = useState("");
+  const [rows, setRows] = useState([
+    { account: "", debit: 0, credit: 0 },
+    { account: "", debit: 0, credit: 0 },
+  ]);
+  const post = useManualEntry();
+  // Every account, not just the ones with a balance this month, otherwise
+  // you could never post to an account that has not been used yet.
+  const { data: all = [] } = useTrialBalance("1900-01-01", todayISO());
+  const options = all.length > 0 ? all : accounts;
+
+  const totalDebit = rows.reduce((a, r) => a + (r.debit || 0), 0);
+  const totalCredit = rows.reduce((a, r) => a + (r.credit || 0), 0);
+  const balanced = totalDebit > 0 && Math.abs(totalDebit - totalCredit) < 0.01;
+  const usable = rows.filter((r) => r.account && (r.debit > 0 || r.credit > 0));
+
+  const setRow = (i: number, patch: Partial<(typeof rows)[number]>) =>
+    setRows((rs) => rs.map((r, ix) => (ix === i ? { ...r, ...patch } : r)));
+
+  const save = () => {
+    if (!balanced || usable.length < 2 || !memo.trim()) return;
+    post.mutate(
+      { date, memo, lines: usable },
+      {
+        onSuccess: () => {
+          toast.success(t("Kidokezo kimewekwa", "Journal posted"));
+          setOpen(false);
+          setMemo("");
+          setRows([
+            { account: "", debit: 0, credit: 0 },
+            { account: "", debit: 0, credit: 0 },
+          ]);
+        },
+        onError: (e) =>
+          toast.error(
+            e.message.includes("period-locked")
+              ? t("Kipindi hiki kimefungwa", "That period is locked")
+              : t("Imeshindikana kuweka", "Could not post the journal"),
+          ),
+      },
+    );
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button size="sm" variant="outline" className="h-8 text-xs">
+          <Plus className="h-3.5 w-3.5 mr-1.5" />
+          {t("Kidokezo cha mkono", "Manual journal")}
+        </Button>
+      </SheetTrigger>
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-2xl overflow-y-auto flex flex-col gap-4"
+      >
+        <SheetHeader>
+          <SheetTitle>{t("Kidokezo cha mkono", "Manual journal entry")}</SheetTitle>
+        </SheetHeader>
+        <div className="grid gap-3">
+          <div className="rounded-xl bg-secondary/60 px-3 py-2.5 text-[11px] text-muted-foreground">
+            {t(
+              "Kwa mambo ambayo mfumo hauwezi kujua: gharama iliyotumika bila ankara, marekebisho, au kufunga mwaka.",
+              "For what the system cannot know on its own: an accrual, a prepayment, a correction, or a year-end adjustment.",
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>{t("Tarehe", "Date")}</Label>
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{t("Maelezo", "Description")}</Label>
+              <Input
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                placeholder={t("mf. Umeme wa Septemba", "e.g. September electricity")}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            {rows.map((r, i) => (
+              <div key={i} className="grid grid-cols-[1fr_110px_110px] gap-2">
+                <Select value={r.account} onValueChange={(v) => setRow(i, { account: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("Chagua akaunti", "Pick an account")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {options.map((a) => (
+                      <SelectItem key={a.code} value={a.code}>
+                        {a.code} · {lang === "sw" ? a.swName : a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  step="any"
+                  placeholder={t("Deni", "Debit")}
+                  value={r.debit || ""}
+                  onChange={(e) => setRow(i, { debit: Number(e.target.value) || 0, credit: 0 })}
+                  className="font-num"
+                />
+                <Input
+                  type="number"
+                  step="any"
+                  placeholder={t("Mkopo", "Credit")}
+                  value={r.credit || ""}
+                  onChange={(e) => setRow(i, { credit: Number(e.target.value) || 0, debit: 0 })}
+                  className="font-num"
+                />
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setRows((rs) => [...rs, { account: "", debit: 0, credit: 0 }])}
+              className="text-[11px] font-semibold text-[#1E7C3F] hover:underline w-fit"
+            >
+              {t("Ongeza mstari", "Add a line")}
+            </button>
+          </div>
+
+          <div
+            className="rounded-xl border-2 p-3 flex items-center justify-between"
+            style={{
+              borderColor: balanced ? "#1E6B3A" : "#E11B22",
+              background: balanced ? "#F4F6F2" : "transparent",
+            }}
+          >
+            <span className="text-sm font-semibold">
+              {balanced
+                ? t("Pande zote mbili zinalingana", "Both sides agree")
+                : t("Bado hazilingani", "The two sides do not agree yet")}
+            </span>
+            <span className="font-num text-sm">
+              {tzs(totalDebit, false)} / {tzs(totalCredit, false)}
+            </span>
+          </div>
+        </div>
+        <SheetFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            {t("Ghairi", "Cancel")}
+          </Button>
+          <Button
+            onClick={save}
+            disabled={!balanced || usable.length < 2 || !memo.trim() || post.isPending}
+          >
+            {post.isPending ? t("Inaweka…", "Posting…") : t("Weka vitabuni", "Post")}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// Bank reconciliation: tick off what the statement shows, then say what the
+// statement said. The difference is the whole point of the exercise, so it
+// is shown plainly and stored even when it is not zero.
+function BankRecTab({ to }: { to: string }) {
+  const { t, can } = useApp();
+  const canWrite = can("finance:write");
+  const [account, setAccount] = useState("1010");
+  const { data, isPending } = useBankRecLines(account, to);
+  const setCleared = useSetCleared();
+  const close = useCloseBankRec();
+  const [statement, setStatement] = useState<number | "">("");
+  const [note, setNote] = useState("");
+
+  const lines = data?.lines ?? [];
+  const summary = data?.summary;
+  const difference =
+    statement === "" || !summary
+      ? null
+      : Math.round((statement - summary.clearedBalance) * 100) / 100;
+
+  const toggle = (lineId: string, cleared: boolean) =>
+    setCleared.mutate(
+      { lineIds: [lineId], cleared },
+      { onError: () => toast.error(t("Imeshindikana", "Could not update the line")) },
+    );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <Select value={account} onValueChange={setAccount}>
+          <SelectTrigger className="h-8 w-44 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1010">{t("Benki", "Bank")}</SelectItem>
+            <SelectItem value="1020">M-Pesa</SelectItem>
+            <SelectItem value="1000">{t("Fedha mkononi", "Cash on hand")}</SelectItem>
+          </SelectContent>
+        </Select>
+        <span className="text-[11px] text-muted-foreground">{t(`Hadi ${to}`, `Up to ${to}`)}</span>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard
+          label={t("Vitabu vinasema", "Ledger says")}
+          value={tzs(summary?.ledgerBalance ?? 0)}
+          accent="info"
+        />
+        <StatCard
+          label={t("Imethibitishwa benki", "Confirmed by bank")}
+          value={tzs(summary?.clearedBalance ?? 0)}
+          accent="green"
+        />
+        <StatCard
+          label={t("Benki bado haijaona", "Bank has not seen yet")}
+          value={tzs(summary?.unclearedTotal ?? 0)}
+          sub={`${num(summary?.unclearedCount ?? 0)} ${t("vipengele", "items")}`}
+          accent="amber"
+        />
+        <StatCard
+          label={t("Tofauti", "Difference")}
+          value={difference === null ? "-" : tzs(difference)}
+          sub={
+            difference === null
+              ? t("Weka salio la benki", "Enter the bank balance")
+              : difference === 0
+                ? t("Inalingana", "Reconciles")
+                : t("Chunguza", "Investigate this")
+          }
+          accent={difference === null ? "info" : difference === 0 ? "green" : "red"}
+        />
+      </div>
+
+      {canWrite && (
+        <SectionCard title={t("Maliza kulinganisha", "Close the reconciliation")}>
+          <div className="grid sm:grid-cols-3 gap-3 items-end">
+            <div className="grid gap-1.5">
+              <Label className="text-xs">
+                {t("Salio kwenye taarifa ya benki", "Balance on the bank statement")}
+              </Label>
+              <Input
+                type="number"
+                step="any"
+                value={statement}
+                onChange={(e) => setStatement(e.target.value === "" ? "" : Number(e.target.value))}
+                className="font-num"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs">{t("Maelezo (hiari)", "Note (optional)")}</Label>
+              <Input value={note} onChange={(e) => setNote(e.target.value)} />
+            </div>
+            <Button
+              disabled={statement === "" || close.isPending}
+              onClick={() =>
+                close.mutate(
+                  { account, statementDate: to, statementBalance: Number(statement), note },
+                  {
+                    onSuccess: (r) =>
+                      toast.success(
+                        r.difference === 0
+                          ? t("Inalingana kabisa", "Reconciles exactly")
+                          : t(
+                              `Imehifadhiwa, tofauti ${tzs(r.difference)}`,
+                              `Saved with a difference of ${tzs(r.difference)}`,
+                            ),
+                      ),
+                    onError: () => toast.error(t("Imeshindikana", "Could not save")),
+                  },
+                )
+              }
+              className="text-white"
+              style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+            >
+              {t("Hifadhi", "Save reconciliation")}
+            </Button>
+          </div>
+          <div className="mt-2 text-[11px] text-muted-foreground">
+            {t(
+              "Tofauti inahifadhiwa hata kama si sifuri. Kuipata ndio lengo la zoezi hili.",
+              "A difference is saved even when it is not zero. Finding one is the point of the exercise.",
+            )}
+          </div>
+        </SectionCard>
+      )}
+
+      <SectionCard title={t("Vipengele", "Items")}>
+        {isPending ? (
+          <TableSkeleton rows={6} cols={4} />
+        ) : lines.length === 0 ? (
+          <EmptyState icon={Scale} title={t("Hakuna vipengele", "Nothing on this account yet")} />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                  <th className="py-2 px-3 w-10">{t("Imeonekana", "Seen")}</th>
+                  <th>{t("Tarehe", "Date")}</th>
+                  <th>{t("Maelezo", "Description")}</th>
+                  <th className="text-right">{t("Imeingia", "In")}</th>
+                  <th className="text-right px-3">{t("Imetoka", "Out")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lines.map((l) => (
+                  <tr
+                    key={l.lineId}
+                    className={`border-b border-border last:border-0 ${l.cleared ? "" : "bg-[#E5A100]/5"}`}
+                  >
+                    <td className="py-2 px-3">
+                      <input
+                        type="checkbox"
+                        checked={l.cleared}
+                        disabled={!canWrite || setCleared.isPending}
+                        onChange={(e) => toggle(l.lineId, e.target.checked)}
+                        className="h-4 w-4 accent-[#1E7C3F]"
+                      />
+                    </td>
+                    <td className="py-2 font-num text-xs text-muted-foreground">{l.entryDate}</td>
+                    <td className="py-2">{l.memo}</td>
+                    <td className="py-2 text-right font-num">
+                      {l.debit > 0 ? tzs(l.debit, false) : ""}
+                    </td>
+                    <td className="py-2 text-right px-3 font-num">
+                      {l.credit > 0 ? tzs(l.credit, false) : ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
+    </div>
   );
 }
 
