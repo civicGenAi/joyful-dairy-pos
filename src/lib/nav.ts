@@ -94,6 +94,13 @@ export const NAV_GROUPS: NavGroup[] = [
     sw: "Fedha",
     items: [
       { to: "/finance", label: "Finance", sw: "Fedha", icon: "Wallet", cap: "finance:read" },
+      {
+        to: "/sales-deposits",
+        label: "Sales deposits",
+        sw: "Amana za mauzo",
+        icon: "Landmark",
+        cap: "finance:read",
+      },
       { to: "/expenses", label: "Expenses", sw: "Matumizi", icon: "Receipt", cap: "finance:read" },
     ],
   },

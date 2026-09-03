@@ -15,6 +15,7 @@ import { Route as StockRouteImport } from './routes/stock'
 import { Route as StatusRouteImport } from './routes/status'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SearchRouteImport } from './routes/search'
+import { Route as SalesDepositsRouteImport } from './routes/sales-deposits'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ReconciliationRouteImport } from './routes/reconciliation'
 import { Route as ProfileRouteImport } from './routes/profile'
@@ -76,6 +77,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SalesDepositsRoute = SalesDepositsRouteImport.update({
+  id: '/sales-deposits',
+  path: '/sales-deposits',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsRoute = ReportsRouteImport.update({
@@ -263,6 +269,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof ProfileRoute
   '/reconciliation': typeof ReconciliationRoute
   '/reports': typeof ReportsRoute
+  '/sales-deposits': typeof SalesDepositsRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
@@ -303,6 +310,7 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/reconciliation': typeof ReconciliationRoute
   '/reports': typeof ReportsRoute
+  '/sales-deposits': typeof SalesDepositsRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
@@ -344,6 +352,7 @@ export interface FileRoutesById {
   '/profile': typeof ProfileRoute
   '/reconciliation': typeof ReconciliationRoute
   '/reports': typeof ReportsRoute
+  '/sales-deposits': typeof SalesDepositsRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
@@ -386,6 +395,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/reconciliation'
     | '/reports'
+    | '/sales-deposits'
     | '/search'
     | '/settings'
     | '/status'
@@ -426,6 +436,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/reconciliation'
     | '/reports'
+    | '/sales-deposits'
     | '/search'
     | '/settings'
     | '/status'
@@ -466,6 +477,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/reconciliation'
     | '/reports'
+    | '/sales-deposits'
     | '/search'
     | '/settings'
     | '/status'
@@ -507,6 +519,7 @@ export interface RootRouteChildren {
   ProfileRoute: typeof ProfileRoute
   ReconciliationRoute: typeof ReconciliationRoute
   ReportsRoute: typeof ReportsRoute
+  SalesDepositsRoute: typeof SalesDepositsRoute
   SearchRoute: typeof SearchRoute
   SettingsRoute: typeof SettingsRoute
   StatusRoute: typeof StatusRoute
@@ -566,6 +579,13 @@ declare module '@tanstack/react-router' {
       path: '/search'
       fullPath: '/search'
       preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sales-deposits': {
+      id: '/sales-deposits'
+      path: '/sales-deposits'
+      fullPath: '/sales-deposits'
+      preLoaderRoute: typeof SalesDepositsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports': {
@@ -819,6 +839,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProfileRoute: ProfileRoute,
   ReconciliationRoute: ReconciliationRoute,
   ReportsRoute: ReportsRoute,
+  SalesDepositsRoute: SalesDepositsRoute,
   SearchRoute: SearchRoute,
   SettingsRoute: SettingsRoute,
   StatusRoute: StatusRoute,

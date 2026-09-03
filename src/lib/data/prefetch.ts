@@ -5,6 +5,7 @@ import { productKeys, productsRepo } from "@/lib/data/products";
 import { locationKeys, locationsRepo } from "@/lib/data/locations";
 import { stockKeys, stockRepo } from "@/lib/data/stock";
 import { financeKeys, expensesRepo } from "@/lib/data/finance";
+import { salesDepositCategoriesRepo } from "@/lib/data/sales";
 
 // BACKEND: hover-prefetch for the sidebar. Warms the query cache for a
 // screen's primary list on nav-link hover, so by the time the click lands
@@ -49,6 +50,12 @@ const PREFETCHERS: Record<string, Prefetcher> = {
     void qc.prefetchQuery({ queryKey: farmerKeys.list(), queryFn: farmersRepo.list }),
   "/expenses": (qc) =>
     void qc.prefetchQuery({ queryKey: financeKeys.expenses(), queryFn: () => expensesRepo.list() }),
+  "/sales-deposits": (qc) =>
+    void qc.prefetchQuery({
+      queryKey: ["salesDepositCategories"],
+      queryFn: salesDepositCategoriesRepo.list,
+      staleTime: REFERENCE_STALE_TIME,
+    }),
   "/settings": (qc) =>
     void qc.prefetchQuery({
       queryKey: locationKeys.list(),
