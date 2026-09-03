@@ -52,3 +52,10 @@ export function useSetOpeningBalances() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ledgerKeys.all }),
   });
 }
+
+export function useCashFlow(from: string, to: string) {
+  return useQuery({
+    queryKey: ledgerKeys.cashFlow(from, to),
+    queryFn: () => ledgerRepo.cashFlow(from, to),
+  });
+}

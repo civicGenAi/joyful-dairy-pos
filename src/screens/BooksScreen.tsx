@@ -12,6 +12,7 @@ import {
   useOpeningBalances,
   useSuggestedOpening,
   useSetOpeningBalances,
+  useCashFlow,
 } from "@/lib/data/hooks/ledger";
 import type { LedgerAccount } from "@/lib/data/ledger";
 import { useAssetSchedule, useCreateAsset, usePostDepreciation } from "@/lib/data/hooks/assets";
@@ -175,6 +176,7 @@ export function BooksScreen() {
             <TabsTrigger value="pl">{t("Faida na hasara", "Profit & loss")}</TabsTrigger>
             <TabsTrigger value="bs">{t("Mizania", "Balance sheet")}</TabsTrigger>
             <TabsTrigger value="tb">{t("Salio la majaribio", "Trial balance")}</TabsTrigger>
+            <TabsTrigger value="cash">{t("Mtiririko wa fedha", "Cash flow")}</TabsTrigger>
             <TabsTrigger value="vat">{t("VAT", "VAT return")}</TabsTrigger>
             <TabsTrigger value="assets">{t("Mali za kudumu", "Fixed assets")}</TabsTrigger>
             <TabsTrigger value="opening">{t("Salio la kuanzia", "Opening balances")}</TabsTrigger>
@@ -394,6 +396,11 @@ export function BooksScreen() {
               </div>
             </SectionCard>
           </TabsContent>
+          {/* ---- Cash flow ---- */}
+          <TabsContent value="cash" className="mt-4">
+            <CashFlowTab from={from} to={to} monthLabel={monthLabel} />
+          </TabsContent>
+
           {/* ---- Fixed assets ---- */}
           <TabsContent value="assets" className="mt-4">
             <FixedAssetsTab month={from} monthLabel={monthLabel} />
@@ -406,6 +413,135 @@ export function BooksScreen() {
         </Tabs>
       )}
     </AppShell>
+  );
+}
+
+// Profit and cash are not the same thing, and the gap between them is what
+// catches people out: a good month whose profit is sitting in unpaid
+// invoices, or went out as a chiller, or was drawn by the owner. This walks
+// from one to the other and then checks itself against what the bank
+// actually did, reporting any gap rather than quietly absorbing it.
+function CashFlowTab({ from, to, monthLabel }: { from: string; to: string; monthLabel: string }) {
+  const { t } = useApp();
+  const { data: cf, isPending } = useCashFlow(from, to);
+
+  if (isPending || !cf) return <TableSkeleton rows={8} cols={2} />;
+
+  const line = (label: string, value: number, muted?: boolean) => (
+    <tr className="border-b border-border last:border-0">
+      <td className={`py-2 pl-3 ${muted ? "text-muted-foreground" : ""}`}>{label}</td>
+      <td className="py-2 text-right pr-3 font-num">{tzs(value, false)}</td>
+    </tr>
+  );
+
+  return (
+    <SectionCard
+      title={t(`Mtiririko wa fedha, ${monthLabel}`, `Cash flow, ${monthLabel}`)}
+      action={
+        <ExportMenu
+          formats={["csv", "excel", "pdf"]}
+          filename={`cash-flow-${from.slice(0, 7)}`}
+          data={() => ({
+            title: t(`Mtiririko wa fedha, ${monthLabel}`, `Cash flow, ${monthLabel}`),
+            headers: ["Item", "Amount TZS"],
+            rows: [
+              ["Profit for the period", cf.profit],
+              ["Depreciation added back", cf.depreciation],
+              ["Change in receivables", cf.receivablesChange],
+              ["Change in payables", cf.payablesChange],
+              ["Change in tax and VAT owed", cf.taxPayablesChange],
+              ["Cash from operations", cf.operating],
+              ["Equipment purchased", cf.assetsPurchased],
+              ["Owner drawings", cf.ownerDrawings],
+              ["Capital introduced", cf.capitalIntroduced],
+              ["Net change in cash", cf.netChange],
+              ["Opening cash", cf.openingCash],
+              ["Closing cash", cf.closingCash],
+            ],
+          })}
+        />
+      }
+    >
+      <table className="w-full text-sm">
+        <tbody>
+          <tr>
+            <td
+              colSpan={2}
+              className="pt-1 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+            >
+              {t("Kutoka kwenye biashara", "From operations")}
+            </td>
+          </tr>
+          {line(t("Faida ya kipindi", "Profit for the period"), cf.profit)}
+          {line(
+            t("Jumlisha uchakavu (hakuna fedha iliyotoka)", "Add back depreciation, no cash moved"),
+            cf.depreciation,
+            true,
+          )}
+          {line(
+            t("Mabadiliko ya madeni ya wateja", "Change in what customers owe"),
+            cf.receivablesChange,
+            true,
+          )}
+          {line(
+            t("Mabadiliko ya tunayodaiwa", "Change in what we owe suppliers and farmers"),
+            cf.payablesChange,
+            true,
+          )}
+          {line(
+            t("Kodi na VAT tunazoshikilia", "Tax and VAT collected, not yet remitted"),
+            cf.taxPayablesChange,
+            true,
+          )}
+          <Total label={t("Fedha kutoka biashara", "Cash from operations")} value={cf.operating} />
+
+          <tr>
+            <td
+              colSpan={2}
+              className="pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+            >
+              {t("Kununua vifaa", "Investing")}
+            </td>
+          </tr>
+          {line(t("Vifaa vilivyonunuliwa", "Equipment purchased"), cf.assetsPurchased)}
+
+          <tr>
+            <td
+              colSpan={2}
+              className="pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+            >
+              {t("Mtaji", "Financing")}
+            </td>
+          </tr>
+          {line(t("Mmiliki alichochukua", "Owner drawings"), cf.ownerDrawings)}
+          {line(t("Mtaji ulioingizwa", "Capital introduced"), cf.capitalIntroduced)}
+
+          <Total
+            label={t("Mabadiliko halisi ya fedha", "Net change in cash")}
+            value={cf.netChange}
+            strong
+          />
+          {line(t("Fedha mwanzoni", "Cash at the start"), cf.openingCash, true)}
+          {line(t("Fedha mwishoni", "Cash at the end"), cf.closingCash, true)}
+        </tbody>
+      </table>
+
+      {Math.abs(cf.unexplained) >= 0.01 ? (
+        <div className="mt-3 rounded-xl border border-[#E11B22]/40 bg-[#E11B22]/10 px-3 py-2.5 text-[11px] text-[#E11B22]">
+          {t(
+            `Kuna tofauti ya ${tzs(cf.unexplained)} isiyoelezeka kati ya hesabu hii na fedha halisi. Hii inaonyeshwa badala ya kufichwa.`,
+            `There is ${tzs(cf.unexplained)} of unexplained difference between this statement and the actual cash movement. It is shown rather than hidden.`,
+          )}
+        </div>
+      ) : (
+        <div className="mt-3 text-[11px] text-muted-foreground">
+          {t(
+            "Hesabu hii inalingana kabisa na fedha halisi iliyoingia na kutoka.",
+            "This statement ties exactly to the cash that actually moved.",
+          )}
+        </div>
+      )}
+    </SectionCard>
   );
 }
 
