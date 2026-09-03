@@ -83,6 +83,19 @@ export interface CashFlow {
   unexplained: number;
 }
 
+export interface PostingStatus {
+  lastPostedDate: string | null;
+  unpostedCount: number;
+  oldestUnposted: string | null;
+}
+
+export interface LockedPeriod {
+  period: string;
+  lockedAt: string;
+  lockedByName: string | null;
+  note: string | null;
+}
+
 export const ledgerKeys = {
   all: ["ledger"] as const,
   trial: (from: string, to: string) => ["ledger", "trial", from, to] as const,
@@ -92,6 +105,8 @@ export const ledgerKeys = {
   opening: () => ["ledger", "opening"] as const,
   suggested: () => ["ledger", "suggestedOpening"] as const,
   cashFlow: (from: string, to: string) => ["ledger", "cashFlow", from, to] as const,
+  status: () => ["ledger", "status"] as const,
+  locks: () => ["ledger", "locks"] as const,
 };
 
 export const ledgerRepo = {
@@ -128,6 +143,54 @@ export const ledgerRepo = {
       inputVat: Number(r.inputVat ?? 0),
       netPayable: Number(r.netPayable ?? 0),
     };
+  },
+
+  /** How current the books are, so a gap is visible rather than inferred. */
+  async postingStatus(): Promise<PostingStatus> {
+    const { data, error } = await supabase.rpc("gl_posting_status");
+    if (error) throw new Error(error.message);
+    const r = (data ?? {}) as Record<string, unknown>;
+    return {
+      lastPostedDate: (r.lastPostedDate as string) ?? null,
+      unpostedCount: Number(r.unpostedCount ?? 0),
+      oldestUnposted: (r.oldestUnposted as string) ?? null,
+    };
+  },
+
+  async lockedPeriods(): Promise<LockedPeriod[]> {
+    const { data, error } = await supabase.rpc("gl_locked_periods");
+    if (error) throw new Error(error.message);
+    return (
+      data as {
+        period: string;
+        locked_at: string;
+        locked_by_name: string | null;
+        note: string | null;
+      }[]
+    ).map((r) => ({
+      period: r.period,
+      lockedAt: r.locked_at,
+      lockedByName: r.locked_by_name,
+      note: r.note,
+    }));
+  },
+
+  /** Refused while anything in the month is still outside the ledger, so a
+   *  lock can never freeze a period with transactions stranded outside it. */
+  async lockPeriod(period: string, note?: string): Promise<void> {
+    const { error } = await supabase.rpc("gl_lock_period", {
+      p_period: period,
+      p_note: note ?? null,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  async unlockPeriod(period: string, reason: string): Promise<void> {
+    const { error } = await supabase.rpc("gl_unlock_period", {
+      p_period: period,
+      p_reason: reason,
+    });
+    if (error) throw new Error(error.message);
   },
 
   async cashFlow(from: string, to: string): Promise<CashFlow> {

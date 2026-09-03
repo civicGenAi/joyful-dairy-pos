@@ -13,6 +13,10 @@ import {
   useSuggestedOpening,
   useSetOpeningBalances,
   useCashFlow,
+  usePostingStatus,
+  useLockedPeriods,
+  useLockPeriod,
+  useUnlockPeriod,
 } from "@/lib/data/hooks/ledger";
 import type { LedgerAccount } from "@/lib/data/ledger";
 import { useAssetSchedule, useCreateAsset, usePostDepreciation } from "@/lib/data/hooks/assets";
@@ -33,6 +37,7 @@ import { Label } from "@/components/ui/label";
 import { tzs } from "@/lib/format";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
 import {
   ChevronLeft,
@@ -43,6 +48,9 @@ import {
   Wand2,
   Plus,
   Truck,
+  Lock,
+  LockOpen,
+  AlertTriangle,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -62,6 +70,11 @@ export function BooksScreen() {
   const { data: tb = [] } = useTrialBalance(from, to);
   const { data: vat } = useVatReturn(from, to);
   const post = usePostLedger();
+  const { data: status } = usePostingStatus();
+  const { data: locks = [] } = useLockedPeriods();
+  const lockPeriod = useLockPeriod();
+  const unlockPeriod = useUnlockPeriod();
+  const isLocked = locks.some((l) => l.period === viewMonth);
 
   const monthLabel = new Date(`${from}T00:00:00`).toLocaleDateString(
     lang === "sw" ? "sw-TZ" : "en-GB",
@@ -130,21 +143,110 @@ export function BooksScreen() {
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
-        {canPost && (
-          <Button
-            size="sm"
-            onClick={runPosting}
-            disabled={post.isPending}
-            className="h-8 text-white"
-            style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
-          >
-            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${post.isPending ? "animate-spin" : ""}`} />
-            {post.isPending
-              ? t("Inaweka vitabuni…", "Posting…")
-              : t("Weka vitabuni", "Post to ledger")}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {isLocked && (
+            <Pill tone="info">
+              <Lock className="h-3 w-3" />
+              {t("Kipindi kimefungwa", "Period locked")}
+            </Pill>
+          )}
+          {canPost && !isLocked && (
+            <ConfirmDialog
+              title={t("Funga kipindi hiki?", "Lock this period?")}
+              description={t(
+                "Baada ya kufunga, hakuna muamala mpya utakaoingia kwenye mwezi huu. Marekebisho yatakwenda kwenye mwezi unaofuata ulio wazi. Fanya hivi baada ya kuwasilisha VAT.",
+                "Once locked, no new entry can land in this month. Corrections go to the next open month instead. Do this after you have filed the VAT return.",
+              )}
+              confirmLabel={t("Funga", "Lock")}
+              onConfirm={() =>
+                lockPeriod.mutate(
+                  { period: viewMonth },
+                  {
+                    onSuccess: () => toast.success(t("Kipindi kimefungwa", "Period locked")),
+                    onError: (e) =>
+                      toast.error(
+                        e.message.includes("unposted-transactions")
+                          ? t(
+                              "Weka miamala yote vitabuni kwanza",
+                              "Post everything in this month to the ledger first",
+                            )
+                          : t("Imeshindikana kufunga", "Could not lock the period"),
+                      ),
+                  },
+                )
+              }
+              trigger={
+                <Button size="sm" variant="outline" className="h-8 text-xs">
+                  <Lock className="h-3.5 w-3.5 mr-1.5" />
+                  {t("Funga kipindi", "Lock period")}
+                </Button>
+              }
+            />
+          )}
+          {canPost && isLocked && (
+            <ConfirmDialog
+              destructive
+              title={t("Fungua kipindi kilichofungwa?", "Reopen a locked period?")}
+              description={t(
+                "Hii inaruhusu takwimu za mwezi uliokwisha wasilishwa kubadilika. Itaandikwa kwenye kumbukumbu.",
+                "This allows a month you have already reported on to change. It is recorded in the audit log.",
+              )}
+              confirmLabel={t("Fungua", "Reopen")}
+              onConfirm={() =>
+                unlockPeriod.mutate(
+                  { period: viewMonth, reason: "Reopened from Books" },
+                  {
+                    onSuccess: () => toast.success(t("Kimefunguliwa", "Period reopened")),
+                    onError: () => toast.error(t("Imeshindikana", "Could not reopen the period")),
+                  },
+                )
+              }
+              trigger={
+                <Button size="sm" variant="outline" className="h-8 text-xs">
+                  <LockOpen className="h-3.5 w-3.5 mr-1.5" />
+                  {t("Fungua", "Reopen")}
+                </Button>
+              }
+            />
+          )}
+          {canPost && (
+            <Button
+              size="sm"
+              onClick={runPosting}
+              disabled={post.isPending}
+              className="h-8 text-white"
+              style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${post.isPending ? "animate-spin" : ""}`} />
+              {post.isPending
+                ? t("Inaweka vitabuni…", "Posting…")
+                : t("Weka vitabuni", "Post to ledger")}
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* How current the books are. An unposted month otherwise looks
+          exactly like a quiet one, which is the more dangerous of the two. */}
+      {status && status.unpostedCount > 0 && (
+        <div className="mb-4 rounded-xl border border-[#E5A100]/40 bg-[#E5A100]/10 px-3.5 py-3 flex items-start gap-2.5">
+          <AlertTriangle className="h-4 w-4 text-[#8a5a00] shrink-0 mt-0.5" />
+          <div className="text-[12.5px] text-[#8a5a00]">
+            {t(
+              `Miamala ${status.unpostedCount} bado haijawekwa vitabuni, ya zamani zaidi ni ya ${status.oldestUnposted}. Takwimu hapa chini hazijakamilika mpaka iwekwe.`,
+              `${status.unpostedCount} transactions are not in the ledger yet, the oldest from ${status.oldestUnposted}. The figures below are incomplete until they are posted.`,
+            )}
+          </div>
+        </div>
+      )}
+      {status && status.unpostedCount === 0 && status.lastPostedDate && (
+        <div className="mb-4 text-[11px] text-muted-foreground">
+          {t(
+            `Vitabu vimewekwa hadi ${status.lastPostedDate}. Vinawekwa vyenyewe kila usiku.`,
+            `Books posted up to ${status.lastPostedDate}. Posting runs automatically each night.`,
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         <StatCard label={t("Mapato", "Revenue")} value={tzs(totalRevenue)} accent="green" />

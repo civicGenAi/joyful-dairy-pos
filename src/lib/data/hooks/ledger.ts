@@ -59,3 +59,29 @@ export function useCashFlow(from: string, to: string) {
     queryFn: () => ledgerRepo.cashFlow(from, to),
   });
 }
+
+export function usePostingStatus() {
+  return useQuery({ queryKey: ledgerKeys.status(), queryFn: ledgerRepo.postingStatus });
+}
+
+export function useLockedPeriods() {
+  return useQuery({ queryKey: ledgerKeys.locks(), queryFn: ledgerRepo.lockedPeriods });
+}
+
+export function useLockPeriod() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ period, note }: { period: string; note?: string }) =>
+      ledgerRepo.lockPeriod(period, note),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ledgerKeys.all }),
+  });
+}
+
+export function useUnlockPeriod() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ period, reason }: { period: string; reason: string }) =>
+      ledgerRepo.unlockPeriod(period, reason),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ledgerKeys.all }),
+  });
+}
