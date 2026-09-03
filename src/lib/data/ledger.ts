@@ -49,12 +49,27 @@ function toAccount(
   };
 }
 
+export interface OpeningLine {
+  code: string;
+  name: string;
+  swName: string;
+  type: string;
+  amount: number;
+}
+
+export interface OpeningBalances {
+  date: string | null;
+  lines: OpeningLine[];
+}
+
 export const ledgerKeys = {
   all: ["ledger"] as const,
   trial: (from: string, to: string) => ["ledger", "trial", from, to] as const,
   pl: (from: string, to: string) => ["ledger", "pl", from, to] as const,
   bs: (asAt: string) => ["ledger", "bs", asAt] as const,
   vat: (from: string, to: string) => ["ledger", "vat", from, to] as const,
+  opening: () => ["ledger", "opening"] as const,
+  suggested: () => ["ledger", "suggestedOpening"] as const,
 };
 
 export const ledgerRepo = {
@@ -91,6 +106,55 @@ export const ledgerRepo = {
       inputVat: Number(r.inputVat ?? 0),
       netPayable: Number(r.netPayable ?? 0),
     };
+  },
+
+  async openingBalances(): Promise<OpeningBalances> {
+    const { data, error } = await supabase.rpc("gl_get_opening_balances");
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as {
+      date: string;
+      code: string;
+      name: string;
+      sw_name: string;
+      type: string;
+      amount: number;
+    }[];
+    return {
+      date: rows[0]?.date ?? null,
+      lines: rows.map((r) => ({
+        code: r.code,
+        name: r.name,
+        swName: r.sw_name,
+        type: r.type,
+        amount: Number(r.amount),
+      })),
+    };
+  },
+
+  /** What the system already knows, so the opening form pre-fills rather
+   *  than asking for figures it can work out itself. */
+  async suggestedOpening(): Promise<{ receivables: number; farmerPayables: number }> {
+    const { data, error } = await supabase.rpc("gl_suggested_opening");
+    if (error) throw new Error(error.message);
+    const r = (data ?? {}) as Record<string, unknown>;
+    return {
+      receivables: Number(r.receivables ?? 0),
+      farmerPayables: Number(r.farmerPayables ?? 0),
+    };
+  },
+
+  /** Replaces the opening entry outright, so a wrong figure is corrected
+   *  rather than stacked on top of. Owner capital is derived, not typed. */
+  async setOpeningBalances(
+    date: string,
+    lines: { account: string; amount: number }[],
+  ): Promise<{ ownerCapital: number }> {
+    const { data, error } = await supabase.rpc("gl_set_opening_balances", {
+      p_date: date,
+      p_lines: lines,
+    });
+    if (error) throw new Error(error.message);
+    return { ownerCapital: Number((data as Record<string, unknown>).ownerCapital ?? 0) };
   },
 
   /** Posts every unposted transaction in the range. Safe to re-run: entries

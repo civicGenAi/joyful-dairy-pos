@@ -9,17 +9,22 @@ import {
   useBalanceSheet,
   useVatReturn,
   usePostLedger,
+  useOpeningBalances,
+  useSuggestedOpening,
+  useSetOpeningBalances,
 } from "@/lib/data/hooks/ledger";
 import type { LedgerAccount } from "@/lib/data/ledger";
 import { todayISO } from "@/lib/data/dates";
 import { SectionCard, StatCard, Pill } from "@/components/ui/data-bits";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { tzs } from "@/lib/format";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
-import { ChevronLeft, ChevronRight, BookOpen, RefreshCw, Scale } from "lucide-react";
+import { ChevronLeft, ChevronRight, BookOpen, RefreshCw, Scale, Wand2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -153,6 +158,7 @@ export function BooksScreen() {
             <TabsTrigger value="bs">{t("Mizania", "Balance sheet")}</TabsTrigger>
             <TabsTrigger value="tb">{t("Salio la majaribio", "Trial balance")}</TabsTrigger>
             <TabsTrigger value="vat">{t("VAT", "VAT return")}</TabsTrigger>
+            <TabsTrigger value="opening">{t("Salio la kuanzia", "Opening balances")}</TabsTrigger>
           </TabsList>
 
           {/* ---- Profit & loss ---- */}
@@ -369,9 +375,216 @@ export function BooksScreen() {
               </div>
             </SectionCard>
           </TabsContent>
+          {/* ---- Opening balances ---- */}
+          <TabsContent value="opening" className="mt-4">
+            <OpeningBalancesTab />
+          </TabsContent>
         </Tabs>
       )}
     </AppShell>
+  );
+}
+
+// Opening balances: what the business already had on the day the books
+// open. Hybrid by design, the figures the system knows for certain are
+// offered as a pre-fill, the rest (cash, bank, equipment) only exist
+// outside the system and have to be typed.
+//
+// Owner capital is deliberately not an input. It is whatever the assets
+// exceed the liabilities by, so the system derives it; typing it would
+// invite a figure that does not reconcile.
+const OPENING_FIELDS: {
+  code: string;
+  sw: string;
+  en: string;
+  group: "asset" | "liability";
+  suggest?: "receivables" | "farmerPayables";
+}[] = [
+  { code: "1000", sw: "Fedha mkononi", en: "Cash on hand", group: "asset" },
+  { code: "1010", sw: "Benki", en: "Bank", group: "asset" },
+  { code: "1020", sw: "M-Pesa", en: "M-Pesa", group: "asset" },
+  {
+    code: "1100",
+    sw: "Madeni ya wateja",
+    en: "Customers owe us",
+    group: "asset",
+    suggest: "receivables",
+  },
+  { code: "1210", sw: "Thamani ya ghala", en: "Stock value", group: "asset" },
+  { code: "1500", sw: "Mali na vifaa", en: "Property and equipment", group: "asset" },
+  {
+    code: "1510",
+    sw: "Uchakavu uliokusanywa",
+    en: "Accumulated depreciation",
+    group: "asset",
+  },
+  {
+    code: "2000",
+    sw: "Tunadaiwa na wafugaji",
+    en: "We owe farmers",
+    group: "liability",
+    suggest: "farmerPayables",
+  },
+  { code: "2010", sw: "Tunadaiwa na wauzaji", en: "We owe suppliers", group: "liability" },
+];
+
+function OpeningBalancesTab() {
+  const { t } = useApp();
+  const { data: existing } = useOpeningBalances();
+  const { data: suggested } = useSuggestedOpening();
+  const save = useSetOpeningBalances();
+  const canWrite = useApp().can("finance:write");
+
+  const [date, setDate] = useState("");
+  const [values, setValues] = useState<Record<string, number>>({});
+  // Seeded from whatever is already saved, once, so an edit starts from
+  // the real figures instead of an empty form.
+  const [seeded, setSeeded] = useState(false);
+  if (!seeded && existing) {
+    setSeeded(true);
+    setDate(existing.date ?? todayISO());
+    const v: Record<string, number> = {};
+    for (const l of existing.lines) if (l.code !== "3000") v[l.code] = l.amount;
+    setValues(v);
+  }
+
+  const assets = OPENING_FIELDS.filter((f) => f.group === "asset");
+  const liabilities = OPENING_FIELDS.filter((f) => f.group === "liability");
+  // Accumulated depreciation is a contra-asset: it reduces what the
+  // equipment is worth, so it subtracts here rather than adding.
+  const totalAssets = assets.reduce(
+    (s, f) => s + (f.code === "1510" ? -(values[f.code] ?? 0) : (values[f.code] ?? 0)),
+    0,
+  );
+  const totalLiabilities = liabilities.reduce((s, f) => s + (values[f.code] ?? 0), 0);
+  const ownerCapital = totalAssets - totalLiabilities;
+
+  const prefill = () => {
+    if (!suggested) return;
+    setValues((v) => ({
+      ...v,
+      1100: suggested.receivables,
+      2000: suggested.farmerPayables,
+    }));
+    toast.success(t("Tumejaza tunachokijua", "Filled in what we already know"));
+  };
+
+  const submit = () => {
+    if (!date) return;
+    save.mutate(
+      {
+        date,
+        lines: OPENING_FIELDS.map((f) => ({ account: f.code, amount: values[f.code] ?? 0 })),
+      },
+      {
+        onSuccess: () =>
+          toast.success(t("Salio la kuanzia limehifadhiwa", "Opening balances saved")),
+        onError: () => toast.error(t("Imeshindikana kuhifadhi", "Could not save opening balances")),
+      },
+    );
+  };
+
+  const field = (f: (typeof OPENING_FIELDS)[number]) => (
+    <div key={f.code} className="grid gap-1.5">
+      <Label className="text-xs">
+        <span className="font-num text-[10px] text-muted-foreground mr-1.5">{f.code}</span>
+        {t(f.sw, f.en)}
+      </Label>
+      <Input
+        type="number"
+        step="any"
+        disabled={!canWrite}
+        value={values[f.code] ?? ""}
+        placeholder="0"
+        onChange={(e) => setValues((v) => ({ ...v, [f.code]: Number(e.target.value) || 0 }))}
+        className="font-num"
+      />
+    </div>
+  );
+
+  return (
+    <SectionCard
+      title={t("Salio la kuanzia", "Opening balances")}
+      action={
+        canWrite && (
+          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={prefill}>
+            <Wand2 className="h-3.5 w-3.5 mr-1.5" />
+            {t("Jaza tunachokijua", "Fill what we know")}
+          </Button>
+        )
+      }
+    >
+      <div className="rounded-xl bg-secondary/60 px-3 py-2.5 text-[11px] text-muted-foreground mb-4">
+        {t(
+          "Hii ni hali ya biashara siku vitabu vinaanza: fedha, benki, vifaa na madeni yaliyokuwepo kabla ya mfumo. Bila hii, mizania inaonyesha tu yaliyotokea ndani ya mfumo.",
+          "This is where the business stood on the day the books open: the cash, bank, equipment and debts that existed before the system. Without it the balance sheet only shows what happened inside the system.",
+        )}
+      </div>
+
+      <div className="grid gap-1.5 max-w-xs mb-4">
+        <Label className="text-xs">{t("Vitabu vinaanza tarehe", "Books open as at")}</Label>
+        <Input
+          type="date"
+          value={date}
+          disabled={!canWrite}
+          onChange={(e) => setDate(e.target.value)}
+        />
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-5">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+            {t("Tulichokuwa nacho", "What we had")}
+          </div>
+          <div className="grid gap-3">{assets.map(field)}</div>
+        </div>
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+            {t("Tuliyokuwa tunadaiwa", "What we owed")}
+          </div>
+          <div className="grid gap-3">{liabilities.map(field)}</div>
+
+          <div
+            className="mt-5 rounded-xl border-2 p-3.5 bg-[#F4F6F2]"
+            style={{ borderColor: "#1E6B3A" }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold">
+                {t("Mtaji wa mmiliki", "Owner capital")}
+              </span>
+              <span className="font-num font-bold text-lg">{tzs(ownerCapital)}</span>
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-1">
+              {t(
+                "Inahesabiwa yenyewe: mali kasoro madeni. Hakuna cha kuandika hapa.",
+                "Worked out for you: what you had less what you owed. Nothing to type here.",
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {canWrite && (
+        <div className="mt-5 flex items-center gap-3">
+          <Button
+            onClick={submit}
+            disabled={save.isPending || !date}
+            className="text-white"
+            style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+          >
+            {save.isPending
+              ? t("Inahifadhi…", "Saving…")
+              : t("Hifadhi salio la kuanzia", "Save opening balances")}
+          </Button>
+          <span className="text-[11px] text-muted-foreground">
+            {t(
+              "Kuhifadhi tena kunarekebisha, hakuongezi mara ya pili.",
+              "Saving again corrects the figures, it does not add a second set.",
+            )}
+          </span>
+        </div>
+      )}
+    </SectionCard>
   );
 }
 

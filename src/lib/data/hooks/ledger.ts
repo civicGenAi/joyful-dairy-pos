@@ -35,3 +35,20 @@ export function usePostLedger() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ledgerKeys.all }),
   });
 }
+
+export function useOpeningBalances() {
+  return useQuery({ queryKey: ledgerKeys.opening(), queryFn: ledgerRepo.openingBalances });
+}
+
+export function useSuggestedOpening() {
+  return useQuery({ queryKey: ledgerKeys.suggested(), queryFn: ledgerRepo.suggestedOpening });
+}
+
+export function useSetOpeningBalances() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ date, lines }: { date: string; lines: { account: string; amount: number }[] }) =>
+      ledgerRepo.setOpeningBalances(date, lines),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ledgerKeys.all }),
+  });
+}
