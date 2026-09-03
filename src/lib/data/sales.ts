@@ -163,11 +163,35 @@ export const salesRepo = {
   },
 };
 
+// Bilingual display label per deposit source. The 4 fixed sources plus the
+// initial 7 sales-deposit categories are named here for a nicer label; any
+// later custom category (typed by staff, see salesDepositCategoriesRepo)
+// just falls back to its own raw name in both languages, same as expense
+// categories already do.
+export const SOURCE_LABEL: Record<string, { sw: string; en: string }> = {
+  customer: { sw: "Amana ya mteja", en: "Customer deposit" },
+  route: { sw: "Cash ya njia", en: "Route cash-up" },
+  pos: { sw: "Cash benki", en: "Cash banking" },
+  other: { sw: "Nyingine", en: "Other" },
+  "fresh-milk": { sw: "Mauzo ya maziwa", en: "Fresh milk sales" },
+  mtindi: { sw: "Mtindi", en: "Mtindi" },
+  yogurt: { sw: "Yogati", en: "Yoghurt" },
+  butter: { sw: "Siagi", en: "Butter" },
+  shambani: { sw: "Shambani", en: "Shambani" },
+  masoko: { sw: "Masoko", en: "Masoko" },
+  madumu: { sw: "Madumu", en: "Madumu" },
+};
+
+// "pos" | "route" | "customer" | "other" are the fixed, structural sources,
+// each already has its own dedicated recording flow elsewhere. Anything
+// else is a sales-deposit category (fresh milk, mtindi, an outlet like
+// Shambani, ...), an open set backed by sales_deposit_categories so a
+// newly-typed one is remembered, see salesDepositCategoriesRepo below.
 export interface DepositRecord {
   id: string;
   date: string;
   at: string;
-  source: "pos" | "route" | "customer" | "other";
+  source: string;
   customerId: string | null;
   customerName?: string;
   method: "cash" | "mpesa" | "bank";
@@ -181,6 +205,7 @@ export const depositKeys = {
   all: ["deposits"] as const,
   list: () => ["deposits", "list"] as const,
   byId: (id: string) => ["deposits", "byId", id] as const,
+  byRange: (from: string, to: string) => ["deposits", "byRange", from, to] as const,
 };
 
 interface DepositRow {
@@ -232,6 +257,19 @@ export const depositsRepo = {
     return toDeposit(row);
   },
 
+  /** All deposits within a date range, uncapped, for a monthly view. */
+  async listByRange(fromDate: string, toDate: string): Promise<DepositRecord[]> {
+    const rows = unwrap(
+      await supabase
+        .from("deposits")
+        .select("*, customers(name)")
+        .gte("date", fromDate)
+        .lte("date", toDate)
+        .order("date"),
+    ) as DepositRow[];
+    return rows.map(toDeposit);
+  },
+
   /**
    * Generic deposit slip (route cash-up, counter banking, other income).
    * The reference is system-generated (AJD-DEP-YYMMDD-seq) unless supplied.
@@ -244,6 +282,7 @@ export const depositsRepo = {
     ref?: string;
     note?: string;
     attachmentUrl?: string;
+    date?: string;
   }): Promise<void> {
     const { error } = await supabase.rpc("record_deposit", {
       p_source: input.source,
@@ -253,7 +292,30 @@ export const depositsRepo = {
       p_ref: input.ref ?? null,
       p_note: input.note ?? null,
       p_attachment_url: input.attachmentUrl ?? null,
+      ...(input.date ? { p_date: input.date } : {}),
     });
     if (error) throw new Error(error.message);
+  },
+};
+
+// Sales-deposit categories (fresh milk, mtindi, an outlet like Shambani, ...):
+// an open set, not a fixed enum, so a newly-typed one is offered again
+// next time instead of everything uncommon falling into "other".
+export const salesDepositCategoriesRepo = {
+  async list(): Promise<string[]> {
+    const rows = unwrap(
+      await supabase.from("sales_deposit_categories").select("name").order("name"),
+    ) as { name: string }[];
+    return rows.map((r) => r.name);
+  },
+
+  /** Safe to call with an already-existing name, just does nothing. */
+  async create(name: string): Promise<void> {
+    unwrap(
+      await supabase
+        .from("sales_deposit_categories")
+        .upsert({ name }, { onConflict: "name" })
+        .select(),
+    );
   },
 };

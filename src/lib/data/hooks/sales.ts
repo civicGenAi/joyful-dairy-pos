@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { depositKeys, depositsRepo, saleKeys, salesRepo } from "@/lib/data/sales";
+import {
+  depositKeys,
+  depositsRepo,
+  saleKeys,
+  salesRepo,
+  salesDepositCategoriesRepo,
+} from "@/lib/data/sales";
 
 // BACKEND: react-query wrappers for sales + deposits.
 
@@ -67,5 +73,27 @@ export function useRecordDeposit() {
       qc.invalidateQueries({ queryKey: ["customers"] });
       qc.invalidateQueries({ queryKey: ["finance"] });
     },
+  });
+}
+
+export function useDepositsByRange(fromDate: string, toDate: string) {
+  return useQuery({
+    queryKey: depositKeys.byRange(fromDate, toDate),
+    queryFn: () => depositsRepo.listByRange(fromDate, toDate),
+  });
+}
+
+export function useSalesDepositCategories() {
+  return useQuery({
+    queryKey: ["salesDepositCategories"],
+    queryFn: salesDepositCategoriesRepo.list,
+  });
+}
+
+export function useCreateSalesDepositCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: salesDepositCategoriesRepo.create,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["salesDepositCategories"] }),
   });
 }

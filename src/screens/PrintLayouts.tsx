@@ -2,6 +2,7 @@ import { JoyLogo } from "@/components/brand/JoyLogo";
 import { Button } from "@/components/ui/button";
 // BACKEND: print pages render live records via src/lib/data hooks.
 import { useSale, useDeposit } from "@/lib/data/hooks/sales";
+import { SOURCE_LABEL } from "@/lib/data/sales";
 import { useProducts } from "@/lib/data/hooks/products";
 import {
   useCustomer,
@@ -649,14 +650,10 @@ export function DepositSlipPrintScreen() {
       </PrintShell>
     );
 
-  const sourceLabel =
-    deposit.source === "route"
-      ? t("Cash ya njia", "Route cash-up")
-      : deposit.source === "pos"
-        ? t("Cash benki", "Cash banking")
-        : deposit.source === "customer"
-          ? t("Amana ya mteja", "Customer deposit")
-          : t("Nyingine", "Other");
+  const sourceLabel = t(
+    SOURCE_LABEL[deposit.source]?.sw ?? deposit.source,
+    SOURCE_LABEL[deposit.source]?.en ?? deposit.source,
+  );
 
   return (
     <PrintShell

@@ -3,7 +3,14 @@ import { useApp } from "@/app/context";
 // BACKEND: data now flows through src/lib/data/{customers,farmers,sales,finance,recon}.
 import { useCustomers } from "@/lib/data/hooks/customers";
 import { useFarmers, useCycleSummary } from "@/lib/data/hooks/farmers";
-import { useDeposits, useRecordDeposit } from "@/lib/data/hooks/sales";
+import {
+  useDeposits,
+  useRecordDeposit,
+  useDepositsByRange,
+  useSalesDepositCategories,
+  useCreateSalesDepositCategory,
+} from "@/lib/data/hooks/sales";
+import { SOURCE_LABEL } from "@/lib/data/sales";
 import { useCashPosition, useInitiatePayouts } from "@/lib/data/hooks/finance";
 import { useDayLocks, useConfirmDay } from "@/lib/data/hooks/recon";
 import { todayISO, dateLabel } from "@/lib/data/dates";
@@ -54,6 +61,8 @@ import {
   ArrowUpRight,
   Paperclip,
   Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -62,13 +71,6 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Link } from "@tanstack/react-router";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
 import { EmptyState } from "@/components/ui/EmptyState";
-
-const SOURCE_LABEL: Record<string, { sw: string; en: string }> = {
-  customer: { sw: "Amana ya mteja", en: "Customer deposit" },
-  route: { sw: "Cash ya njia", en: "Route cash-up" },
-  pos: { sw: "Cash benki", en: "Cash banking" },
-  other: { sw: "Nyingine", en: "Other" },
-};
 
 export function FinanceScreen() {
   const { t } = useApp();
@@ -170,6 +172,7 @@ export function FinanceScreen() {
           <TabsTrigger value="receivables">{t("Madeni", "Receivables")}</TabsTrigger>
           <TabsTrigger value="payables">{t("Malipo wafugaji", "Farmer payables")}</TabsTrigger>
           <TabsTrigger value="deposits">{t("Amana & Risiti", "Deposits & receipts")}</TabsTrigger>
+          <TabsTrigger value="sales-deposits">{t("Amana za mauzo", "Sales deposits")}</TabsTrigger>
           <TabsTrigger value="cash">{t("Cash position", "Cash position")}</TabsTrigger>
           <TabsTrigger value="dayclose">
             {t("Kuthibitisha siku", "Day-close confirmation")}
@@ -481,6 +484,10 @@ export function FinanceScreen() {
           </SectionCard>
         </TabsContent>
 
+        <TabsContent value="sales-deposits" className="mt-4">
+          <SalesDepositsTab canDeposit={canDeposit} />
+        </TabsContent>
+
         <TabsContent value="cash" className="mt-4">
           <div className="grid lg:grid-cols-3 gap-4">
             <SectionCard
@@ -615,6 +622,316 @@ export function FinanceScreen() {
         </TabsContent>
       </Tabs>
     </AppShell>
+  );
+}
+
+// Sales deposits: banking real sales revenue (products + outlets) by month,
+// typed in by hand since POS/route sales don't record which outlet a sale
+// happened at yet. Reuses the same deposits table/RPC as the generic
+// Deposits & receipts tab, just scoped to sales_deposit_categories sources
+// instead of customer/route/pos/other.
+function SalesDepositsTab({ canDeposit }: { canDeposit: boolean }) {
+  const { t, lang } = useApp();
+  const currentMonth = todayISO().slice(0, 7);
+  const [viewMonth, setViewMonth] = useState(currentMonth);
+  const [viewYear, viewMon] = viewMonth.split("-").map(Number);
+  const daysInMonth = new Date(viewYear, viewMon, 0).getDate();
+  const monthStart = `${viewMonth}-01`;
+  const monthEnd = `${viewMonth}-${String(daysInMonth).padStart(2, "0")}`;
+  const { data: categories = [] } = useSalesDepositCategories();
+  const { data: monthDeposits = [], isPending } = useDepositsByRange(monthStart, monthEnd);
+
+  const salesDeposits = monthDeposits.filter((d) => categories.includes(d.source));
+  const grandTotal = salesDeposits.reduce((a, d) => a + d.amountTZS, 0);
+  const byCategory = categories.map((cat) => {
+    const txns = salesDeposits
+      .filter((d) => d.source === cat)
+      .sort((a, b) => (a.date < b.date ? 1 : -1));
+    return { category: cat, txns, total: txns.reduce((a, d) => a + d.amountTZS, 0) };
+  });
+
+  const monthLabel = new Date(`${monthStart}T00:00:00`).toLocaleDateString(
+    lang === "sw" ? "sw-TZ" : "en-GB",
+    { month: "long", year: "numeric" },
+  );
+  const shiftMonth = (delta: number) => {
+    const d = new Date(viewYear, viewMon - 1 + delta, 1);
+    setViewMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => shiftMonth(-1)}
+            className="grid h-7 w-7 place-items-center rounded-md hover:bg-accent border border-border"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <span className="text-sm font-semibold w-36 text-center">{monthLabel}</span>
+          <button
+            type="button"
+            onClick={() => shiftMonth(1)}
+            disabled={viewMonth >= currentMonth}
+            className="grid h-7 w-7 place-items-center rounded-md hover:bg-accent border border-border disabled:opacity-30"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        {canDeposit && <RecordSalesDepositDialog categories={categories} />}
+      </div>
+
+      {isPending ? (
+        <SectionSkeleton>
+          <TableSkeleton rows={7} cols={3} />
+        </SectionSkeleton>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {byCategory.map(({ category, total, txns }) => (
+              <div key={category} className="rounded-xl border border-border p-3">
+                <div className="text-xs font-semibold">
+                  {t(
+                    SOURCE_LABEL[category]?.sw ?? category,
+                    SOURCE_LABEL[category]?.en ?? category,
+                  )}
+                </div>
+                <div className="font-num font-bold text-lg mt-0.5">{tzs(total)}</div>
+                <div className="text-[11px] text-muted-foreground">
+                  {txns.length} {t("miamala", "deposits")}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div
+            className="rounded-xl border-2 p-3 flex items-center justify-between bg-[#F4F6F2]"
+            style={{ borderColor: "#1E6B3A" }}
+          >
+            <span className="text-sm font-semibold">{t("Jumla ya mwezi", "Total this month")}</span>
+            <span className="font-num font-bold text-lg">{tzs(grandTotal)}</span>
+          </div>
+
+          <SectionCard title={t("Miamala ya mwezi", "This month's transactions")}>
+            {salesDeposits.length === 0 ? (
+              <EmptyState
+                icon={Receipt}
+                title={t("Hakuna amana za mauzo bado", "No sales deposits recorded yet")}
+              />
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                    <th className="py-2 px-3">{t("Tarehe", "Date")}</th>
+                    <th>{t("Aina", "Category")}</th>
+                    <th>{t("Njia", "Method")}</th>
+                    <th className="text-right">{t("Kiasi", "Amount")}</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {salesDeposits
+                    .slice()
+                    .sort((a, b) => (a.date < b.date ? 1 : -1))
+                    .map((d) => (
+                      <tr key={d.id} className="border-b border-border last:border-0">
+                        <td className="py-2.5 px-3 font-num text-xs text-muted-foreground">
+                          {d.date}
+                        </td>
+                        <td className="py-2.5">
+                          <Pill tone="info">
+                            {t(
+                              SOURCE_LABEL[d.source]?.sw ?? d.source,
+                              SOURCE_LABEL[d.source]?.en ?? d.source,
+                            )}
+                          </Pill>
+                        </td>
+                        <td className="py-2.5">
+                          <span className="inline-flex items-center gap-1 text-xs">
+                            {d.method === "mpesa" ? (
+                              <Smartphone className="h-3 w-3" />
+                            ) : (
+                              <ArrowUpRight className="h-3 w-3" />
+                            )}
+                            {d.method}
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-right font-num font-semibold">
+                          {tzs(d.amountTZS)}
+                        </td>
+                        <td className="py-2.5 text-right pr-3">
+                          {d.attachmentUrl && (
+                            <a
+                              href={d.attachmentUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={t("Nakala ngumu", "Hard copy")}
+                              className="text-[#1E7C3F] hover:opacity-70"
+                            >
+                              <Paperclip className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            )}
+          </SectionCard>
+        </>
+      )}
+    </div>
+  );
+}
+
+const NEW_SALES_CATEGORY = "__new__";
+
+function RecordSalesDepositDialog({ categories }: { categories: string[] }) {
+  const { t } = useApp();
+  const [open, setOpen] = useState(false);
+  const [category, setCategory] = useState(categories[0] ?? "");
+  const [newCategory, setNewCategory] = useState("");
+  const [date, setDate] = useState(todayISO());
+  const [amount, setAmount] = useState(0);
+  const [method, setMethod] = useState<"mpesa" | "bank">("mpesa");
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  const record = useRecordDeposit();
+  const createCategory = useCreateSalesDepositCategory();
+
+  const isNewCategory = category === NEW_SALES_CATEGORY;
+  const finalCategory = isNewCategory ? newCategory.trim().toLowerCase() : category;
+
+  const save = async () => {
+    if (!finalCategory || amount <= 0 || !file) return;
+    setSaving(true);
+    try {
+      const attachmentUrl = await uploadHardCopy(file, "deposit");
+      if (isNewCategory) await createCategory.mutateAsync(finalCategory);
+      record.mutate(
+        { source: finalCategory, method, amountTZS: amount, date, attachmentUrl },
+        {
+          onSuccess: () => {
+            toast.success(t("Amana imerekodiwa", "Deposit recorded"));
+            setOpen(false);
+            setAmount(0);
+            setFile(null);
+            setNewCategory("");
+          },
+          onError: () => toast.error(t("Imeshindikana kurekodi", "Could not record the deposit")),
+          onSettled: () => setSaving(false),
+        },
+      );
+    } catch {
+      toast.error(t("Imeshindikana kupakia risiti", "Could not upload the receipt"));
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          size="sm"
+          className="h-8 text-white"
+          style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+        >
+          <Plus className="h-3.5 w-3.5 mr-1" />
+          {t("Amana mpya", "New deposit")}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("Rekodi amana ya mauzo", "Record a sales deposit")}</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-3">
+          <div className="grid gap-1.5">
+            <Label>{t("Aina/Sehemu", "Category/outlet")}</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {t(SOURCE_LABEL[c]?.sw ?? c, SOURCE_LABEL[c]?.en ?? c)}
+                  </SelectItem>
+                ))}
+                <SelectItem value={NEW_SALES_CATEGORY}>{t("Ongeza mpya…", "Add new…")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {isNewCategory && (
+            <div className="grid gap-1.5">
+              <Label>{t("Jina la aina mpya", "New category name")}</Label>
+              <Input
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                placeholder={t("mfano: Njiro", "e.g. Njiro")}
+              />
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>{t("Tarehe", "Date")}</Label>
+              <Input
+                type="date"
+                value={date}
+                max={todayISO()}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{t("Kiasi (TZS)", "Amount (TZS)")}</Label>
+              <Input
+                type="number"
+                step="any"
+                value={amount}
+                onChange={(e) => setAmount(Number(e.target.value))}
+              />
+            </div>
+          </div>
+          <div className="grid gap-1.5">
+            <Label>{t("Njia", "Channel")}</Label>
+            <Select value={method} onValueChange={(v) => setMethod(v as typeof method)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mpesa">M-Pesa</SelectItem>
+                <SelectItem value="bank">Bank</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label>{t("Risiti (lazima, picha au PDF)", "Receipt (required, photo or PDF)")}</Label>
+            <Input
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="text-xs"
+            />
+            {file && <div className="text-[11px] text-muted-foreground">{file.name}</div>}
+            <div className="text-[11px] text-muted-foreground">
+              {t(
+                "Risiti ndiyo ushahidi pekee wa amana hii, hakuna namba ya rejea ya kuandika.",
+                "The receipt is the single source of truth for this deposit, there's no reference number to type.",
+              )}
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            {t("Ghairi", "Cancel")}
+          </Button>
+          <Button onClick={save} disabled={saving || record.isPending || !file || amount <= 0}>
+            {saving || record.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
