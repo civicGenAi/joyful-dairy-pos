@@ -106,6 +106,9 @@ export interface CollectionEntry {
   /** The rate that actually applied on this day, captured historically so
    *  a later rate change never distorts what an old statement line shows. */
   ratePerL?: number;
+  /** What the farmer brought, where some was refused on quality. */
+  offeredLitres?: number;
+  rejectReason?: string;
 }
 
 export interface StockItem {

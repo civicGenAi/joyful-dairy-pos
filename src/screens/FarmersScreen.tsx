@@ -404,13 +404,31 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
   const [note, setNote] = useState("");
   const record = useRecordCollectionDay();
   const total = morningLitres + eveningLitres;
+  // Refusing milk is the exception, so it stays folded away: the ordinary
+  // day is still two numbers and a save.
+  const [rejecting, setRejecting] = useState(false);
+  const [morningRejected, setMorningRejected] = useState(0);
+  const [eveningRejected, setEveningRejected] = useState(0);
+  const [rejectReason, setRejectReason] = useState("alcohol-test");
+  const rejectedTotal = rejecting ? morningRejected + eveningRejected : 0;
 
   // Autosaved while open, so a closed tab or a stray click never costs a
   // half-entered day of collection.
   const draft = useFormDraft({
     key: "record-collection",
     enabled: open,
-    value: { farmerId, date, morningLitres, eveningLitres, locationId, note },
+    value: {
+      farmerId,
+      date,
+      morningLitres,
+      eveningLitres,
+      locationId,
+      note,
+      rejecting,
+      morningRejected,
+      eveningRejected,
+      rejectReason,
+    },
     onRestore: (v) => {
       setFarmerId(v.farmerId);
       setDate(v.date);
@@ -418,6 +436,10 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
       setEveningLitres(v.eveningLitres);
       setLocationId(v.locationId);
       setNote(v.note);
+      setRejecting(v.rejecting);
+      setMorningRejected(v.morningRejected);
+      setEveningRejected(v.eveningRejected);
+      setRejectReason(v.rejectReason);
     },
   });
 
@@ -447,6 +469,10 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
         morningLitres,
         eveningLitres,
         qualityNote: note || undefined,
+        // Offered is what she brought: accepted plus whatever was sent back.
+        morningOffered: rejectedTotal > 0 ? morningLitres + morningRejected : undefined,
+        eveningOffered: rejectedTotal > 0 ? eveningLitres + eveningRejected : undefined,
+        rejectReason: rejectedTotal > 0 ? rejectReason : undefined,
       },
       {
         onSuccess: () => {
@@ -456,6 +482,9 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
           setNote("");
           setMorningLitres(0);
           setEveningLitres(0);
+          setRejecting(false);
+          setMorningRejected(0);
+          setEveningRejected(0);
         },
         onError: (e) =>
           toast.error(
@@ -466,12 +495,17 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
                     "Huwezi kurekodi tarehe ijayo, chagua leo au tarehe iliyopita",
                     "You can't record a future date, pick today or an earlier date",
                   )
-                : e.message.includes("empty-collection")
+                : e.message.includes("accepted-exceeds-offered")
                   ? t(
-                      "Weka lita za asubuhi au jioni, angalau moja",
-                      "Enter morning or evening litres, at least one",
+                      "Uliyokubali ni zaidi ya aliyoleta",
+                      "You accepted more litres than she brought",
                     )
-                  : t("Imeshindikana kurekodi", "Could not record collection"),
+                  : e.message.includes("empty-collection")
+                    ? t(
+                        "Weka lita za asubuhi au jioni, angalau moja",
+                        "Enter morning or evening litres, at least one",
+                      )
+                    : t("Imeshindikana kurekodi", "Could not record collection"),
           ),
       },
     );
@@ -580,9 +614,100 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
             </div>
           </div>
           <div className="rounded-lg bg-secondary/60 px-3 py-2 text-xs flex items-center justify-between">
-            <span className="text-muted-foreground">{t("Jumla ya siku", "Day total")}</span>
+            <span className="text-muted-foreground">
+              {t("Jumla ya kulipwa", "Total she is paid for")}
+            </span>
             <span className="font-num font-semibold">{L(total)}</span>
           </div>
+
+          {/* Refusing milk is the exception, so it stays folded away and an
+              ordinary day is still two numbers and a save. */}
+          {!rejecting ? (
+            <button
+              type="button"
+              onClick={() => setRejecting(true)}
+              className="text-[11px] font-semibold text-[#E11B22] hover:underline text-left w-fit"
+            >
+              {t("Kuna maziwa yaliyokataliwa?", "Was any milk refused?")}
+            </button>
+          ) : (
+            <div className="rounded-xl border border-[#E11B22]/30 bg-[#E11B22]/5 p-3 grid gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-[#E11B22]">
+                  {t("Maziwa yaliyokataliwa", "Milk refused")}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRejecting(false);
+                    setMorningRejected(0);
+                    setEveningRejected(0);
+                  }}
+                  className="text-[11px] text-muted-foreground hover:underline"
+                >
+                  {t("Ondoa", "Remove")}
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label className="text-xs">{t("Asubuhi (L)", "Morning (L)")}</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    min={0}
+                    value={morningRejected}
+                    onChange={(e) => setMorningRejected(Math.max(0, Number(e.target.value)))}
+                    className="font-num"
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs">{t("Jioni (L)", "Evening (L)")}</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    min={0}
+                    value={eveningRejected}
+                    onChange={(e) => setEveningRejected(Math.max(0, Number(e.target.value)))}
+                    className="font-num"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-xs">{t("Sababu", "Reason")}</Label>
+                <Select value={rejectReason} onValueChange={setRejectReason}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="alcohol-test">
+                      {t("Imefeli kipimo cha alkoholi", "Failed the alcohol test")}
+                    </SelectItem>
+                    <SelectItem value="sour">{t("Imechacha", "Sour")}</SelectItem>
+                    <SelectItem value="density">
+                      {t("Uzito hafifu (maji)", "Watered down")}
+                    </SelectItem>
+                    <SelectItem value="dirty">{t("Uchafu", "Dirty")}</SelectItem>
+                    <SelectItem value="temperature">
+                      {t("Joto kupita kiasi", "Too warm")}
+                    </SelectItem>
+                    <SelectItem value="antibiotics">
+                      {t("Dalili za dawa", "Signs of antibiotics")}
+                    </SelectItem>
+                    <SelectItem value="other">{t("Nyingine", "Other")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {rejectedTotal > 0 && (
+                <div className="text-[11px] text-muted-foreground">
+                  {t(
+                    `Ameleta ${num(total + rejectedTotal)} L, amelipwa ${num(total)} L. Iliyokataliwa inarekodiwa lakini hailipwi.`,
+                    `She brought ${num(total + rejectedTotal)} L and is paid for ${num(total)} L. The refused milk is recorded but not paid for.`,
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid gap-1.5">
             <Label>{t("Maelezo (hiari)", "Notes (optional)")}</Label>
             <Input
@@ -879,9 +1004,14 @@ function FarmerDetailDrawer({
                           toast.error(
                             e.message.includes("day-locked")
                               ? t("Siku hii imefungwa", "This day is locked")
-                              : e.message.includes("empty-collection")
-                                ? t("Weka angalau lita moja", "Enter at least some litres")
-                                : t("Imeshindikana kusahihisha", "Could not save the correction"),
+                              : e.message.includes("accepted-exceeds-offered")
+                                ? t(
+                                    "Uliyokubali ni zaidi ya aliyoleta",
+                                    "You accepted more than she brought",
+                                  )
+                                : e.message.includes("empty-collection")
+                                  ? t("Weka angalau lita moja", "Enter at least some litres")
+                                  : t("Imeshindikana kusahihisha", "Could not save the correction"),
                           ),
                       },
                     )

@@ -12,6 +12,8 @@ interface CollectionRow {
   litres: number;
   location_id: string;
   rate_per_l?: number;
+  offered_litres?: number | null;
+  reject_reason?: string | null;
   quality_note: string | null;
   created_at?: string;
   farmers?: { name: string } | null;
@@ -33,6 +35,8 @@ function toEntry(r: CollectionRow): CollectionWithFarmer {
     point: r.location_id === "loc-field-a" ? "field-a" : "main",
     locationId: r.location_id,
     ratePerL: r.rate_per_l !== undefined ? Number(r.rate_per_l) : undefined,
+    offeredLitres: r.offered_litres != null ? Number(r.offered_litres) : undefined,
+    rejectReason: r.reject_reason ?? undefined,
     qualityNote: r.quality_note ?? undefined,
     farmerName: r.farmers?.name,
     createdAt: r.created_at,
@@ -116,6 +120,11 @@ export const collectionsRepo = {
     morningLitres: number;
     eveningLitres: number;
     qualityNote?: string;
+    /** What the farmer actually brought, where some was refused. Omitted
+     *  when nothing was refused, in which case offered equals accepted. */
+    morningOffered?: number;
+    eveningOffered?: number;
+    rejectReason?: string;
   }): Promise<void> {
     const { error } = await supabase.rpc("record_collection_day", {
       p_farmer_id: input.farmerId,
@@ -124,6 +133,9 @@ export const collectionsRepo = {
       p_morning_litres: input.morningLitres,
       p_evening_litres: input.eveningLitres,
       p_quality_note: input.qualityNote ?? null,
+      p_morning_offered: input.morningOffered ?? null,
+      p_evening_offered: input.eveningOffered ?? null,
+      p_reject_reason: input.rejectReason ?? null,
     });
     if (error) throw new Error(error.message);
   },
