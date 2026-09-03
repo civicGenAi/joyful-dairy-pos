@@ -587,11 +587,11 @@ function AddExpenseSheet() {
           {t("Matumizi mapya", "New expense")}
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
         <SheetHeader>
           <SheetTitle>{t("Rekodi matumizi", "Record an expense")}</SheetTitle>
         </SheetHeader>
-        <div className="grid gap-3 mt-5">
+        <div className="grid gap-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label>{t("Tarehe", "Date")}</Label>
@@ -732,7 +732,7 @@ function AddExpenseSheet() {
             )}
           </div>
         </div>
-        <SheetFooter className="mt-5">
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>

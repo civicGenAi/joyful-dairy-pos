@@ -11,7 +11,14 @@ import {
   useSetProductActive,
   useSetPrice,
 } from "@/lib/data/hooks/products";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { Product } from "@/mock/types";
 import type { PriceTier, ProductCategory, Unit } from "@/mock/types";
@@ -28,14 +35,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Save, Plus, History, Search, Tag } from "lucide-react";
@@ -458,8 +457,8 @@ function AddProductDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button
           size="sm"
           className="h-8 text-white"
@@ -467,13 +466,13 @@ function AddProductDialog() {
         >
           <Plus className="h-3.5 w-3.5 mr-1" /> {t("Bidhaa mpya", "New product")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>
             {t("Ongeza bidhaa mpya kwenye katalogi", "Add new product to catalogue")}
-          </DialogTitle>
-        </DialogHeader>
+          </SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
@@ -552,7 +551,7 @@ function AddProductDialog() {
             </div>
           )}
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
@@ -564,9 +563,9 @@ function AddProductDialog() {
           >
             {create.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 

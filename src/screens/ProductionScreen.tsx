@@ -13,13 +13,13 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 // BACKEND: data now flows through src/lib/data/production + stock + products.
 import {
   useBatches,
@@ -344,8 +344,8 @@ function RecordBatchDialog({ products }: { products: Product[] }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button
           size="sm"
           className="text-white"
@@ -354,14 +354,14 @@ function RecordBatchDialog({ products }: { products: Product[] }) {
           <Plus className="h-3.5 w-3.5 mr-1" />
           {t("Rekodi batch", "Record batch")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <Factory className="h-4 w-4" />
             {t("Rekodi batch ya uzalishaji", "Record production batch")}
-          </DialogTitle>
-        </DialogHeader>
+          </SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Bidhaa", "Product")}</Label>
@@ -428,16 +428,16 @@ function RecordBatchDialog({ products }: { products: Product[] }) {
             )}
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
           <Button onClick={save} disabled={record.isPending}>
             {record.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -472,8 +472,8 @@ function RecordSpoilageDialog({ stock }: { stock: StockItem[] }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button
           size="sm"
           variant="outline"
@@ -482,11 +482,11 @@ function RecordSpoilageDialog({ stock }: { stock: StockItem[] }) {
           <TriangleAlert className="h-3.5 w-3.5 mr-1.5" />
           {t("Rekodi haribika", "Record spoilage")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Rekodi bidhaa iliyoharibika", "Record spoilage")}</DialogTitle>
-        </DialogHeader>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Rekodi bidhaa iliyoharibika", "Record spoilage")}</SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Bidhaa", "Product")}</Label>
@@ -525,7 +525,7 @@ function RecordSpoilageDialog({ stock }: { stock: StockItem[] }) {
             />
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
@@ -536,8 +536,8 @@ function RecordSpoilageDialog({ stock }: { stock: StockItem[] }) {
           >
             {record.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }

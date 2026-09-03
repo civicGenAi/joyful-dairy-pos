@@ -26,14 +26,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   Select,
   SelectContent,
@@ -460,19 +459,19 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button
           className="h-8 text-white"
           style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
         >
           <Plus className="h-3.5 w-3.5 mr-1" /> {t("Rekodi ukusanyaji", "Record collection")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Rekodi ukusanyaji wa maziwa", "Record milk collection")}</DialogTitle>
-        </DialogHeader>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Rekodi ukusanyaji wa maziwa", "Record milk collection")}</SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Mfugaji", "Farmer")}</Label>
@@ -565,16 +564,16 @@ function RecordCollectionDialog({ farmers }: { farmers: Farmer[] }) {
             />
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
           <Button onClick={save} disabled={record.isPending || total <= 0}>
             {record.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -1045,16 +1044,16 @@ function AddFarmerDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button variant="outline" className="h-8">
           <UserPlus className="h-3.5 w-3.5 mr-1" /> {t("Mfugaji mpya", "Add farmer")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Sajili mfugaji mpya", "Register a new farmer")}</DialogTitle>
-        </DialogHeader>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Sajili mfugaji mpya", "Register a new farmer")}</SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Jina kamili", "Full name")}</Label>
@@ -1095,7 +1094,7 @@ function AddFarmerDialog() {
             />
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
@@ -1107,9 +1106,9 @@ function AddFarmerDialog() {
           >
             {create.isPending ? t("Inasajili…", "Registering…") : t("Sajili", "Register")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -1135,11 +1134,11 @@ function EditFarmerDialog({ farmer, onClose }: { farmer: Farmer; onClose: () => 
   };
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Hariri mfugaji", "Edit farmer")}</DialogTitle>
-        </DialogHeader>
+    <Sheet open onOpenChange={(o) => !o && onClose()}>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Hariri mfugaji", "Edit farmer")}</SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Jina", "Name")}</Label>
@@ -1176,16 +1175,16 @@ function EditFarmerDialog({ farmer, onClose }: { farmer: Farmer; onClose: () => 
             />
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={onClose}>
             {t("Ghairi", "Cancel")}
           </Button>
           <Button onClick={save} disabled={update.isPending}>
             {update.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -1243,21 +1242,21 @@ function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button
           className="flex-1 text-white"
           style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
         >
           <Wallet className="h-3.5 w-3.5 mr-1.5" /> {t("Rekodi malipo", "Record payment")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>
             {t("Lipa", "Pay")} {farmer.name}
-          </DialogTitle>
-        </DialogHeader>
+          </SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="rounded-xl bg-secondary/60 p-3 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">{t("Salio la sasa", "Current balance")}</span>
@@ -1320,7 +1319,7 @@ function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
             </div>
           )}
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
@@ -1342,9 +1341,9 @@ function RecordFarmerPaymentDialog({ farmer }: { farmer: Farmer }) {
                 ? t("Inalipa…", "Paying…")
                 : t("Lipa sasa", "Pay now")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -1380,18 +1379,18 @@ function RequestAdjustmentDialog({ farmer }: { farmer: Farmer }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button variant="outline" className="rounded-xl">
           {t("Omba marekebisho ya salio", "Request balance adjustment")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>
             {t("Marekebisho ya salio la", "Balance adjustment for")} {farmer.name}
-          </DialogTitle>
-        </DialogHeader>
+          </SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="rounded-xl bg-secondary/60 p-3 flex justify-between text-sm">
             <span className="text-muted-foreground">{t("Salio la sasa", "Current balance")}</span>
@@ -1439,16 +1438,16 @@ function RequestAdjustmentDialog({ farmer }: { farmer: Farmer }) {
             )}
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
           <Button onClick={save} disabled={request.isPending}>
             {request.isPending ? t("Inawasilisha…", "Submitting…") : t("Wasilisha", "Submit")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 

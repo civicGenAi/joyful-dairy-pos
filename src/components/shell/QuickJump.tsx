@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useApp } from "@/app/context";
 import { navGroupsFor } from "@/lib/nav";
 import { motion, AnimatePresence } from "framer-motion";
+import { Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PANEL_WIDTH = 660;
@@ -84,18 +85,15 @@ export function QuickJump({
         onClick={() => setOpen((o) => !o)}
         title={collapsed ? t("Shortcut", "Shortcut") : undefined}
         className={cn(
-          "w-full flex items-center rounded-xl text-sm font-medium transition-all",
+          "w-full flex items-center rounded-xl font-semibold transition-all",
           open
             ? "bg-accent text-foreground"
             : "text-foreground/80 hover:bg-accent hover:text-foreground",
-          collapsed ? "h-10 w-10 mx-auto justify-center" : "gap-2.5 px-2.5 py-2",
+          collapsed ? "h-11 w-11 mx-auto justify-center" : "gap-2.5 px-2.5 py-2.5 text-[15px]",
         )}
       >
-        {collapsed ? (
-          <span className="text-base font-bold leading-none">⋯</span>
-        ) : (
-          <span className="truncate">{t("Shortcut", "Shortcut")}</span>
-        )}
+        <Zap className={cn("shrink-0", collapsed ? "h-5 w-5" : "h-[18px] w-[18px]")} />
+        {!collapsed && <span className="truncate">{t("Shortcut", "Shortcut")}</span>}
       </button>
 
       <AnimatePresence>

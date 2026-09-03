@@ -44,13 +44,13 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useMemo, useState } from "react";
@@ -423,25 +423,25 @@ function AssignRolesDialog({ user, onSave }: { user: User; onSave: (roles: Role[
   const [open, setOpen] = useState(false);
   const [sel, setSel] = useState<Role[]>(user.roles);
   return (
-    <Dialog
+    <Sheet
       open={open}
       onOpenChange={(o) => {
         setOpen(o);
         if (o) setSel(user.roles);
       }}
     >
-      <DialogTrigger asChild>
+      <SheetTrigger asChild>
         <Button size="sm" variant="outline" className="h-7 text-xs">
           <UserCog className="h-3.5 w-3.5 mr-1.5" />
           {t("Hariri majukumu", "Assign roles")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>
             {t("Majukumu ya", "Roles for")} {user.name}
-          </DialogTitle>
-        </DialogHeader>
+          </SheetTitle>
+        </SheetHeader>
         <div className="grid grid-cols-2 gap-2">
           {ALL_ROLES.map((r) => (
             <label
@@ -464,7 +464,7 @@ function AssignRolesDialog({ user, onSave }: { user: User; onSave: (roles: Role[
             "User gets the union of capabilities from all selected roles.",
           )}
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
@@ -477,9 +477,9 @@ function AssignRolesDialog({ user, onSave }: { user: User; onSave: (roles: Role[
           >
             {t("Hifadhi", "Save")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -494,8 +494,8 @@ function AddUserDialog() {
   const create = useCreateUser();
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button
           size="sm"
           className="h-8 text-white"
@@ -504,11 +504,11 @@ function AddUserDialog() {
           <Plus className="h-3.5 w-3.5 mr-1" />
           {t("Mtumiaji mpya", "Add user")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Sajili mtumiaji mpya", "Register a new user")}</DialogTitle>
-        </DialogHeader>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Sajili mtumiaji mpya", "Register a new user")}</SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
@@ -563,7 +563,7 @@ function AddUserDialog() {
             </div>
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
@@ -610,9 +610,9 @@ function AddUserDialog() {
           >
             {create.isPending ? t("Inasajili…", "Registering…") : t("Sajili", "Register")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -642,7 +642,7 @@ function EditLocationDialog({ location }: { location: Location }) {
   };
 
   return (
-    <Dialog
+    <Sheet
       open={open}
       onOpenChange={(o) => {
         setOpen(o);
@@ -653,7 +653,7 @@ function EditLocationDialog({ location }: { location: Location }) {
         }
       }}
     >
-      <DialogTrigger asChild>
+      <SheetTrigger asChild>
         <Button
           size="icon"
           variant="ghost"
@@ -662,13 +662,13 @@ function EditLocationDialog({ location }: { location: Location }) {
         >
           <Pencil className="h-3.5 w-3.5" />
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>
             {t("Hariri eneo", "Edit location")}: {location.name}
-          </DialogTitle>
-        </DialogHeader>
+          </SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Jina (Kiingereza)", "Name (English)")}</Label>
@@ -683,16 +683,16 @@ function EditLocationDialog({ location }: { location: Location }) {
             <Input value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
           <Button onClick={save} disabled={update.isPending}>
             {update.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -706,8 +706,8 @@ function AddLocationDialog() {
   const create = useCreateLocation();
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button
           size="sm"
           className="h-8 text-white"
@@ -716,11 +716,11 @@ function AddLocationDialog() {
           <Plus className="h-3.5 w-3.5 mr-1" />
           {t("Eneo jipya", "Add location")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Ongeza eneo", "Add a location")}</DialogTitle>
-        </DialogHeader>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Ongeza eneo", "Add a location")}</SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
@@ -757,7 +757,7 @@ function AddLocationDialog() {
             />
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
@@ -784,9 +784,9 @@ function AddLocationDialog() {
           >
             {create.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -1501,10 +1501,13 @@ function UserActions({ user }: { user: User }) {
         }
       />
 
-      <Dialog open={infoOpen} onOpenChange={setInfoOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-3">
+      <Sheet open={infoOpen} onOpenChange={setInfoOpen}>
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4"
+        >
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-3">
               <span
                 className="grid h-10 w-10 place-items-center rounded-full text-sm font-bold text-white"
                 style={{ background: user.avatarColor }}
@@ -1516,8 +1519,8 @@ function UserActions({ user }: { user: User }) {
                   .join("")}
               </span>
               {user.name}
-            </DialogTitle>
-          </DialogHeader>
+            </SheetTitle>
+          </SheetHeader>
           <div className="grid gap-2 text-sm">
             <div className="flex justify-between rounded-xl bg-secondary/60 p-3">
               <span className="text-muted-foreground">{t("Barua pepe", "Email")}</span>
@@ -1544,16 +1547,19 @@ function UserActions({ user }: { user: User }) {
               </div>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
-      <Dialog open={pwdOpen} onOpenChange={setPwdOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
+      <Sheet open={pwdOpen} onOpenChange={setPwdOpen}>
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4"
+        >
+          <SheetHeader>
+            <SheetTitle>
               {t("Badilisha nenosiri la", "Change password for")} {user.name}
-            </DialogTitle>
-          </DialogHeader>
+            </SheetTitle>
+          </SheetHeader>
           <div className="grid gap-1.5">
             <Label>{t("Nenosiri jipya", "New password")}</Label>
             <Input
@@ -1563,7 +1569,7 @@ function UserActions({ user }: { user: User }) {
               placeholder={t("Angalau herufi 6", "At least 6 characters")}
             />
           </div>
-          <DialogFooter>
+          <SheetFooter>
             <Button variant="outline" onClick={() => setPwdOpen(false)}>
               {t("Ghairi", "Cancel")}
             </Button>
@@ -1572,9 +1578,9 @@ function UserActions({ user }: { user: User }) {
                 ? t("Inabadilisha…", "Changing…")
                 : t("Badilisha", "Change")}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

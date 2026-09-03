@@ -25,13 +25,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   Plus,
   Receipt,
@@ -256,8 +256,8 @@ function RecordSalesDepositDialog({ categories }: { categories: string[] }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button
           size="sm"
           className="h-8 text-white"
@@ -266,11 +266,11 @@ function RecordSalesDepositDialog({ categories }: { categories: string[] }) {
           <Plus className="h-3.5 w-3.5 mr-1" />
           {t("Amana mpya", "New deposit")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Rekodi amana ya mauzo", "Record a sales deposit")}</DialogTitle>
-        </DialogHeader>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Rekodi amana ya mauzo", "Record a sales deposit")}</SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Aina/Sehemu", "Category/outlet")}</Label>
@@ -347,15 +347,15 @@ function RecordSalesDepositDialog({ categories }: { categories: string[] }) {
             </div>
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
           <Button onClick={save} disabled={saving || record.isPending || !file || amount <= 0}>
             {saving || record.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }

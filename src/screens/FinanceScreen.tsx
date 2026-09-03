@@ -23,13 +23,13 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   PieChart,
   Pie,
@@ -650,8 +650,8 @@ function RecordReceiptDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button
           size="sm"
           className="h-8 text-white"
@@ -660,11 +660,11 @@ function RecordReceiptDialog() {
           <Plus className="h-3.5 w-3.5 mr-1" />
           {t("Risiti mpya", "New receipt")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Rekodi risiti / amana", "Record receipt / deposit")}</DialogTitle>
-        </DialogHeader>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Rekodi risiti / amana", "Record receipt / deposit")}</SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="rounded-xl bg-secondary/60 px-3 py-2.5 text-[11px] text-muted-foreground">
             {t(
@@ -735,16 +735,16 @@ function RecordReceiptDialog() {
             {file && <div className="text-[11px] text-muted-foreground">{file.name}</div>}
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
           <Button onClick={save} disabled={saving || record.isPending}>
             {saving || record.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -781,8 +781,8 @@ function InitiatePayoutsDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button
           className="ml-auto text-white"
           style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
@@ -790,11 +790,11 @@ function InitiatePayoutsDialog({
           <Wallet className="h-4 w-4 mr-1.5" />
           {t("Anzisha malipo", "Initiate payouts")}
         </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{t("Anzisha mzunguko wa malipo", "Initiate payout batch")}</DialogTitle>
-        </DialogHeader>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Anzisha mzunguko wa malipo", "Initiate payout batch")}</SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="rounded-xl bg-secondary/60 p-3 flex justify-between">
             <span className="text-sm text-muted-foreground">
@@ -826,7 +826,7 @@ function InitiatePayoutsDialog({
             )}
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
@@ -838,8 +838,8 @@ function InitiatePayoutsDialog({
           >
             {initiate.isPending ? t("Inaanzisha…", "Initiating…") : t("Anzisha", "Initiate")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }

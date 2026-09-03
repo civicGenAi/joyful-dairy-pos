@@ -18,7 +18,14 @@ import { todayISO } from "@/lib/data/dates";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { tzs, num } from "@/lib/format";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -29,14 +36,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -799,23 +798,23 @@ function RecordIntakeDialog({ customerId }: { customerId: string }) {
   const previewPrice = productId ? priceOf(productId, tier) : null;
 
   return (
-    <Dialog
+    <Sheet
       open={open}
       onOpenChange={(o) => {
         setOpen(o);
         if (!o) reset();
       }}
     >
-      <DialogTrigger asChild>
+      <SheetTrigger asChild>
         <Button size="sm" variant="outline" className="h-8 text-xs">
           <PackagePlus className="h-3.5 w-3.5 mr-1.5" />
           {t("Rekodi ulaji", "Record intake")}
         </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{t("Rekodi ulaji wa bidhaa", "Record product intake")}</DialogTitle>
-        </DialogHeader>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Rekodi ulaji wa bidhaa", "Record product intake")}</SheetTitle>
+        </SheetHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -945,7 +944,7 @@ function RecordIntakeDialog({ customerId }: { customerId: string }) {
             <span className="font-num">{tzs(total)}</span>
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button
             className="text-white"
             style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
@@ -954,9 +953,9 @@ function RecordIntakeDialog({ customerId }: { customerId: string }) {
           >
             {complete.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi ulaji", "Save intake")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -1011,8 +1010,8 @@ function RecordDepositDialog({ customerId }: { customerId: string }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button
           size="sm"
           className="text-white"
@@ -1021,11 +1020,11 @@ function RecordDepositDialog({ customerId }: { customerId: string }) {
           <Plus className="h-3.5 w-3.5 mr-1" />
           {t("Rekodi amana", "Record deposit")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Rekodi amana", "Record deposit")}</DialogTitle>
-        </DialogHeader>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Rekodi amana", "Record deposit")}</SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Njia", "Method")}</Label>
@@ -1074,7 +1073,7 @@ function RecordDepositDialog({ customerId }: { customerId: string }) {
             </div>
           )}
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
@@ -1088,9 +1087,9 @@ function RecordDepositDialog({ customerId }: { customerId: string }) {
                 ? t("Inahifadhi…", "Saving…")
                 : t("Hifadhi", "Save")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -1122,16 +1121,16 @@ function AddCustomerDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button variant="outline" size="sm" className="h-8 text-xs">
           <UserPlus className="h-3.5 w-3.5 mr-1" /> {t("Mteja mpya", "Add customer")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Sajili mteja mpya", "Register a new customer")}</DialogTitle>
-        </DialogHeader>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Sajili mteja mpya", "Register a new customer")}</SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Jina", "Name")}</Label>
@@ -1214,7 +1213,7 @@ function AddCustomerDialog() {
             </>
           )}
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
@@ -1226,9 +1225,9 @@ function AddCustomerDialog() {
           >
             {create.isPending ? t("Inasajili…", "Registering…") : t("Sajili", "Register")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -1363,13 +1362,16 @@ function CustomerActions({ c }: { c: Customer }) {
         }
       />
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
+      <Sheet open={editOpen} onOpenChange={setEditOpen}>
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4"
+        >
+          <SheetHeader>
+            <SheetTitle>
               {t("Hariri mteja", "Edit customer")}: {c.name}
-            </DialogTitle>
-          </DialogHeader>
+            </SheetTitle>
+          </SheetHeader>
           <div className="grid gap-3">
             <div className="grid gap-1.5">
               <Label>{t("Jina", "Name")}</Label>
@@ -1454,16 +1456,16 @@ function CustomerActions({ c }: { c: Customer }) {
               </>
             )}
           </div>
-          <DialogFooter>
+          <SheetFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>
               {t("Ghairi", "Cancel")}
             </Button>
             <Button onClick={saveEdit} disabled={update.isPending}>
               {update.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

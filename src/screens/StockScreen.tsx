@@ -21,14 +21,13 @@ import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -565,7 +564,7 @@ function StoreItemDialog({ category, item }: { category: "raw" | "consumable"; i
   };
 
   return (
-    <Dialog
+    <Sheet
       open={open}
       onOpenChange={(o) => {
         setOpen(o);
@@ -577,7 +576,7 @@ function StoreItemDialog({ category, item }: { category: "raw" | "consumable"; i
         }
       }}
     >
-      <DialogTrigger asChild>
+      <SheetTrigger asChild>
         {item ? (
           <Button size="icon" variant="ghost" className="h-7 w-7" title={t("Hariri", "Edit")}>
             <Pencil className="h-3.5 w-3.5" />
@@ -590,17 +589,17 @@ function StoreItemDialog({ category, item }: { category: "raw" | "consumable"; i
               : t("Ongeza kifaa", "Add item")}
           </Button>
         )}
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>
             {item
               ? `${t("Hariri bidhaa", "Edit item")}: ${item.name}`
               : category === "raw"
                 ? t("Ongeza malighafi", "Add a raw stock item")
                 : t("Ongeza kifaa cha ghala", "Add a consumable store item")}
-          </DialogTitle>
-        </DialogHeader>
+          </SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Jina (Kiingereza)", "Name (English)")}</Label>
@@ -642,16 +641,16 @@ function StoreItemDialog({ category, item }: { category: "raw" | "consumable"; i
             )}
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
           <Button onClick={save} disabled={busy}>
             {busy ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -684,8 +683,8 @@ function PackSizesDialog({ item }: { item: StockItem }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button
           size="icon"
           variant="ghost"
@@ -694,13 +693,13 @@ function PackSizesDialog({ item }: { item: StockItem }) {
         >
           <ListChecks className="h-3.5 w-3.5" />
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>
             {t("Vipimo vya kuhesabu", "Pack sizes for counting")}: {item.name}
-          </DialogTitle>
-        </DialogHeader>
+          </SheetTitle>
+        </SheetHeader>
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground">
             {t(
@@ -767,13 +766,13 @@ function PackSizesDialog({ item }: { item: StockItem }) {
             </Button>
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Funga", "Close")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -892,8 +891,8 @@ function ReceiveDialog({ items: allItems }: { items: StockItem[] }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button
           size="sm"
           className="text-white"
@@ -902,11 +901,11 @@ function ReceiveDialog({ items: allItems }: { items: StockItem[] }) {
           <PackagePlus className="h-3.5 w-3.5 mr-1.5" />
           {t("Pokea ununuzi", "Receive purchase")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Pokea bidhaa ghalani", "Receive items to store")}</DialogTitle>
-        </DialogHeader>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Pokea bidhaa ghalani", "Receive items to store")}</SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Bidhaa", "Item")}</Label>
@@ -958,16 +957,16 @@ function ReceiveDialog({ items: allItems }: { items: StockItem[] }) {
             </div>
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
           <Button onClick={save} disabled={move.isPending}>
             {move.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -1008,17 +1007,17 @@ function AdjustDialog({ items: allItems }: { items: StockItem[] }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button size="sm" variant="outline" className="h-8">
           <Pencil className="h-3.5 w-3.5 mr-1.5" />
           {t("Marekebisho / spoilage", "Adjust / spoilage")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Marekebisho ya stock", "Stock adjustment")}</DialogTitle>
-        </DialogHeader>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Marekebisho ya stock", "Stock adjustment")}</SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Bidhaa", "Item")}</Label>
@@ -1078,16 +1077,16 @@ function AdjustDialog({ items: allItems }: { items: StockItem[] }) {
             />
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
           <Button onClick={save} disabled={pending}>
             {pending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -1119,8 +1118,8 @@ function SendToProductionDialog({ rawItems: allRaw }: { rawItems: StockItem[] })
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button
           size="sm"
           className="text-white"
@@ -1129,13 +1128,13 @@ function SendToProductionDialog({ rawItems: allRaw }: { rawItems: StockItem[] })
           <Factory className="h-3.5 w-3.5 mr-1.5" />
           {t("Peleka uzalishaji", "Send to production")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>
             {t("Peleka maziwa ghafi uzalishaji", "Send raw milk to production")}
-          </DialogTitle>
-        </DialogHeader>
+          </SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Litre", "Litres")}</Label>
@@ -1147,16 +1146,16 @@ function SendToProductionDialog({ rawItems: allRaw }: { rawItems: StockItem[] })
             />
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
           <Button onClick={save} disabled={move.isPending}>
             {move.isPending ? t("Inatuma…", "Sending…") : t("Tuma", "Send")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 

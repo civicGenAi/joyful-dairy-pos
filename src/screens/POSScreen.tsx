@@ -22,13 +22,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -887,11 +887,14 @@ export function POSScreen() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={!!voiding} onOpenChange={(o) => !o && setVoiding(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("Batilisha risiti?", "Void this receipt?")}</DialogTitle>
-          </DialogHeader>
+      <Sheet open={!!voiding} onOpenChange={(o) => !o && setVoiding(null)}>
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4"
+        >
+          <SheetHeader>
+            <SheetTitle>{t("Batilisha risiti?", "Void this receipt?")}</SheetTitle>
+          </SheetHeader>
           {voiding && (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
@@ -911,7 +914,7 @@ export function POSScreen() {
               </div>
             </div>
           )}
-          <DialogFooter>
+          <SheetFooter>
             <Button variant="outline" onClick={() => setVoiding(null)}>
               {t("Ghairi", "Cancel")}
             </Button>
@@ -942,15 +945,18 @@ export function POSScreen() {
               <Ban className="h-3.5 w-3.5 mr-1.5" />
               {t("Batilisha", "Void")}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
-      <Dialog open={!!receipt} onOpenChange={() => setReceipt(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("Risiti", "Receipt")}</DialogTitle>
-          </DialogHeader>
+      <Sheet open={!!receipt} onOpenChange={() => setReceipt(null)}>
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4"
+        >
+          <SheetHeader>
+            <SheetTitle>{t("Risiti", "Receipt")}</SheetTitle>
+          </SheetHeader>
           {receipt && (
             <div className="rounded-xl border border-dashed border-border p-4 font-mono text-sm">
               <div className="text-center font-display font-bold">African Joy Dairy</div>
@@ -1000,8 +1006,8 @@ export function POSScreen() {
             <Printer className="h-4 w-4 mr-1.5" />
             {t("Fungua kwa kuchapisha", "Open print view")}
           </Button>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       <QuantityKeypadDialog
         product={qtyPrompt?.product ?? null}
@@ -1141,11 +1147,11 @@ function QuantityKeypadDialog({
   const lineTotal = qty * priceEach;
 
   return (
-    <Dialog open={!!product} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-xs">
-        <DialogHeader>
-          <DialogTitle className="text-base">{product?.name}</DialogTitle>
-        </DialogHeader>
+    <Sheet open={!!product} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent side="right" className="w-full sm:max-w-sm overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle className="text-base">{product?.name}</SheetTitle>
+        </SheetHeader>
         <div className="rounded-xl bg-secondary/60 p-4 text-center">
           <div className="font-num text-4xl font-extrabold tabular-nums">
             {value || "0"}
@@ -1185,7 +1191,7 @@ function QuantityKeypadDialog({
             <Delete className="h-5 w-5" />
           </button>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={onClose}>
             {t("Ghairi", "Cancel")}
           </Button>
@@ -1197,9 +1203,9 @@ function QuantityKeypadDialog({
           >
             {initialQty > 0 ? t("Sasisha", "Update") : t("Ongeza", "Add")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -1217,17 +1223,17 @@ function ParkedDropdown({
   const { t } = useApp();
   const [open, setOpen] = useState(false);
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button variant="outline" size="sm" className="h-7 text-xs">
           <History className="h-3.5 w-3.5 mr-1" /> {parked.length}{" "}
           {t("zimewekwa pembeni", "parked")}
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Mauzo yaliyowekwa pembeni", "Parked sales")}</DialogTitle>
-        </DialogHeader>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Mauzo yaliyowekwa pembeni", "Parked sales")}</SheetTitle>
+        </SheetHeader>
         <ul className="divide-y divide-border">
           {parked.map((p, i) => {
             const total = p.reduce(
@@ -1262,8 +1268,8 @@ function ParkedDropdown({
             );
           })}
         </ul>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -1363,14 +1369,14 @@ function NewOrderDialog({
   };
 
   return (
-    <Dialog
+    <Sheet
       open={open}
       onOpenChange={(o) => {
         setOpen(o);
         if (!o) reset();
       }}
     >
-      <DialogTrigger asChild>
+      <SheetTrigger asChild>
         <Button
           size="sm"
           className="h-8 text-white"
@@ -1378,14 +1384,14 @@ function NewOrderDialog({
         >
           <Plus className="h-3.5 w-3.5 mr-1" /> {t("Order mpya", "New order")}
         </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <ReceiptIcon className="h-4 w-4" />
             {t("Unda order", "Create order")}
-          </DialogTitle>
-        </DialogHeader>
+          </SheetTitle>
+        </SheetHeader>
         <div className="grid gap-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
@@ -1520,7 +1526,7 @@ function NewOrderDialog({
             <span className="font-num">{tzs(total)}</span>
           </div>
         </div>
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
@@ -1536,8 +1542,8 @@ function NewOrderDialog({
                 ? t("Inaunda…", "Creating…")
                 : t("Unda", "Create")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
