@@ -1,23 +1,61 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useApp } from "@/app/context";
 import { navGroupsFor } from "@/lib/nav";
-import * as Icons from "lucide-react";
-import { LayoutGrid, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
+
+const PANEL_WIDTH = 660;
+const GAP = 8;
+const EDGE = 12;
 
 /**
- * A full-screen launcher: every screen the user's capabilities allow,
- * laid out as big tiles under its own category heading. Reaching a screen
- * becomes one glance and one click instead of scrolling the sidebar.
- * Nav comes from the same capability-driven source as the sidebar and the
- * command palette, so it can never drift out of sync with them.
+ * Shortcut: a flyout listing every screen the user's capabilities allow,
+ * grouped by category in columns, in the shape a product switcher usually
+ * takes (anchored beside its trigger, sized to its content, closed by an
+ * outside click or Esc) rather than a full-screen takeover.
+ *
+ * The trigger sits in the sidebar's Overview group under Dashboard. Nav
+ * comes from the same capability-driven source the sidebar and command
+ * palette read, so the three can never drift apart.
  */
-export function QuickJump() {
+export function QuickJump({
+  collapsed,
+  onNavigate,
+}: {
+  collapsed: boolean;
+  onNavigate?: () => void;
+}) {
   const { t, lang, can } = useApp();
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const nav = useNavigate();
   const groups = navGroupsFor(can);
+
+  // Anchored to the trigger, then pulled back inside the viewport. Fixed
+  // rather than absolute: the sidebar's nav scrolls and would clip it.
+  const place = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const width = Math.min(PANEL_WIDTH, window.innerWidth - EDGE * 2);
+    const height = panelRef.current?.offsetHeight ?? 0;
+    const left = Math.min(
+      Math.max(rect.right + GAP, EDGE),
+      Math.max(window.innerWidth - width - EDGE, EDGE),
+    );
+    const top = Math.min(
+      Math.max(rect.top, EDGE),
+      Math.max(window.innerHeight - height - EDGE, EDGE),
+    );
+    setPos({ left, top });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (open) place();
+  }, [open, place]);
 
   useEffect(() => {
     if (!open) return;
@@ -25,126 +63,83 @@ export function QuickJump() {
       if (e.key === "Escape") setOpen(false);
     };
     window.addEventListener("keydown", onKey);
-    // Freeze the page behind the overlay so a scroll gesture moves the
-    // launcher's own list, not the dashboard underneath it.
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    window.addEventListener("resize", place);
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
+      window.removeEventListener("resize", place);
     };
-  }, [open]);
+  }, [open, place]);
 
   const go = (to: string) => {
     setOpen(false);
+    onNavigate?.();
     nav({ to });
   };
 
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen(true)}
-        className="w-full rounded-2xl border border-border bg-card p-4 flex items-center gap-3 text-left hover:bg-accent/40 transition"
+        onClick={() => setOpen((o) => !o)}
+        title={collapsed ? t("Shortcut", "Shortcut") : undefined}
+        className={cn(
+          "w-full flex items-center rounded-xl text-sm font-medium transition-all",
+          open
+            ? "bg-accent text-foreground"
+            : "text-foreground/80 hover:bg-accent hover:text-foreground",
+          collapsed ? "h-10 w-10 mx-auto justify-center" : "gap-2.5 px-2.5 py-2",
+        )}
       >
-        <span
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white"
-          style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
-        >
-          <LayoutGrid className="h-5 w-5" />
-        </span>
-        <span className="min-w-0">
-          <span className="block font-semibold">{t("Nenda popote", "Jump to any screen")}</span>
-          <span className="block text-xs text-muted-foreground">
-            {t(
-              "Fungua orodha kamili ya skrini zote kwa makundi",
-              "Open the full list of screens, grouped by category",
-            )}
-          </span>
-        </span>
+        {collapsed ? (
+          <span className="text-base font-bold leading-none">⋯</span>
+        ) : (
+          <span className="truncate">{t("Shortcut", "Shortcut")}</span>
+        )}
       </button>
 
       <AnimatePresence>
         {open && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm overflow-y-auto"
-            onClick={() => setOpen(false)}
-          >
+          <>
+            {/* Click-catcher only, the page stays visible behind it. */}
+            <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
             <motion.div
-              initial={{ y: 12, scale: 0.99 }}
-              animate={{ y: 0, scale: 1 }}
-              exit={{ y: 8, scale: 0.99 }}
-              transition={{ type: "spring", stiffness: 420, damping: 34 }}
-              onClick={(e) => e.stopPropagation()}
-              className="min-h-full bg-background p-4 sm:p-6 lg:p-8"
+              ref={panelRef}
+              initial={{ opacity: 0, y: -4, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.98 }}
+              transition={{ duration: 0.13 }}
+              style={{
+                left: pos?.left ?? -9999,
+                top: pos?.top ?? -9999,
+                width: `min(${PANEL_WIDTH}px, calc(100vw - ${EDGE * 2}px))`,
+              }}
+              className="fixed z-[61] max-h-[70vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-elevated p-4"
             >
-              <div className="mx-auto max-w-6xl">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-xl font-bold font-display">
-                      {t("Nenda popote", "Jump to any screen")}
-                    </h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {t(
-                        "Bonyeza skrini yoyote kuifungua, au bonyeza Esc kufunga.",
-                        "Click any screen to open it, or press Esc to close.",
-                      )}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setOpen(false)}
-                    className="grid h-9 w-9 place-items-center rounded-lg border border-border hover:bg-accent"
-                    aria-label={t("Funga", "Close")}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <div className="space-y-7">
-                  {groups.map((group) => (
-                    <div key={group.group}>
-                      <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2.5">
-                        {lang === "sw" ? group.sw : group.group}
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                        {group.items.map((item) => {
-                          const Icon =
-                            (Icons[item.icon as keyof typeof Icons] as typeof LayoutGrid) ??
-                            LayoutGrid;
-                          return (
-                            <button
-                              key={item.to}
-                              type="button"
-                              onClick={() => go(item.to)}
-                              className="rounded-xl border border-border bg-card p-4 text-left hover:border-[#1E7C3F] hover:bg-[#1E7C3F]/5 transition"
-                            >
-                              <span
-                                className="grid h-9 w-9 place-items-center rounded-lg mb-2.5"
-                                style={{ background: "#1E7C3F15", color: "#1E7C3F" }}
-                              >
-                                <Icon className="h-4 w-4" />
-                              </span>
-                              <span className="block text-sm font-semibold leading-tight">
-                                {lang === "sw" ? item.sw : item.label}
-                              </span>
-                              <span className="block text-[11px] text-muted-foreground mt-0.5">
-                                {lang === "sw" ? item.label : item.sw}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-4">
+                {groups.map((group) => (
+                  <div key={group.group}>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-1.5 px-2">
+                      {lang === "sw" ? group.sw : group.group}
                     </div>
-                  ))}
-                </div>
+                    <ul className="space-y-0.5">
+                      {group.items.map((item) => (
+                        <li key={item.to}>
+                          <button
+                            type="button"
+                            onClick={() => go(item.to)}
+                            className="w-full text-left rounded-lg px-2 py-1.5 text-sm hover:bg-accent transition"
+                          >
+                            {lang === "sw" ? item.sw : item.label}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
               </div>
             </motion.div>
-          </motion.div>
+          </>
         )}
       </AnimatePresence>
     </>

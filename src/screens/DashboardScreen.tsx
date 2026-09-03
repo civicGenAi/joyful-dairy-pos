@@ -16,7 +16,6 @@ import { useStock } from "@/lib/data/hooks/stock";
 import { useYieldTrend } from "@/lib/data/hooks/production";
 import { useDayLock } from "@/lib/data/hooks/recon";
 import { DayLockBanner } from "@/components/shell/DayLockBanner";
-import { QuickJump } from "@/components/shell/QuickJump";
 import { todayISO, daysAgoISO } from "@/lib/data/dates";
 import {
   AreaChart,
@@ -223,11 +222,6 @@ export function DashboardScreen() {
   return (
     <AppShell title={t("Dashibodi", "Dashboard")}>
       <DayLockBanner />
-      {/* Shortcut into every screen, grouped, so nobody has to hunt the
-          sidebar for a tab that sits below the fold. */}
-      <div className="mb-4">
-        <QuickJump />
-      </div>
       {/* Date + live clock strip, compact */}
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
         <LiveDateTime />

@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, X, LogOut } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { prefetchForRoute } from "@/lib/data/prefetch";
+import { QuickJump } from "@/components/shell/QuickJump";
 
 interface Props {
   collapsed: boolean;
@@ -206,6 +207,13 @@ function SidebarBody({
                   </li>
                 );
               })}
+              {/* Sits directly under Dashboard: opens the shortcut flyout
+                  rather than navigating anywhere itself. */}
+              {g.group === "Overview" && (
+                <li>
+                  <QuickJump collapsed={collapsed} onNavigate={onNavigate} />
+                </li>
+              )}
             </ul>
           </div>
         ))}
