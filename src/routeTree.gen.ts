@@ -36,6 +36,7 @@ import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as CustomerFeedbackRouteImport } from './routes/customer-feedback'
 import { Route as CollectionPointsRouteImport } from './routes/collection-points'
 import { Route as CatalogRouteImport } from './routes/catalog'
+import { Route as BooksRouteImport } from './routes/books'
 import { Route as R500RouteImport } from './routes/500'
 import { Route as R403RouteImport } from './routes/403'
 import { Route as IndexRouteImport } from './routes/index'
@@ -185,6 +186,11 @@ const CatalogRoute = CatalogRouteImport.update({
   path: '/catalog',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BooksRoute = BooksRouteImport.update({
+  id: '/books',
+  path: '/books',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const R500Route = R500RouteImport.update({
   id: '/500',
   path: '/500',
@@ -255,6 +261,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/403': typeof R403Route
   '/500': typeof R500Route
+  '/books': typeof BooksRoute
   '/catalog': typeof CatalogRoute
   '/collection-points': typeof CollectionPointsRoute
   '/customer-feedback': typeof CustomerFeedbackRoute
@@ -297,6 +304,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/403': typeof R403Route
   '/500': typeof R500Route
+  '/books': typeof BooksRoute
   '/catalog': typeof CatalogRoute
   '/collection-points': typeof CollectionPointsRoute
   '/customer-feedback': typeof CustomerFeedbackRoute
@@ -340,6 +348,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/403': typeof R403Route
   '/500': typeof R500Route
+  '/books': typeof BooksRoute
   '/catalog': typeof CatalogRoute
   '/collection-points': typeof CollectionPointsRoute
   '/customer-feedback': typeof CustomerFeedbackRoute
@@ -384,6 +393,7 @@ export interface FileRouteTypes {
     | '/'
     | '/403'
     | '/500'
+    | '/books'
     | '/catalog'
     | '/collection-points'
     | '/customer-feedback'
@@ -426,6 +436,7 @@ export interface FileRouteTypes {
     | '/'
     | '/403'
     | '/500'
+    | '/books'
     | '/catalog'
     | '/collection-points'
     | '/customer-feedback'
@@ -468,6 +479,7 @@ export interface FileRouteTypes {
     | '/'
     | '/403'
     | '/500'
+    | '/books'
     | '/catalog'
     | '/collection-points'
     | '/customer-feedback'
@@ -511,6 +523,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   R403Route: typeof R403Route
   R500Route: typeof R500Route
+  BooksRoute: typeof BooksRoute
   CatalogRoute: typeof CatalogRoute
   CollectionPointsRoute: typeof CollectionPointsRoute
   CustomerFeedbackRoute: typeof CustomerFeedbackRoute
@@ -740,6 +753,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CatalogRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/books': {
+      id: '/books'
+      path: '/books'
+      fullPath: '/books'
+      preLoaderRoute: typeof BooksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/500': {
       id: '/500'
       path: '/500'
@@ -849,6 +869,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   R403Route: R403Route,
   R500Route: R500Route,
+  BooksRoute: BooksRoute,
   CatalogRoute: CatalogRoute,
   CollectionPointsRoute: CollectionPointsRoute,
   CustomerFeedbackRoute: CustomerFeedbackRoute,

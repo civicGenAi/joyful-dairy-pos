@@ -1,0 +1,103 @@
+import { supabase } from "@/lib/api/client";
+
+// BACKEND: the general ledger. Every figure here is derived from journal
+// entries written by gl_post_range(), which reads the operational tables.
+// Nothing in this file computes accounting itself, it only reads what the
+// ledger already says, so the screens can never disagree with the books.
+
+export interface LedgerAccount {
+  code: string;
+  name: string;
+  swName: string;
+  type: "asset" | "liability" | "equity" | "revenue" | "expense";
+  subtype: string | null;
+  debit?: number;
+  credit?: number;
+  amount: number;
+}
+
+export interface VatReturn {
+  from: string;
+  to: string;
+  salesExVat: number;
+  exemptSales: number;
+  outputVat: number;
+  inputVat: number;
+  netPayable: number;
+}
+
+interface RowBase {
+  code: string;
+  name: string;
+  sw_name: string;
+  type: LedgerAccount["type"];
+  subtype: string | null;
+}
+
+function toAccount(
+  r: RowBase & { amount?: number; debit?: number; credit?: number },
+): LedgerAccount {
+  return {
+    code: r.code,
+    name: r.name,
+    swName: r.sw_name,
+    type: r.type,
+    subtype: r.subtype,
+    debit: r.debit !== undefined ? Number(r.debit) : undefined,
+    credit: r.credit !== undefined ? Number(r.credit) : undefined,
+    amount: Number(r.amount ?? 0),
+  };
+}
+
+export const ledgerKeys = {
+  all: ["ledger"] as const,
+  trial: (from: string, to: string) => ["ledger", "trial", from, to] as const,
+  pl: (from: string, to: string) => ["ledger", "pl", from, to] as const,
+  bs: (asAt: string) => ["ledger", "bs", asAt] as const,
+  vat: (from: string, to: string) => ["ledger", "vat", from, to] as const,
+};
+
+export const ledgerRepo = {
+  async trialBalance(from: string, to: string): Promise<LedgerAccount[]> {
+    const { data, error } = await supabase.rpc("gl_trial_balance", { p_from: from, p_to: to });
+    if (error) throw new Error(error.message);
+    return (data as (RowBase & { debit: number; credit: number; balance: number })[]).map((r) =>
+      toAccount({ ...r, amount: r.balance }),
+    );
+  },
+
+  async profitLoss(from: string, to: string): Promise<LedgerAccount[]> {
+    const { data, error } = await supabase.rpc("gl_profit_loss", { p_from: from, p_to: to });
+    if (error) throw new Error(error.message);
+    return (data as (RowBase & { amount: number })[]).map(toAccount);
+  },
+
+  async balanceSheet(asAt: string): Promise<LedgerAccount[]> {
+    const { data, error } = await supabase.rpc("gl_balance_sheet", { p_as_at: asAt });
+    if (error) throw new Error(error.message);
+    return (data as (RowBase & { amount: number })[]).map(toAccount);
+  },
+
+  async vatReturn(from: string, to: string): Promise<VatReturn> {
+    const { data, error } = await supabase.rpc("gl_vat_return", { p_from: from, p_to: to });
+    if (error) throw new Error(error.message);
+    const r = data as Record<string, unknown>;
+    return {
+      from: String(r.from),
+      to: String(r.to),
+      salesExVat: Number(r.salesExVat ?? 0),
+      exemptSales: Number(r.exemptSales ?? 0),
+      outputVat: Number(r.outputVat ?? 0),
+      inputVat: Number(r.inputVat ?? 0),
+      netPayable: Number(r.netPayable ?? 0),
+    };
+  },
+
+  /** Posts every unposted transaction in the range. Safe to re-run: entries
+   *  are keyed by source, so a second run over the same days posts nothing. */
+  async post(from: string, to: string): Promise<{ posted: number }> {
+    const { data, error } = await supabase.rpc("gl_post_range", { p_from: from, p_to: to });
+    if (error) throw new Error(error.message);
+    return { posted: Number((data as Record<string, unknown>).posted ?? 0) };
+  },
+};
