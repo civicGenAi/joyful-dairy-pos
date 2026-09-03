@@ -127,6 +127,18 @@ export const collectionsRepo = {
     });
     if (error) throw new Error(error.message);
   },
+
+  /** Removes an entire day's collection (both sessions) through the server
+   *  RPC: reverses the exact litres/amount out of the farmer's balance and
+   *  writes a compensating stock movement, so the deleted day stops
+   *  counting everywhere at once instead of lingering in totals. */
+  async deleteDay(input: { farmerId: string; date: string }): Promise<void> {
+    const { error } = await supabase.rpc("delete_collection_day", {
+      p_farmer_id: input.farmerId,
+      p_date: input.date,
+    });
+    if (error) throw new Error(error.message);
+  },
 };
 
 interface TransferRow {

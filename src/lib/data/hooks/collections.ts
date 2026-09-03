@@ -35,6 +35,18 @@ export function useRecordCollectionDay() {
   });
 }
 
+export function useDeleteCollectionDay() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: collectionsRepo.deleteDay,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: collectionKeys.all });
+      qc.invalidateQueries({ queryKey: farmerKeys.all });
+      qc.invalidateQueries({ queryKey: ["recon"] });
+    },
+  });
+}
+
 export function useTransfers(limit = 20) {
   return useQuery({
     queryKey: collectionKeys.transfers(),

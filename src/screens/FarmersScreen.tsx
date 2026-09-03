@@ -14,7 +14,7 @@ import {
   useReviewAdjustment,
   useFarmerMonthlySummary,
 } from "@/lib/data/hooks/farmers";
-import { useRecordCollectionDay } from "@/lib/data/hooks/collections";
+import { useRecordCollectionDay, useDeleteCollectionDay } from "@/lib/data/hooks/collections";
 import { useLocations } from "@/lib/data/hooks/locations";
 import { useQuery } from "@tanstack/react-query";
 import { collectionKeys, collectionsRepo } from "@/lib/data/collections";
@@ -56,12 +56,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Pencil,
+  Trash2,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
 import { RowActions } from "@/components/ui/RowActions";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { PaginationBar } from "@/components/ui/PaginationBar";
 import { usePagination } from "@/hooks/use-pagination";
 import type { Farmer } from "@/mock/types";
@@ -605,6 +607,7 @@ function FarmerDetailDrawer({
   const { data: payouts = [] } = useFarmerPayouts(f.id);
   const { data: monthly = [] } = useFarmerMonthlySummary(f.id, 6);
   const recordDay = useRecordCollectionDay();
+  const deleteDay = useDeleteCollectionDay();
 
   // Morning and evening tracked separately so a specific day can show both,
   // not just one combined number, the calendar cell still shows the total.
@@ -643,6 +646,7 @@ function FarmerDetailDrawer({
     setEditEvening(selected.evening);
   }
   const dayChanged = editMorning !== selected.morning || editEvening !== selected.evening;
+  const hasRecordedDay = selected.morning > 0 || selected.evening > 0;
 
   const monthLabel = new Date(`${monthStart}T00:00:00`).toLocaleDateString(
     lang === "sw" ? "sw-TZ" : "en-GB",
@@ -829,39 +833,83 @@ function FarmerDetailDrawer({
               </span>
             </div>
             {canEditCollection && (
-              <Button
-                size="sm"
-                disabled={!dayChanged || recordDay.isPending}
-                onClick={() =>
-                  recordDay.mutate(
-                    {
-                      farmerId: f.id,
-                      date: selectedDate,
-                      locationId: selected.locationId ?? "loc-main",
-                      morningLitres: editMorning,
-                      eveningLitres: editEvening,
-                    },
-                    {
-                      onSuccess: () => toast.success(t("Siku imesahihishwa", "Day corrected")),
-                      onError: (e) =>
-                        toast.error(
-                          e.message.includes("day-locked")
-                            ? t("Siku hii imefungwa", "This day is locked")
-                            : e.message.includes("empty-collection")
-                              ? t("Weka angalau lita moja", "Enter at least some litres")
-                              : t("Imeshindikana kusahihisha", "Could not save the correction"),
-                        ),
-                    },
-                  )
-                }
-                className="w-full mt-2 text-white"
-                style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
-              >
-                <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                {recordDay.isPending
-                  ? t("Inahifadhi…", "Saving…")
-                  : t("Hifadhi marekebisho", "Save correction")}
-              </Button>
+              <div className="flex gap-2 mt-2">
+                <Button
+                  size="sm"
+                  disabled={!dayChanged || recordDay.isPending}
+                  onClick={() =>
+                    recordDay.mutate(
+                      {
+                        farmerId: f.id,
+                        date: selectedDate,
+                        locationId: selected.locationId ?? "loc-main",
+                        morningLitres: editMorning,
+                        eveningLitres: editEvening,
+                      },
+                      {
+                        onSuccess: () => toast.success(t("Siku imesahihishwa", "Day corrected")),
+                        onError: (e) =>
+                          toast.error(
+                            e.message.includes("day-locked")
+                              ? t("Siku hii imefungwa", "This day is locked")
+                              : e.message.includes("empty-collection")
+                                ? t("Weka angalau lita moja", "Enter at least some litres")
+                                : t("Imeshindikana kusahihisha", "Could not save the correction"),
+                          ),
+                      },
+                    )
+                  }
+                  className="flex-1 text-white"
+                  style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+                >
+                  <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                  {recordDay.isPending
+                    ? t("Inahifadhi…", "Saving…")
+                    : t("Hifadhi marekebisho", "Save correction")}
+                </Button>
+                {hasRecordedDay && (
+                  <ConfirmDialog
+                    trigger={
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={deleteDay.isPending}
+                        className="border-[#E11B22]/40 text-[#E11B22] hover:bg-[#E11B22]/10 hover:text-[#E11B22]"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    }
+                    destructive
+                    title={t(
+                      `Futa ukusanyaji wa siku ${selectedDay}?`,
+                      `Delete the collection for day ${selectedDay}?`,
+                    )}
+                    description={t(
+                      `Hii itaondoa lita ${num(selected.morning + selected.evening)} na kurekebisha salio la ${f.name}. Haiwezi kutenduliwa.`,
+                      `This removes ${num(selected.morning + selected.evening)} L and corrects ${f.name}'s balance to match. This cannot be undone.`,
+                    )}
+                    confirmLabel={t("Futa", "Delete")}
+                    onConfirm={() =>
+                      deleteDay.mutate(
+                        { farmerId: f.id, date: selectedDate },
+                        {
+                          onSuccess: () => {
+                            setEditMorning(0);
+                            setEditEvening(0);
+                            toast.success(t("Siku imefutwa", "Day deleted"));
+                          },
+                          onError: (e) =>
+                            toast.error(
+                              e.message.includes("day-locked")
+                                ? t("Siku hii imefungwa", "This day is locked")
+                                : t("Imeshindikana kufuta", "Could not delete the day"),
+                            ),
+                        },
+                      )
+                    }
+                  />
+                )}
+              </div>
             )}
           </div>
         </div>
