@@ -70,3 +70,15 @@ export function useSetDriverActive() {
     onSuccess: () => qc.invalidateQueries({ queryKey: driverKeys.all }),
   });
 }
+
+export function useDriversOverview() {
+  return useQuery({ queryKey: driverKeys.overview(), queryFn: driversRepo.overview });
+}
+
+export function useDriverDailySales(id: string | null, days = 14) {
+  return useQuery({
+    queryKey: driverKeys.daily(id ?? "", days),
+    queryFn: () => driversRepo.dailySales(id!, days),
+    enabled: !!id,
+  });
+}

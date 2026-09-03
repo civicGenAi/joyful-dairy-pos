@@ -42,6 +42,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as VerifyIdRouteImport } from './routes/verify/$id'
 import { Route as ReceiptIdRouteImport } from './routes/receipt/$id'
 import { Route as InvoiceIdRouteImport } from './routes/invoice/$id'
+import { Route as DriversIdRouteImport } from './routes/drivers/$id'
 import { Route as StatementFarmerIdRouteImport } from './routes/statement/farmer.$id'
 import { Route as StatementCustomerIdRouteImport } from './routes/statement/customer.$id'
 import { Route as ReportDayCloseDateRouteImport } from './routes/report/day-close.$date'
@@ -214,6 +215,11 @@ const InvoiceIdRoute = InvoiceIdRouteImport.update({
   path: '/invoice/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DriversIdRoute = DriversIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => DriversRoute,
+} as any)
 const StatementFarmerIdRoute = StatementFarmerIdRouteImport.update({
   id: '/statement/farmer/$id',
   path: '/statement/farmer/$id',
@@ -254,7 +260,7 @@ export interface FileRoutesByFullPath {
   '/customer-feedback': typeof CustomerFeedbackRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
-  '/drivers': typeof DriversRoute
+  '/drivers': typeof DriversRouteWithChildren
   '/expenses': typeof ExpensesRoute
   '/farmers': typeof FarmersRoute
   '/feedback': typeof FeedbackRoute
@@ -276,6 +282,7 @@ export interface FileRoutesByFullPath {
   '/stock': typeof StockRoute
   '/stock-count': typeof StockCountRoute
   '/van': typeof VanRoute
+  '/drivers/$id': typeof DriversIdRoute
   '/invoice/$id': typeof InvoiceIdRoute
   '/receipt/$id': typeof ReceiptIdRoute
   '/verify/$id': typeof VerifyIdRoute
@@ -295,7 +302,7 @@ export interface FileRoutesByTo {
   '/customer-feedback': typeof CustomerFeedbackRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
-  '/drivers': typeof DriversRoute
+  '/drivers': typeof DriversRouteWithChildren
   '/expenses': typeof ExpensesRoute
   '/farmers': typeof FarmersRoute
   '/feedback': typeof FeedbackRoute
@@ -317,6 +324,7 @@ export interface FileRoutesByTo {
   '/stock': typeof StockRoute
   '/stock-count': typeof StockCountRoute
   '/van': typeof VanRoute
+  '/drivers/$id': typeof DriversIdRoute
   '/invoice/$id': typeof InvoiceIdRoute
   '/receipt/$id': typeof ReceiptIdRoute
   '/verify/$id': typeof VerifyIdRoute
@@ -337,7 +345,7 @@ export interface FileRoutesById {
   '/customer-feedback': typeof CustomerFeedbackRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
-  '/drivers': typeof DriversRoute
+  '/drivers': typeof DriversRouteWithChildren
   '/expenses': typeof ExpensesRoute
   '/farmers': typeof FarmersRoute
   '/feedback': typeof FeedbackRoute
@@ -359,6 +367,7 @@ export interface FileRoutesById {
   '/stock': typeof StockRoute
   '/stock-count': typeof StockCountRoute
   '/van': typeof VanRoute
+  '/drivers/$id': typeof DriversIdRoute
   '/invoice/$id': typeof InvoiceIdRoute
   '/receipt/$id': typeof ReceiptIdRoute
   '/verify/$id': typeof VerifyIdRoute
@@ -402,6 +411,7 @@ export interface FileRouteTypes {
     | '/stock'
     | '/stock-count'
     | '/van'
+    | '/drivers/$id'
     | '/invoice/$id'
     | '/receipt/$id'
     | '/verify/$id'
@@ -443,6 +453,7 @@ export interface FileRouteTypes {
     | '/stock'
     | '/stock-count'
     | '/van'
+    | '/drivers/$id'
     | '/invoice/$id'
     | '/receipt/$id'
     | '/verify/$id'
@@ -484,6 +495,7 @@ export interface FileRouteTypes {
     | '/stock'
     | '/stock-count'
     | '/van'
+    | '/drivers/$id'
     | '/invoice/$id'
     | '/receipt/$id'
     | '/verify/$id'
@@ -504,7 +516,7 @@ export interface RootRouteChildren {
   CustomerFeedbackRoute: typeof CustomerFeedbackRoute
   CustomersRoute: typeof CustomersRoute
   DashboardRoute: typeof DashboardRoute
-  DriversRoute: typeof DriversRoute
+  DriversRoute: typeof DriversRouteWithChildren
   ExpensesRoute: typeof ExpensesRoute
   FarmersRoute: typeof FarmersRoute
   FeedbackRoute: typeof FeedbackRoute
@@ -770,6 +782,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InvoiceIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/drivers/$id': {
+      id: '/drivers/$id'
+      path: '/$id'
+      fullPath: '/drivers/$id'
+      preLoaderRoute: typeof DriversIdRouteImport
+      parentRoute: typeof DriversRoute
+    }
     '/statement/farmer/$id': {
       id: '/statement/farmer/$id'
       path: '/statement/farmer/$id'
@@ -815,6 +834,17 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface DriversRouteChildren {
+  DriversIdRoute: typeof DriversIdRoute
+}
+
+const DriversRouteChildren: DriversRouteChildren = {
+  DriversIdRoute: DriversIdRoute,
+}
+
+const DriversRouteWithChildren =
+  DriversRoute._addFileChildren(DriversRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   R403Route: R403Route,
@@ -824,7 +854,7 @@ const rootRouteChildren: RootRouteChildren = {
   CustomerFeedbackRoute: CustomerFeedbackRoute,
   CustomersRoute: CustomersRoute,
   DashboardRoute: DashboardRoute,
-  DriversRoute: DriversRoute,
+  DriversRoute: DriversRouteWithChildren,
   ExpensesRoute: ExpensesRoute,
   FarmersRoute: FarmersRoute,
   FeedbackRoute: FeedbackRoute,

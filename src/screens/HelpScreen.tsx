@@ -166,20 +166,28 @@ const GUIDE: {
     title: { sw: "Siku ya gari la njia (Dereva)", en: "The van day (Driver)" },
     steps: [
       {
-        sw: "Pakia: ondoa tiki bidhaa usizonazo, jaza idadi za ulizonazo, thibitisha. Zisizochaguliwa zinaondolewa kwenye siku yako.",
-        en: "Load: untick products you do not have, fill quantities for what you do, confirm. Unselected products disappear from your day.",
+        sw: "Hatua 1, Ratiba: fungua Njia, tabo ya Ratiba inaonyesha wateja wa kutembelea leo kwa mpangilio. Bonyeza Uza kwenda moja kwa moja kwa mteja huyo.",
+        en: "Step 1, Plan: open Route. The Plan tab lists today's customers in visiting order. Tap Sell on any of them to jump straight to selling.",
       },
       {
-        sw: "Uza: chagua mteja, gusa bidhaa, chagua malipo (cash, mkopo, M-Pesa). Unaweza kubadili mpangilio wa bidhaa (gridi au orodha).",
-        en: "Sell: pick the customer, tap products, choose payment (cash, credit, M-Pesa). You can switch the product layout (grid or list).",
+        sw: "Hatua 2, Pakia: ondoa tiki bidhaa usizonazo, jaza idadi za ulizonazo, thibitisha. Hii ndiyo lango, huwezi kuuza kabla ya kuthibitisha upakiaji.",
+        en: "Step 2, Load: untick products you do not have, fill quantities for what you do, confirm. This is the gate, you cannot sell until the load is confirmed.",
       },
       {
-        sw: "Marejesho yanahesabiwa otomatiki (kilichopakiwa kasoro kilichouzwa). Ukibadilisha namba lazima utoe sababu.",
-        en: "Returns are computed automatically (loaded minus sold). Changing a number requires a reason.",
+        sw: "Hatua 3, Uza: kwa kila mteja chagua mteja, gusa bidhaa, chagua malipo (cash, mkopo, M-Pesa). Kila mauzo yanapunguza mzigo wa gari papo hapo.",
+        en: "Step 3, Sell: for each stop pick the customer, tap products, choose payment (cash, credit, M-Pesa). Every sale draws down the van's load immediately.",
       },
       {
-        sw: "Fungasa: weka cash benki, pakia picha ya risiti ya benki (ni lazima kwa cash), kisha tengeneza risiti ya amana.",
-        en: "Cash-up: bank the cash, upload the deposit-slip photo (mandatory for cash), then generate the deposit receipt.",
+        sw: "Hatua 4, Marejesho: mwisho wa njia, kilichobaki kinahesabiwa otomatiki (kilichopakiwa kasoro kilichouzwa) na kinarudi ghalani. Ukibadilisha namba lazima utoe sababu.",
+        en: "Step 4, Returns: at the end of the round, what is left is computed automatically (loaded minus sold) and goes back to store. Changing a number requires a reason.",
+      },
+      {
+        sw: "Hatua 5, Fungasa: weka cash benki, kisha rekodi amana. Picha ya risiti ni ya hiari, unaweza kuiweka baadaye ikifika. Mkopo hauhesabiwi hapa, ni deni la mteja.",
+        en: "Step 5, Cash-up: bank the cash, then record the deposit. The slip photo is optional, attach it later when it arrives. Credit sales are not counted here, they stay as customer debt.",
+      },
+      {
+        sw: "Kila hatua inafuata nyingine. Kama umekwama, angalia hatua iliyotangulia: mara nyingi upakiaji haujathibitishwa.",
+        en: "Each step feeds the next. If something is blocked, check the step before it: most often the load was never confirmed.",
       },
     ],
   },

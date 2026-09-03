@@ -36,6 +36,25 @@ export interface DriverRoute {
   lastLoadDate: string;
 }
 
+export interface DriverOverview {
+  profileId: string;
+  salesTodayTZS: number;
+  salesMonthTZS: number;
+  salesTotalTZS: number;
+  salesCount: number;
+  distinctCustomers: number;
+  depositsMonthTZS: number;
+  lastSaleDate: string | null;
+  lastLoadDate: string | null;
+  loadedToday: boolean;
+}
+
+export interface DriverDay {
+  date: string;
+  amountTZS: number;
+  salesCount: number;
+}
+
 export const driverKeys = {
   all: ["drivers"] as const,
   list: () => ["drivers", "list"] as const,
@@ -44,6 +63,8 @@ export const driverKeys = {
   routes: (id: string) => ["drivers", "routes", id] as const,
   sales: (id: string) => ["drivers", "sales", id] as const,
   deposits: (id: string) => ["drivers", "deposits", id] as const,
+  overview: () => ["drivers", "overview"] as const,
+  daily: (id: string, days: number) => ["drivers", "daily", id, days] as const,
 };
 
 export const driversRepo = {
@@ -53,6 +74,52 @@ export const driversRepo = {
       await supabase.from("profiles").select("*").contains("roles", ["route"]).order("name"),
     ) as ProfileRow[];
     return rows.map(profileToUser);
+  },
+
+  /** Headline figures for the whole roster in one round trip, so the card
+   *  grid doesn't fire a driver_stats call per driver. */
+  async overview(): Promise<DriverOverview[]> {
+    const { data, error } = await supabase.rpc("drivers_overview");
+    if (error) throw new Error(error.message);
+    return (
+      data as {
+        profile_id: string;
+        sales_today_tzs: number;
+        sales_month_tzs: number;
+        sales_total_tzs: number;
+        sales_count: number;
+        distinct_customers: number;
+        deposits_month_tzs: number;
+        last_sale_date: string | null;
+        last_load_date: string | null;
+        loaded_today: boolean;
+      }[]
+    ).map((r) => ({
+      profileId: r.profile_id,
+      salesTodayTZS: Number(r.sales_today_tzs),
+      salesMonthTZS: Number(r.sales_month_tzs),
+      salesTotalTZS: Number(r.sales_total_tzs),
+      salesCount: Number(r.sales_count),
+      distinctCustomers: Number(r.distinct_customers),
+      depositsMonthTZS: Number(r.deposits_month_tzs),
+      lastSaleDate: r.last_sale_date,
+      lastLoadDate: r.last_load_date,
+      loadedToday: r.loaded_today,
+    }));
+  },
+
+  /** Daily sales for one driver, gap-filled, for the trend on their page. */
+  async dailySales(profileId: string, days = 14): Promise<DriverDay[]> {
+    const { data, error } = await supabase.rpc("driver_daily_sales", {
+      p_profile_id: profileId,
+      p_days: days,
+    });
+    if (error) throw new Error(error.message);
+    return (data as { date: string; amount_tzs: number; sales_count: number }[]).map((r) => ({
+      date: r.date,
+      amountTZS: Number(r.amount_tzs),
+      salesCount: Number(r.sales_count),
+    }));
   },
 
   async stats(profileId: string): Promise<DriverStats> {
