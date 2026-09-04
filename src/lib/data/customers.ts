@@ -79,7 +79,7 @@ export const customersRepo = {
       await supabase
         .from("sale_lines")
         .select(
-          "id, product_id, qty, unit, amount_tzs, sales!inner(id, date, payment, customer_id, voided)",
+          "id, product_id, qty, unit, unit_price, amount_tzs, sales!inner(id, date, payment, customer_id, voided)",
         )
         .eq("sales.customer_id", customerId)
         .eq("sales.voided", false)
@@ -90,12 +90,15 @@ export const customersRepo = {
       product_id: string;
       qty: number;
       unit: Unit;
+      unit_price: number;
       amount_tzs: number;
       sales: { id: string; date: string; payment: string; customer_id: string; voided: boolean };
     }[];
     return rows
       .map((r) => ({
         id: r.id,
+        saleId: r.sales.id,
+        unitPrice: Number(r.unit_price),
         date: r.sales.date,
         productId: r.product_id,
         qty: Number(r.qty),

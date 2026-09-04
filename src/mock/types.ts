@@ -85,6 +85,9 @@ export interface Customer {
 
 export interface CustomerActivity {
   id: string;
+  /** The sale this line belongs to, so a row can be corrected or voided. */
+  saleId?: string;
+  unitPrice?: number;
   date: string;
   productId: string;
   qty: number;

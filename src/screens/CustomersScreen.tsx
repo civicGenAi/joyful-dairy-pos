@@ -13,7 +13,7 @@ import {
   useSendReminder,
 } from "@/lib/data/hooks/customers";
 import { useProducts, usePriceMatrix } from "@/lib/data/hooks/products";
-import { useCompleteSale } from "@/lib/data/hooks/sales";
+import { useCompleteSale, useUpdateSale, useVoidSale } from "@/lib/data/hooks/sales";
 import { todayISO } from "@/lib/data/dates";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
 import { tzs, num } from "@/lib/format";
@@ -54,7 +54,14 @@ import {
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import type { BillingCycle, Customer, CustomerType, PriceTier } from "@/mock/types";
+import type {
+  BillingCycle,
+  Customer,
+  CustomerActivity,
+  CustomerType,
+  PriceTier,
+  Product,
+} from "@/mock/types";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { KPISkeleton, SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
@@ -468,6 +475,7 @@ function CustomerDrawer({ c }: { c: Customer }) {
                     <th className="text-right">{t("Idadi", "Qty")}</th>
                     <th className="text-right">{t("Kiasi", "Amount")}</th>
                     <th>{t("Hali", "Status")}</th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
@@ -487,6 +495,11 @@ function CustomerDrawer({ c }: { c: Customer }) {
                           <Pill tone={a.paid ? "success" : "warning"}>
                             {a.paid ? t("Imelipwa", "Paid") : t("Mkopo", "Credit")}
                           </Pill>
+                        </td>
+                        <td className="py-2 text-right whitespace-nowrap">
+                          {canInvoice && a.saleId && (
+                            <EditActivitySheet activity={a} products={products} />
+                          )}
                         </td>
                       </tr>
                     );
@@ -714,6 +727,192 @@ interface IntakeLine {
   qty: number;
   tier: PriceTier;
   unitPrice: number;
+}
+
+// Correcting one line of activity. Behind it is a sale, so this hands the
+// whole thing back to update_sale, which returns the old stock and the old
+// credit before applying the new figures. Removing voids the sale, which
+// keeps the receipt on record as cancelled rather than deleting the
+// evidence that it ever happened.
+function EditActivitySheet({
+  activity,
+  products,
+}: {
+  activity: CustomerActivity;
+  products: Product[];
+}) {
+  const { t } = useApp();
+  const [open, setOpen] = useState(false);
+  const [productId, setProductId] = useState(activity.productId);
+  const [qty, setQty] = useState<number>(activity.qty);
+  const [price, setPrice] = useState<number>(activity.unitPrice ?? 0);
+  const [date, setDate] = useState(activity.date);
+  const [payment, setPayment] = useState<"cash" | "credit">(activity.paid ? "cash" : "credit");
+  const update = useUpdateSale();
+  const voidSale = useVoidSale();
+
+  const total = qty * price;
+  const changed =
+    productId !== activity.productId ||
+    qty !== activity.qty ||
+    price !== (activity.unitPrice ?? 0) ||
+    date !== activity.date ||
+    payment !== (activity.paid ? "cash" : "credit");
+
+  const fail = (e: Error) =>
+    toast.error(
+      e.message.includes("day-locked")
+        ? t("Siku hii imefungwa", "That day is locked")
+        : e.message.includes("insufficient-stock")
+          ? t("Hakuna bidhaa za kutosha", "Not enough stock for that quantity")
+          : t("Imeshindikana", "Could not save the change"),
+    );
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button size="sm" variant="ghost" className="h-7 text-xs">
+          {t("Hariri", "Edit")}
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Rekebisha shughuli", "Correct this activity")}</SheetTitle>
+        </SheetHeader>
+        <div className="grid gap-3">
+          <div className="rounded-xl bg-secondary/60 px-3 py-2.5 text-[11px] text-muted-foreground font-num">
+            {activity.saleId} · {t("ilirekodiwa", "recorded")} {activity.date}
+          </div>
+          <div className="grid gap-1.5">
+            <Label>{t("Bidhaa", "Product")}</Label>
+            <Select value={productId} onValueChange={setProductId}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {products
+                  .filter((p) => p.active)
+                  .map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>{t("Idadi", "Quantity")}</Label>
+              <Input
+                type="number"
+                step="any"
+                min={0}
+                value={qty}
+                onChange={(e) => setQty(Number(e.target.value))}
+                className="font-num"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{t("Bei kwa kimoja", "Unit price")}</Label>
+              <Input
+                type="number"
+                step="any"
+                min={0}
+                value={price}
+                onChange={(e) => setPrice(Number(e.target.value))}
+                className="font-num"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>{t("Tarehe", "Date")}</Label>
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{t("Malipo", "Payment")}</Label>
+              <Select value={payment} onValueChange={(v) => setPayment(v as typeof payment)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">{t("Amelipa", "Paid")}</SelectItem>
+                  <SelectItem value="credit">{t("Mkopo", "Credit")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="rounded-xl bg-secondary/60 px-3 py-2.5 flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">{t("Jumla", "Total")}</span>
+            <span className="font-num font-bold">{tzs(total)}</span>
+          </div>
+          {payment === "credit" && (
+            <div className="text-[11px] text-muted-foreground">
+              {t(
+                "Deni la mteja litarekebishwa kufuata kiasi kipya.",
+                "The customer's balance is adjusted to match the new amount.",
+              )}
+            </div>
+          )}
+        </div>
+        <SheetFooter className="flex-col sm:flex-row sm:justify-between gap-2">
+          <ConfirmDialog
+            destructive
+            title={t("Ondoa shughuli hii?", "Remove this activity?")}
+            description={t(
+              "Mauzo yatafutwa, bidhaa zitarudi ghalani na deni litarekebishwa. Rekodi itabaki ikionyesha imefutwa.",
+              "The sale is cancelled, the stock goes back and the balance is corrected. The record stays, marked as cancelled.",
+            )}
+            confirmLabel={t("Ondoa", "Remove")}
+            onConfirm={() =>
+              voidSale.mutate(
+                { saleId: activity.saleId!, reason: "Removed from customer activity" },
+                {
+                  onSuccess: () => {
+                    toast.success(t("Imeondolewa", "Removed"));
+                    setOpen(false);
+                  },
+                  onError: (e: Error) => fail(e),
+                },
+              )
+            }
+            trigger={
+              <Button variant="outline" className="text-[#E11B22] border-[#E11B22]/40">
+                {t("Ondoa", "Remove")}
+              </Button>
+            }
+          />
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              {t("Ghairi", "Cancel")}
+            </Button>
+            <Button
+              disabled={!changed || qty <= 0 || update.isPending}
+              onClick={() =>
+                update.mutate(
+                  {
+                    saleId: activity.saleId!,
+                    date,
+                    payment,
+                    lines: [{ productId, qty, unitPrice: price }],
+                  },
+                  {
+                    onSuccess: () => {
+                      toast.success(t("Imerekebishwa", "Corrected"));
+                      setOpen(false);
+                    },
+                    onError: (e: Error) => fail(e),
+                  },
+                )
+              }
+            >
+              {update.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
+            </Button>
+          </div>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
 }
 
 function RecordIntakeDialog({ customerId }: { customerId: string }) {

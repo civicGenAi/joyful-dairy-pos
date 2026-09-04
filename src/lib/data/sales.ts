@@ -151,6 +151,30 @@ export const salesRepo = {
     return toSale(row);
   },
 
+  /** Corrects a sale in place: gives back the old lines' stock and the old
+   *  credit, applies the new lines, and reverses the ledger entry so the
+   *  corrected figures post fresh. Keeps the same receipt number, which
+   *  voiding and re-entering would not. */
+  async update(input: {
+    saleId: string;
+    date: string;
+    payment: Sale["payment"];
+    lines: SaleLineInput[];
+  }): Promise<Sale> {
+    const { data, error } = await supabase.rpc("update_sale", {
+      p_sale_id: input.saleId,
+      p_date: input.date,
+      p_payment: input.payment,
+      p_lines: input.lines.map((l) => ({
+        product_id: l.productId,
+        qty: l.qty,
+        unit_price: l.unitPrice,
+      })),
+    });
+    if (error) throw new Error(error.message);
+    return toSale(data as SaleRow);
+  },
+
   /** Voids a receipt: reverses its stock movements and any credit balance
    *  it created, via the transactional RPC. Only possible on an unlocked day. */
   async void(input: { saleId: string; reason?: string }): Promise<Sale> {

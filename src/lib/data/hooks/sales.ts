@@ -124,3 +124,18 @@ export function useDeleteDeposit() {
     },
   });
 }
+
+export function useUpdateSale() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: salesRepo.update,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: saleKeys.all });
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["stock"] });
+      qc.invalidateQueries({ queryKey: ["recon"] });
+      qc.invalidateQueries({ queryKey: ["ledger"] });
+      qc.invalidateQueries({ queryKey: ["finance"] });
+    },
+  });
+}
