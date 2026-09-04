@@ -138,3 +138,14 @@ export function useCloseBankRec() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ledgerKeys.all }),
   });
 }
+
+export function useAddBankItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ledgerRepo.addBankItem,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ledgerKeys.all });
+      qc.invalidateQueries({ queryKey: ["customers"] });
+    },
+  });
+}

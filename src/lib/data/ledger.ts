@@ -247,6 +247,31 @@ export const ledgerRepo = {
     return { difference: Number((data as Record<string, unknown>).difference ?? 0) };
   },
 
+  /** Records something the statement shows but the books never saw: a bank
+   *  charge, interest, a customer who paid straight in. Posts it and marks
+   *  it cleared in one move, because a line already printed on a statement
+   *  is by definition one the bank has seen. */
+  async addBankItem(input: {
+    account: string;
+    date: string;
+    amount: number;
+    direction: "in" | "out";
+    contraAccount: string;
+    memo: string;
+    customerId?: string;
+  }): Promise<void> {
+    const { error } = await supabase.rpc("bank_rec_add_item", {
+      p_account: input.account,
+      p_date: input.date,
+      p_amount: input.amount,
+      p_direction: input.direction,
+      p_contra_account: input.contraAccount,
+      p_memo: input.memo,
+      p_customer_id: input.customerId ?? null,
+    });
+    if (error) throw new Error(error.message);
+  },
+
   async postingStatus(): Promise<PostingStatus> {
     const { data, error } = await supabase.rpc("gl_posting_status");
     if (error) throw new Error(error.message);

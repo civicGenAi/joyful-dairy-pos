@@ -21,6 +21,7 @@ import {
   useManualEntry,
   useSetCleared,
   useCloseBankRec,
+  useAddBankItem,
 } from "@/lib/data/hooks/ledger";
 import type { LedgerAccount } from "@/lib/data/ledger";
 import { useAssetSchedule, useCreateAsset, usePostDepreciation } from "@/lib/data/hooks/assets";
@@ -32,6 +33,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useCustomers } from "@/lib/data/hooks/customers";
 import { todayISO } from "@/lib/data/dates";
 import { SectionCard, StatCard, Pill } from "@/components/ui/data-bits";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -700,6 +702,197 @@ function ManualEntrySheet({ accounts }: { accounts: LedgerAccount[] }) {
   );
 }
 
+// The other half of a reconciliation: something the statement shows that
+// the books never saw. Money is banked late and receipts arrive later, so
+// a statement here routinely carries charges, interest and customers who
+// paid straight in. Without this the difference could be seen but not
+// resolved, and people go back to reconciling in a notebook.
+const BANK_ITEM_PRESETS: {
+  id: string;
+  sw: string;
+  en: string;
+  direction: "in" | "out";
+  account: string;
+  needsCustomer?: boolean;
+}[] = [
+  { id: "charge", sw: "Gharama za benki", en: "Bank charge", direction: "out", account: "6080" },
+  { id: "interest", sw: "Riba", en: "Interest received", direction: "in", account: "4920" },
+  {
+    id: "customer",
+    sw: "Mteja amelipa moja kwa moja",
+    en: "Customer paid straight in",
+    direction: "in",
+    account: "1100",
+    needsCustomer: true,
+  },
+  {
+    id: "other-in",
+    sw: "Kingine kimeingia",
+    en: "Other money in",
+    direction: "in",
+    account: "4900",
+  },
+  {
+    id: "other-out",
+    sw: "Kingine kimetoka",
+    en: "Other money out",
+    direction: "out",
+    account: "6900",
+  },
+];
+
+function AddBankItemSheet({ account, asAt }: { account: string; asAt: string }) {
+  const { t } = useApp();
+  const [open, setOpen] = useState(false);
+  const [preset, setPreset] = useState("charge");
+  const [date, setDate] = useState(asAt);
+  const [amount, setAmount] = useState<number | "">("");
+  const [memo, setMemo] = useState("");
+  const [customerId, setCustomerId] = useState("");
+  const { data: customers = [] } = useCustomers();
+  const add = useAddBankItem();
+
+  const chosen = BANK_ITEM_PRESETS.find((p) => p.id === preset) ?? BANK_ITEM_PRESETS[0];
+  const needsCustomer = chosen.needsCustomer === true;
+  const ready = amount !== "" && amount > 0 && memo.trim() !== "" && (!needsCustomer || customerId);
+
+  const save = () => {
+    if (!ready) return;
+    add.mutate(
+      {
+        account,
+        date,
+        amount: Number(amount),
+        direction: chosen.direction,
+        contraAccount: chosen.account,
+        memo,
+        customerId: needsCustomer ? customerId : undefined,
+      },
+      {
+        onSuccess: () => {
+          toast.success(t("Kimeongezwa na kimehakikiwa", "Added and ticked off"));
+          setOpen(false);
+          setAmount("");
+          setMemo("");
+          setCustomerId("");
+        },
+        onError: (e: Error) =>
+          toast.error(
+            e.message.includes("period-locked")
+              ? t("Kipindi hiki kimefungwa", "That period is locked")
+              : t("Imeshindikana kuongeza", "Could not add the item"),
+          ),
+      },
+    );
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button size="sm" variant="outline" className="h-8 text-xs">
+          <Plus className="h-3.5 w-3.5 mr-1.5" />
+          {t("Ongeza kutoka taarifa", "Add from statement")}
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>
+            {t("Kipengele cha taarifa ya benki", "Item from the bank statement")}
+          </SheetTitle>
+        </SheetHeader>
+        <div className="grid gap-3">
+          <div className="rounded-xl bg-secondary/60 px-3 py-2.5 text-[11px] text-muted-foreground">
+            {t(
+              "Kwa kitu kilichopo kwenye taarifa ya benki lakini hakikuingizwa hapa. Kitawekwa vitabuni na kuhakikiwa mara moja, kwa sababu benki tayari imekiona.",
+              "For something on the bank statement that was never entered here. It is posted and ticked off at once, because the bank has already seen it.",
+            )}
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label>{t("Ni kitu gani", "What is it")}</Label>
+            <Select value={preset} onValueChange={setPreset}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {BANK_ITEM_PRESETS.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {t(p.sw, p.en)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {needsCustomer && (
+            <div className="grid gap-1.5">
+              <Label>{t("Mteja", "Customer")}</Label>
+              <Select value={customerId} onValueChange={setCustomerId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t("Chagua mteja", "Pick the customer")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers
+                    .filter((c) => c.outstandingTZS > 0)
+                    .map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name} · {tzs(c.outstandingTZS)}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <div className="text-[11px] text-muted-foreground">
+                {t(
+                  "Deni lake litapungua pia, siyo vitabu peke yake.",
+                  "Their balance comes down too, not just the ledger.",
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>{t("Tarehe", "Date")}</Label>
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>
+                {chosen.direction === "in"
+                  ? t("Kiasi kilichoingia", "Amount in")
+                  : t("Kiasi kilichotoka", "Amount out")}
+              </Label>
+              <Input
+                type="number"
+                step="any"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                className="font-num"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label>{t("Maelezo", "Description")}</Label>
+            <Input
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              placeholder={t("Kama ilivyo kwenye taarifa", "As it reads on the statement")}
+            />
+          </div>
+        </div>
+        <SheetFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            {t("Ghairi", "Cancel")}
+          </Button>
+          <Button onClick={save} disabled={!ready || add.isPending}>
+            {add.isPending ? t("Inaongeza…", "Adding…") : t("Ongeza", "Add")}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 // Bank reconciliation: tick off what the statement shows, then say what the
 // statement said. The difference is the whole point of the exercise, so it
 // is shown plainly and stored even when it is not zero.
@@ -740,6 +933,7 @@ function BankRecTab({ to }: { to: string }) {
           </SelectContent>
         </Select>
         <span className="text-[11px] text-muted-foreground">{t(`Hadi ${to}`, `Up to ${to}`)}</span>
+        {canWrite && <AddBankItemSheet account={account} asAt={to} />}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
