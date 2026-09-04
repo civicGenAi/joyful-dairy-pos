@@ -48,9 +48,6 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import { ExportMenu } from "@/components/ui/ExportMenu";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useMpesaDaily, useRecordMpesaDay, useDeleteMpesaDay } from "@/lib/data/hooks/mpesaDaily";
-import { num, L } from "@/lib/format";
 import { SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useFormDraft } from "@/hooks/use-form-draft";
@@ -158,481 +155,252 @@ export function SalesDepositsScreen() {
 
   return (
     <AppShell title={t("Amana za mauzo", "Sales deposits")}>
-      <Tabs defaultValue="deposits">
-        <TabsList className="mb-4">
-          <TabsTrigger value="deposits">{t("Amana kwa bidhaa", "Deposits by product")}</TabsTrigger>
-          <TabsTrigger value="mpesa">{t("Mauzo ya M-Pesa", "M-Pesa sales")}</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="mpesa">
-          <MpesaDailyTab from={range.from} to={range.to} windowLabel={windowLabel} />
-        </TabsContent>
-
-        <TabsContent value="deposits">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex rounded-lg border border-border overflow-hidden">
-                {(["day", "month", "year"] as const).map((g) => (
-                  <button
-                    key={g}
-                    type="button"
-                    onClick={() => setGrain(g)}
-                    className={`px-3 py-1.5 text-xs font-semibold transition ${
-                      grain === g ? "text-white" : "hover:bg-accent"
-                    }`}
-                    style={grain === g ? { background: "#1E7C3F" } : undefined}
-                  >
-                    {g === "day"
-                      ? t("Siku", "Day")
-                      : g === "month"
-                        ? t("Mwezi", "Month")
-                        : t("Mwaka", "Year")}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => shift(-1)}
-                  className="grid h-8 w-8 place-items-center rounded-lg border border-border hover:bg-accent"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <span className="text-sm font-semibold min-w-[9rem] text-center">
-                  {windowLabel}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => shift(1)}
-                  disabled={atLatest}
-                  className="grid h-8 w-8 place-items-center rounded-lg border border-border hover:bg-accent disabled:opacity-30"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <ExportMenu
-                formats={["csv", "excel", "pdf"]}
-                filename={`sales-deposits-${range.from}-to-${range.to}`}
-                data={() => ({
-                  title: t(`Amana za mauzo, ${windowLabel}`, `Sales deposits, ${windowLabel}`),
-                  headers: ["Product or outlet", "M-Pesa", "Bank", "Cash", "Total", "Deposits"],
-                  rows: byCategory.map((r) => [
-                    label(r.category),
-                    r.mpesa,
-                    r.bank,
-                    r.cash,
-                    r.total,
-                    r.count,
-                  ]),
-                })}
-              />
-              {canDeposit && <RecordSalesDepositDialog categories={categories} />}
-            </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-lg border border-border overflow-hidden">
+            {(["day", "month", "year"] as const).map((g) => (
+              <button
+                key={g}
+                type="button"
+                onClick={() => setGrain(g)}
+                className={`px-3 py-1.5 text-xs font-semibold transition ${
+                  grain === g ? "text-white" : "hover:bg-accent"
+                }`}
+                style={grain === g ? { background: "#1E7C3F" } : undefined}
+              >
+                {g === "day"
+                  ? t("Siku", "Day")
+                  : g === "month"
+                    ? t("Mwezi", "Month")
+                    : t("Mwaka", "Year")}
+              </button>
+            ))}
           </div>
-
-          {isPending ? (
-            <SectionSkeleton>
-              <TableSkeleton rows={8} cols={5} />
-            </SectionSkeleton>
-          ) : (
-            <div className="space-y-4">
-              {/* One row per product or outlet: the whole point of the screen. */}
-              <SectionCard title={t("Kila bidhaa na jumla yake", "Each product and its total")}>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                        <th className="py-2 px-3">{t("Bidhaa au sehemu", "Product or outlet")}</th>
-                        <th className="text-right">M-Pesa</th>
-                        <th className="text-right">{t("Benki", "Bank")}</th>
-                        <th className="text-right">{t("Taslimu", "Cash")}</th>
-                        <th className="text-right px-3">{t("Jumla", "Total")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {byCategory.map((r) => (
-                        <tr
-                          key={r.category}
-                          className={`border-b border-border last:border-0 ${r.total === 0 ? "opacity-45" : ""}`}
-                        >
-                          <td className="py-2.5 px-3 font-medium">
-                            {label(r.category)}
-                            {r.count > 0 && (
-                              <span className="ml-2 text-[11px] text-muted-foreground font-num">
-                                {r.count}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-2.5 text-right font-num">
-                            {r.mpesa > 0 ? tzs(r.mpesa, false) : ""}
-                          </td>
-                          <td className="py-2.5 text-right font-num">
-                            {r.bank > 0 ? tzs(r.bank, false) : ""}
-                          </td>
-                          <td className="py-2.5 text-right font-num">
-                            {r.cash > 0 ? tzs(r.cash, false) : ""}
-                          </td>
-                          <td className="py-2.5 text-right px-3 font-num font-semibold">
-                            {r.total > 0 ? tzs(r.total, false) : "-"}
-                          </td>
-                        </tr>
-                      ))}
-                      <tr className="border-t-2" style={{ borderColor: "#1E6B3A" }}>
-                        <td className="py-3 px-3 font-bold">{t("Jumla kuu", "Grand total")}</td>
-                        <td className="py-3 text-right font-num font-bold">
-                          {tzs(grand.mpesa, false)}
-                        </td>
-                        <td className="py-3 text-right font-num font-bold">
-                          {tzs(grand.bank, false)}
-                        </td>
-                        <td className="py-3 text-right font-num font-bold">
-                          {tzs(grand.cash, false)}
-                        </td>
-                        <td className="py-3 text-right px-3 font-num font-bold text-base">
-                          {tzs(grand.total, false)}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </SectionCard>
-
-              {/* Day by day inside the window, so a month can still answer a
-              question about one date without changing view. */}
-              {grain !== "day" && byDay.length > 0 && (
-                <SectionCard title={t("Kila siku", "Day by day")}>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                          <th className="py-2 px-3">{t("Tarehe", "Date")}</th>
-                          {byCategory
-                            .filter((c) => c.total > 0)
-                            .map((c) => (
-                              <th key={c.category} className="text-right">
-                                {label(c.category)}
-                              </th>
-                            ))}
-                          <th className="text-right px-3">{t("Jumla", "Total")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {byDay.map(([date, vals]) => (
-                          <tr key={date} className="border-b border-border last:border-0">
-                            <td className="py-2 px-3 font-num text-xs">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setGrain("day");
-                                  setAnchor(date);
-                                }}
-                                className="hover:underline"
-                              >
-                                {date}
-                              </button>
-                            </td>
-                            {byCategory
-                              .filter((c) => c.total > 0)
-                              .map((c) => (
-                                <td key={c.category} className="py-2 text-right font-num">
-                                  {vals[c.category] ? tzs(vals[c.category], false) : ""}
-                                </td>
-                              ))}
-                            <td className="py-2 text-right px-3 font-num font-semibold">
-                              {tzs(vals.__total ?? 0, false)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="mt-2 text-[11px] text-muted-foreground">
-                    {t(
-                      "Bonyeza tarehe kuona siku hiyo peke yake.",
-                      "Click a date to open that day on its own.",
-                    )}
-                  </div>
-                </SectionCard>
-              )}
-
-              <SectionCard title={t("Miamala", "The deposits themselves")}>
-                {deposits.length === 0 ? (
-                  <EmptyState
-                    icon={Receipt}
-                    title={t("Hakuna amana katika kipindi hiki", "No deposits in this period")}
-                  />
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                          <th className="py-2 px-3">{t("Tarehe", "Date")}</th>
-                          <th>{t("Bidhaa au sehemu", "Product or outlet")}</th>
-                          <th>{t("Njia", "Channel")}</th>
-                          <th className="text-right">{t("Kiasi", "Amount")}</th>
-                          <th className="px-3" />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {deposits.map((x) => (
-                          <tr key={x.id} className="border-b border-border last:border-0">
-                            <td className="py-2.5 px-3 font-num text-xs text-muted-foreground">
-                              {x.date}
-                            </td>
-                            <td className="py-2.5">
-                              <Pill tone="info">{label(x.source)}</Pill>
-                            </td>
-                            <td className="py-2.5">
-                              <span className="inline-flex items-center gap-1 text-xs">
-                                {x.method === "mpesa" ? (
-                                  <Smartphone className="h-3 w-3" />
-                                ) : (
-                                  <ArrowUpRight className="h-3 w-3" />
-                                )}
-                                {x.method}
-                              </span>
-                            </td>
-                            <td className="py-2.5 text-right font-num font-semibold">
-                              {tzs(x.amountTZS)}
-                            </td>
-                            <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                              {x.attachmentUrl && (
-                                <a
-                                  href={x.attachmentUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  title={t("Risiti", "Receipt")}
-                                  className="text-[#1E7C3F] hover:opacity-70 mr-2 inline-block align-middle"
-                                >
-                                  <Paperclip className="h-3.5 w-3.5" />
-                                </a>
-                              )}
-                              {canDeposit && (
-                                <EditDepositSheet deposit={x} categories={categories} />
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </SectionCard>
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
-    </AppShell>
-  );
-}
-
-// The daily M-Pesa book. Milk goes out over M-Pesa all day in ones and
-// twos and nobody rings each one into the counter, so what is written down
-// is litres and money, once, for the day. The price per litre is shown
-// beside each day on purpose: it is the cheapest check there is, and a
-// figure that drifts from the usual one means the litres or the money went
-// in wrong.
-function MpesaDailyTab({
-  from,
-  to,
-  windowLabel,
-}: {
-  from: string;
-  to: string;
-  windowLabel: string;
-}) {
-  const { t, can } = useApp();
-  const canWrite = can("pos:use") || can("finance:write");
-  const { data, isPending } = useMpesaDaily(from, to);
-  const record = useRecordMpesaDay();
-  const remove = useDeleteMpesaDay();
-
-  const [date, setDate] = useState(todayISO());
-  const [litres, setLitres] = useState<number | "">("");
-  const [amount, setAmount] = useState<number | "">("");
-
-  const days = data?.summary ?? [];
-  const entries = data?.entries ?? [];
-  const totalL = days.reduce((a, d) => a + d.litres, 0);
-  const totalTZS = days.reduce((a, d) => a + d.amountTZS, 0);
-  const avg = totalL > 0 ? totalTZS / totalL : 0;
-  const ready = litres !== "" && amount !== "" && (litres > 0 || amount > 0);
-
-  const add = () => {
-    if (!ready) return;
-    record.mutate(
-      { date, litres: Number(litres), amountTZS: Number(amount) },
-      {
-        onSuccess: () => {
-          toast.success(t("Imerekodiwa", "Recorded"));
-          setLitres("");
-          setAmount("");
-        },
-        onError: (e: Error) =>
-          toast.error(
-            e.message.includes("future-date")
-              ? t("Huwezi kurekodi tarehe ijayo", "You cannot record a future date")
-              : t("Imeshindikana kurekodi", "Could not record it"),
-          ),
-      },
-    );
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        <StatCard label={t("Lita zilizouzwa", "Litres sold")} value={L(totalL)} accent="info" />
-        <StatCard label={t("Fedha", "Money in")} value={tzs(totalTZS)} accent="green" />
-        <StatCard
-          label={t("Wastani kwa lita", "Average per litre")}
-          value={tzs(avg)}
-          sub={windowLabel}
-          accent="amber"
-        />
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => shift(-1)}
+              className="grid h-8 w-8 place-items-center rounded-lg border border-border hover:bg-accent"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-sm font-semibold min-w-[9rem] text-center">{windowLabel}</span>
+            <button
+              type="button"
+              onClick={() => shift(1)}
+              disabled={atLatest}
+              className="grid h-8 w-8 place-items-center rounded-lg border border-border hover:bg-accent disabled:opacity-30"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <ExportMenu
+            formats={["csv", "excel", "pdf"]}
+            filename={`sales-deposits-${range.from}-to-${range.to}`}
+            data={() => ({
+              title: t(`Amana za mauzo, ${windowLabel}`, `Sales deposits, ${windowLabel}`),
+              headers: ["Product or outlet", "M-Pesa", "Bank", "Cash", "Total", "Deposits"],
+              rows: byCategory.map((r) => [
+                label(r.category),
+                r.mpesa,
+                r.bank,
+                r.cash,
+                r.total,
+                r.count,
+              ]),
+            })}
+          />
+          {canDeposit && <RecordSalesDepositDialog categories={categories} />}
+        </div>
       </div>
 
-      {canWrite && (
-        <SectionCard title={t("Rekodi mauzo ya M-Pesa ya siku", "Record a day's M-Pesa sales")}>
-          <div className="grid sm:grid-cols-4 gap-3 items-end">
-            <div className="grid gap-1.5">
-              <Label className="text-xs">{t("Tarehe", "Date")}</Label>
-              <Input
-                type="date"
-                value={date}
-                max={todayISO()}
-                onChange={(e) => setDate(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label className="text-xs">{t("Lita", "Litres")}</Label>
-              <Input
-                type="number"
-                step="any"
-                min={0}
-                value={litres}
-                onChange={(e) => setLitres(e.target.value === "" ? "" : Number(e.target.value))}
-                className="font-num"
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label className="text-xs">{t("Fedha (TZS)", "Money (TZS)")}</Label>
-              <Input
-                type="number"
-                step="any"
-                min={0}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value === "" ? "" : Number(e.target.value))}
-                className="font-num"
-              />
-            </div>
-            <Button
-              onClick={add}
-              disabled={!ready || record.isPending}
-              className="text-white"
-              style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
-            >
-              {record.isPending ? t("Inahifadhi…", "Saving…") : t("Ongeza", "Add")}
-            </Button>
-          </div>
-          {ready && Number(litres) > 0 && (
-            <div className="mt-2 text-[11px] text-muted-foreground">
-              {t("Hii ni", "That works out at")}{" "}
-              <span className="font-num font-semibold">{tzs(Number(amount) / Number(litres))}</span>{" "}
-              {t("kwa lita", "per litre")}
-            </div>
-          )}
-        </SectionCard>
-      )}
-
-      <SectionCard title={t("Kila siku", "Day by day")}>
-        {isPending ? (
-          <TableSkeleton rows={5} cols={4} />
-        ) : days.length === 0 ? (
-          <EmptyState
-            icon={Smartphone}
-            title={t("Hakuna mauzo ya M-Pesa", "No M-Pesa sales in this period")}
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                  <th className="py-2 px-3">{t("Tarehe", "Date")}</th>
-                  <th className="text-right">{t("Lita", "Litres")}</th>
-                  <th className="text-right">{t("Fedha", "Money")}</th>
-                  <th className="text-right px-3">{t("Kwa lita", "Per litre")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {days.map((d) => (
-                  <tr key={d.date} className="border-b border-border last:border-0">
-                    <td className="py-2.5 px-3 font-num text-xs">
-                      {d.date}
-                      {d.entries > 1 && (
-                        <span className="ml-2 text-muted-foreground">
-                          {d.entries} {t("mara", "entries")}
-                        </span>
-                      )}
+      {isPending ? (
+        <SectionSkeleton>
+          <TableSkeleton rows={8} cols={5} />
+        </SectionSkeleton>
+      ) : (
+        <div className="space-y-4">
+          {/* One row per product or outlet: the whole point of the screen. */}
+          <SectionCard title={t("Kila bidhaa na jumla yake", "Each product and its total")}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                    <th className="py-2 px-3">{t("Bidhaa au sehemu", "Product or outlet")}</th>
+                    <th className="text-right">M-Pesa</th>
+                    <th className="text-right">{t("Benki", "Bank")}</th>
+                    <th className="text-right">{t("Taslimu", "Cash")}</th>
+                    <th className="text-right px-3">{t("Jumla", "Total")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {byCategory.map((r) => (
+                    <tr
+                      key={r.category}
+                      className={`border-b border-border last:border-0 ${r.total === 0 ? "opacity-45" : ""}`}
+                    >
+                      <td className="py-2.5 px-3 font-medium">
+                        {label(r.category)}
+                        {r.count > 0 && (
+                          <span className="ml-2 text-[11px] text-muted-foreground font-num">
+                            {r.count}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 text-right font-num">
+                        {r.mpesa > 0 ? tzs(r.mpesa, false) : ""}
+                      </td>
+                      <td className="py-2.5 text-right font-num">
+                        {r.bank > 0 ? tzs(r.bank, false) : ""}
+                      </td>
+                      <td className="py-2.5 text-right font-num">
+                        {r.cash > 0 ? tzs(r.cash, false) : ""}
+                      </td>
+                      <td className="py-2.5 text-right px-3 font-num font-semibold">
+                        {r.total > 0 ? tzs(r.total, false) : "-"}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="border-t-2" style={{ borderColor: "#1E6B3A" }}>
+                    <td className="py-3 px-3 font-bold">{t("Jumla kuu", "Grand total")}</td>
+                    <td className="py-3 text-right font-num font-bold">
+                      {tzs(grand.mpesa, false)}
                     </td>
-                    <td className="py-2.5 text-right font-num">{num(d.litres)}</td>
-                    <td className="py-2.5 text-right font-num font-semibold">
-                      {tzs(d.amountTZS, false)}
-                    </td>
-                    <td className="py-2.5 text-right px-3 font-num text-muted-foreground">
-                      {tzs(d.perLitre, false)}
+                    <td className="py-3 text-right font-num font-bold">{tzs(grand.bank, false)}</td>
+                    <td className="py-3 text-right font-num font-bold">{tzs(grand.cash, false)}</td>
+                    <td className="py-3 text-right px-3 font-num font-bold text-base">
+                      {tzs(grand.total, false)}
                     </td>
                   </tr>
-                ))}
-                <tr className="border-t-2" style={{ borderColor: "#1E6B3A" }}>
-                  <td className="py-3 px-3 font-bold">{t("Jumla", "Total")}</td>
-                  <td className="py-3 text-right font-num font-bold">{num(totalL)}</td>
-                  <td className="py-3 text-right font-num font-bold">{tzs(totalTZS, false)}</td>
-                  <td className="py-3 text-right px-3 font-num font-bold">{tzs(avg, false)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-      </SectionCard>
+                </tbody>
+              </table>
+            </div>
+          </SectionCard>
 
-      {canWrite && entries.length > 0 && (
-        <SectionCard title={t("Rekodi moja moja", "Individual entries")}>
-          <ul className="divide-y divide-border text-sm">
-            {entries.map((e) => (
-              <li key={e.id} className="flex items-center justify-between gap-3 py-2.5">
-                <span className="font-num text-xs text-muted-foreground w-24">{e.date}</span>
-                <span className="flex-1 font-num">
-                  {num(e.litres)} L · {tzs(e.amountTZS)}
-                  {e.note && <span className="ml-2 text-xs text-muted-foreground">{e.note}</span>}
-                </span>
-                <ConfirmDialog
-                  destructive
-                  title={t("Futa rekodi hii?", "Remove this entry?")}
-                  description={t(
-                    "Itaondolewa kwenye jumla za siku hiyo.",
-                    "It comes out of that day's totals.",
-                  )}
-                  confirmLabel={t("Futa", "Remove")}
-                  onConfirm={() =>
-                    remove.mutate(e.id, {
-                      onSuccess: () => toast.success(t("Imefutwa", "Removed")),
-                      onError: () => toast.error(t("Imeshindikana", "Could not remove it")),
-                    })
-                  }
-                  trigger={
-                    <Button size="sm" variant="ghost" className="h-7 text-xs text-[#E11B22]">
-                      {t("Futa", "Remove")}
-                    </Button>
-                  }
-                />
-              </li>
-            ))}
-          </ul>
-        </SectionCard>
+          {/* Day by day inside the window, so a month can still answer a
+              question about one date without changing view. */}
+          {grain !== "day" && byDay.length > 0 && (
+            <SectionCard title={t("Kila siku", "Day by day")}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                      <th className="py-2 px-3">{t("Tarehe", "Date")}</th>
+                      {byCategory
+                        .filter((c) => c.total > 0)
+                        .map((c) => (
+                          <th key={c.category} className="text-right">
+                            {label(c.category)}
+                          </th>
+                        ))}
+                      <th className="text-right px-3">{t("Jumla", "Total")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {byDay.map(([date, vals]) => (
+                      <tr key={date} className="border-b border-border last:border-0">
+                        <td className="py-2 px-3 font-num text-xs">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGrain("day");
+                              setAnchor(date);
+                            }}
+                            className="hover:underline"
+                          >
+                            {date}
+                          </button>
+                        </td>
+                        {byCategory
+                          .filter((c) => c.total > 0)
+                          .map((c) => (
+                            <td key={c.category} className="py-2 text-right font-num">
+                              {vals[c.category] ? tzs(vals[c.category], false) : ""}
+                            </td>
+                          ))}
+                        <td className="py-2 text-right px-3 font-num font-semibold">
+                          {tzs(vals.__total ?? 0, false)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-2 text-[11px] text-muted-foreground">
+                {t(
+                  "Bonyeza tarehe kuona siku hiyo peke yake.",
+                  "Click a date to open that day on its own.",
+                )}
+              </div>
+            </SectionCard>
+          )}
+
+          <SectionCard title={t("Miamala", "The deposits themselves")}>
+            {deposits.length === 0 ? (
+              <EmptyState
+                icon={Receipt}
+                title={t("Hakuna amana katika kipindi hiki", "No deposits in this period")}
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                      <th className="py-2 px-3">{t("Tarehe", "Date")}</th>
+                      <th>{t("Bidhaa au sehemu", "Product or outlet")}</th>
+                      <th>{t("Njia", "Channel")}</th>
+                      <th className="text-right">{t("Kiasi", "Amount")}</th>
+                      <th className="px-3" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deposits.map((x) => (
+                      <tr key={x.id} className="border-b border-border last:border-0">
+                        <td className="py-2.5 px-3 font-num text-xs text-muted-foreground">
+                          {x.date}
+                        </td>
+                        <td className="py-2.5">
+                          <Pill tone="info">{label(x.source)}</Pill>
+                        </td>
+                        <td className="py-2.5">
+                          <span className="inline-flex items-center gap-1 text-xs">
+                            {x.method === "mpesa" ? (
+                              <Smartphone className="h-3 w-3" />
+                            ) : (
+                              <ArrowUpRight className="h-3 w-3" />
+                            )}
+                            {x.method}
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-right font-num font-semibold">
+                          {tzs(x.amountTZS)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                          {x.attachmentUrl && (
+                            <a
+                              href={x.attachmentUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={t("Risiti", "Receipt")}
+                              className="text-[#1E7C3F] hover:opacity-70 mr-2 inline-block align-middle"
+                            >
+                              <Paperclip className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                          {canDeposit && <EditDepositSheet deposit={x} categories={categories} />}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </SectionCard>
+        </div>
       )}
-    </div>
+    </AppShell>
   );
 }
 

@@ -101,6 +101,20 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: "Landmark",
         cap: "finance:read",
       },
+      {
+        to: "/mpesa-sales",
+        label: "M-Pesa sales",
+        sw: "Mauzo ya M-Pesa",
+        icon: "Smartphone",
+        cap: "finance:read",
+      },
+      {
+        to: "/joseph-summary",
+        label: "Joseph summary",
+        sw: "Muhtasari wa Joseph",
+        icon: "UserRound",
+        cap: "finance:read",
+      },
       { to: "/expenses", label: "Expenses", sw: "Matumizi", icon: "Receipt", cap: "finance:read" },
       {
         to: "/books",

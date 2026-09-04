@@ -24,8 +24,10 @@ import { Route as ProductionRouteImport } from './routes/production'
 import { Route as PosRouteImport } from './routes/pos'
 import { Route as PayrollRouteImport } from './routes/payroll'
 import { Route as OfflineRouteImport } from './routes/offline'
+import { Route as MpesaSalesRouteImport } from './routes/mpesa-sales'
 import { Route as ManualRouteImport } from './routes/manual'
 import { Route as MaintenanceRouteImport } from './routes/maintenance'
+import { Route as JosephSummaryRouteImport } from './routes/joseph-summary'
 import { Route as HelpRouteImport } from './routes/help'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as FinanceRouteImport } from './routes/finance'
@@ -128,6 +130,11 @@ const OfflineRoute = OfflineRouteImport.update({
   path: '/offline',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MpesaSalesRoute = MpesaSalesRouteImport.update({
+  id: '/mpesa-sales',
+  path: '/mpesa-sales',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ManualRoute = ManualRouteImport.update({
   id: '/manual',
   path: '/manual',
@@ -136,6 +143,11 @@ const ManualRoute = ManualRouteImport.update({
 const MaintenanceRoute = MaintenanceRouteImport.update({
   id: '/maintenance',
   path: '/maintenance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JosephSummaryRoute = JosephSummaryRouteImport.update({
+  id: '/joseph-summary',
+  path: '/joseph-summary',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HelpRoute = HelpRouteImport.update({
@@ -286,8 +298,10 @@ export interface FileRoutesByFullPath {
   '/finance': typeof FinanceRoute
   '/health': typeof HealthRoute
   '/help': typeof HelpRoute
+  '/joseph-summary': typeof JosephSummaryRoute
   '/maintenance': typeof MaintenanceRoute
   '/manual': typeof ManualRoute
+  '/mpesa-sales': typeof MpesaSalesRoute
   '/offline': typeof OfflineRoute
   '/payroll': typeof PayrollRoute
   '/pos': typeof PosRoute
@@ -331,8 +345,10 @@ export interface FileRoutesByTo {
   '/finance': typeof FinanceRoute
   '/health': typeof HealthRoute
   '/help': typeof HelpRoute
+  '/joseph-summary': typeof JosephSummaryRoute
   '/maintenance': typeof MaintenanceRoute
   '/manual': typeof ManualRoute
+  '/mpesa-sales': typeof MpesaSalesRoute
   '/offline': typeof OfflineRoute
   '/payroll': typeof PayrollRoute
   '/pos': typeof PosRoute
@@ -377,8 +393,10 @@ export interface FileRoutesById {
   '/finance': typeof FinanceRoute
   '/health': typeof HealthRoute
   '/help': typeof HelpRoute
+  '/joseph-summary': typeof JosephSummaryRoute
   '/maintenance': typeof MaintenanceRoute
   '/manual': typeof ManualRoute
+  '/mpesa-sales': typeof MpesaSalesRoute
   '/offline': typeof OfflineRoute
   '/payroll': typeof PayrollRoute
   '/pos': typeof PosRoute
@@ -424,8 +442,10 @@ export interface FileRouteTypes {
     | '/finance'
     | '/health'
     | '/help'
+    | '/joseph-summary'
     | '/maintenance'
     | '/manual'
+    | '/mpesa-sales'
     | '/offline'
     | '/payroll'
     | '/pos'
@@ -469,8 +489,10 @@ export interface FileRouteTypes {
     | '/finance'
     | '/health'
     | '/help'
+    | '/joseph-summary'
     | '/maintenance'
     | '/manual'
+    | '/mpesa-sales'
     | '/offline'
     | '/payroll'
     | '/pos'
@@ -514,8 +536,10 @@ export interface FileRouteTypes {
     | '/finance'
     | '/health'
     | '/help'
+    | '/joseph-summary'
     | '/maintenance'
     | '/manual'
+    | '/mpesa-sales'
     | '/offline'
     | '/payroll'
     | '/pos'
@@ -560,8 +584,10 @@ export interface RootRouteChildren {
   FinanceRoute: typeof FinanceRoute
   HealthRoute: typeof HealthRoute
   HelpRoute: typeof HelpRoute
+  JosephSummaryRoute: typeof JosephSummaryRoute
   MaintenanceRoute: typeof MaintenanceRoute
   ManualRoute: typeof ManualRoute
+  MpesaSalesRoute: typeof MpesaSalesRoute
   OfflineRoute: typeof OfflineRoute
   PayrollRoute: typeof PayrollRoute
   PosRoute: typeof PosRoute
@@ -695,6 +721,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OfflineRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/mpesa-sales': {
+      id: '/mpesa-sales'
+      path: '/mpesa-sales'
+      fullPath: '/mpesa-sales'
+      preLoaderRoute: typeof MpesaSalesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/manual': {
       id: '/manual'
       path: '/manual'
@@ -707,6 +740,13 @@ declare module '@tanstack/react-router' {
       path: '/maintenance'
       fullPath: '/maintenance'
       preLoaderRoute: typeof MaintenanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/joseph-summary': {
+      id: '/joseph-summary'
+      path: '/joseph-summary'
+      fullPath: '/joseph-summary'
+      preLoaderRoute: typeof JosephSummaryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/help': {
@@ -922,8 +962,10 @@ const rootRouteChildren: RootRouteChildren = {
   FinanceRoute: FinanceRoute,
   HealthRoute: HealthRoute,
   HelpRoute: HelpRoute,
+  JosephSummaryRoute: JosephSummaryRoute,
   MaintenanceRoute: MaintenanceRoute,
   ManualRoute: ManualRoute,
+  MpesaSalesRoute: MpesaSalesRoute,
   OfflineRoute: OfflineRoute,
   PayrollRoute: PayrollRoute,
   PosRoute: PosRoute,
