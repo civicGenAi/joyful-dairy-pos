@@ -29,7 +29,10 @@ function toCustomer(r: CustomerRow): Customer {
     email: r.email ?? "",
     type: r.type,
     outstandingTZS: Number(r.outstanding_tzs),
-    creditLimitTZS: r.credit_limit_tzs != null ? Number(r.credit_limit_tzs) : undefined,
+    creditLimitTZS:
+      r.credit_limit_tzs != null && r.credit_limit_tzs !== undefined
+        ? Number(r.credit_limit_tzs)
+        : undefined,
     lastActivity: r.last_activity ?? "",
     status: r.status,
     remindersEnabled: r.reminders_enabled ?? true,
@@ -152,7 +155,10 @@ export const customersRepo = {
           type: input.type,
           next_due_date: input.nextDueDate || null,
           billing_cycle: input.billingCycle ?? "month_end",
-          credit_limit_tzs: input.creditLimitTZS ?? null,
+          // Only sent when a limit was actually set. An optional feature
+          // must not be able to break registering a customer, which is a
+          // core daily action, if its column is not there yet.
+          ...(input.creditLimitTZS != null ? { credit_limit_tzs: input.creditLimitTZS } : {}),
         })
         .select("*")
         .single(),
@@ -188,7 +194,7 @@ export const customersRepo = {
           reminders_enabled: input.remindersEnabled ?? true,
           next_due_date: input.nextDueDate || null,
           billing_cycle: input.billingCycle ?? "month_end",
-          credit_limit_tzs: input.creditLimitTZS ?? null,
+          ...(input.creditLimitTZS !== undefined ? { credit_limit_tzs: input.creditLimitTZS } : {}),
         })
         .eq("id", input.id)
         .select("id"),

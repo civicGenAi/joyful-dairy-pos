@@ -1319,7 +1319,15 @@ function CustomerActions({ c }: { c: Customer }) {
         remindersEnabled: reminders,
         nextDueDate: dueDate || undefined,
         billingCycle,
-        creditLimitTZS: creditLimit === "" ? null : creditLimit,
+        // Sent only when it actually changed. Leaving an untouched blank
+        // field out means an optional column cannot break saving a
+        // customer, while a limit that was set can still be cleared.
+        creditLimitTZS:
+          (creditLimit === "" ? null : creditLimit) === (c.creditLimitTZS ?? null)
+            ? undefined
+            : creditLimit === ""
+              ? null
+              : creditLimit,
       },
       {
         onSuccess: () => {
