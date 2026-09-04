@@ -118,11 +118,13 @@ export const expenseCategoriesRepo = {
    *  DO UPDATE path is refused by RLS the moment the name already exists,
    *  which used to take the whole expense save down with it. */
   async create(name: string): Promise<void> {
-    unwrap(
-      await supabase
-        .from("expense_categories")
-        .upsert({ name }, { onConflict: "name", ignoreDuplicates: true }),
-    );
+    // Not unwrap(): with no .select() the call returns a null body by
+    // design, and unwrap treats null data as "not-found" and throws. Only
+    // a real error matters here.
+    const { error } = await supabase
+      .from("expense_categories")
+      .upsert({ name }, { onConflict: "name", ignoreDuplicates: true });
+    if (error) throw new Error(error.message);
   },
 };
 
@@ -139,11 +141,10 @@ export const expenseSitesRepo = {
 
   /** Safe to call with an already-existing name, just does nothing. */
   async create(name: string): Promise<void> {
-    unwrap(
-      await supabase
-        .from("expense_sites")
-        .upsert({ name }, { onConflict: "name", ignoreDuplicates: true }),
-    );
+    const { error } = await supabase
+      .from("expense_sites")
+      .upsert({ name }, { onConflict: "name", ignoreDuplicates: true });
+    if (error) throw new Error(error.message);
   },
 };
 
