@@ -7,8 +7,9 @@ import { JoyLogo } from "@/components/brand/JoyLogo";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, X, LogOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, X, LogOut } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { prefetchForRoute } from "@/lib/data/prefetch";
 import { QuickJump } from "@/components/shell/QuickJump";
 
@@ -106,7 +107,7 @@ function SidebarBody({
   groups: {
     group: string;
     sw: string;
-    items: { to: string; label: string; sw: string; icon: string }[];
+    items: { to: string; label: string; sw: string; icon: string; childOf?: string }[];
   }[];
   lang: "sw" | "en";
   pathname: string;
@@ -116,6 +117,29 @@ function SidebarBody({
   extraTopRight?: React.ReactNode;
 }) {
   const qc = useQueryClient();
+
+  // Dropdown groups (e.g. Sales deposits with M-Pesa sales and Expenses
+  // tucked under it) start open whenever the current page is the parent
+  // or one of its children, and otherwise stay however the user last left
+  // them. Purely a sidebar display concern; every other nav consumer
+  // (search, command palette, quick jump) still sees a flat list.
+  const [openParents, setOpenParents] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    setOpenParents((prev) => {
+      const next = new Set(prev);
+      for (const g of groups) {
+        for (const it of g.items) {
+          if (!it.childOf) continue;
+          const parentActive = pathname === it.childOf || pathname.startsWith(it.childOf);
+          const childActive = pathname === it.to || pathname.startsWith(it.to);
+          if (parentActive || childActive) next.add(it.childOf);
+        }
+      }
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
   return (
     <>
       <div
@@ -158,13 +182,28 @@ function SidebarBody({
               </div>
             )}
             <ul className="space-y-0.5">
-              {g.items.map((it) => {
-                const Icon =
-                  (Icons as unknown as Record<string, typeof Icons.Circle>)[it.icon] ??
-                  Icons.Circle;
-                const active = pathname === it.to || (it.to !== "/" && pathname.startsWith(it.to));
-                return (
-                  <li key={it.to}>
+              {(() => {
+                // In the icon rail there is no room for a dropdown, so
+                // every item still renders flat there, same as before.
+                // Full-width sidebar nests a childOf item under its
+                // parent as a collapsible dropdown instead of its own row.
+                const parentTos = new Set(g.items.map((it) => it.to));
+                const topItems = collapsed
+                  ? g.items
+                  : g.items.filter((it) => !it.childOf || !parentTos.has(it.childOf));
+                const childrenOf = (to: string) =>
+                  collapsed ? [] : g.items.filter((it) => it.childOf === to);
+
+                const renderRow = (
+                  it: { to: string; label: string; sw: string; icon: string },
+                  nested: boolean,
+                ) => {
+                  const Icon =
+                    (Icons as unknown as Record<string, typeof Icons.Circle>)[it.icon] ??
+                    Icons.Circle;
+                  const active =
+                    pathname === it.to || (it.to !== "/" && pathname.startsWith(it.to));
+                  return (
                     <Link
                       to={it.to}
                       onClick={onNavigate}
@@ -172,7 +211,11 @@ function SidebarBody({
                       title={collapsed ? (lang === "sw" ? it.sw : it.label) : undefined}
                       className={cn(
                         "relative flex items-center rounded-xl text-sm font-medium transition-all",
-                        collapsed ? "h-10 w-10 mx-auto justify-center" : "gap-2.5 px-2.5 py-2",
+                        collapsed
+                          ? "h-10 w-10 mx-auto justify-center"
+                          : nested
+                            ? "gap-2.5 pl-8 pr-2.5 py-1.5 text-[13px]"
+                            : "gap-2.5 px-2.5 py-2",
                         active
                           ? "text-white shadow-card"
                           : "text-foreground/80 hover:bg-accent hover:text-foreground",
@@ -188,7 +231,7 @@ function SidebarBody({
                     >
                       {active && (
                         <motion.span
-                          layoutId="nav-active"
+                          layoutId={nested ? undefined : "nav-active"}
                           className="absolute inset-0 -z-0 rounded-xl"
                           style={{
                             background:
@@ -197,16 +240,75 @@ function SidebarBody({
                           transition={{ type: "spring", stiffness: 380, damping: 32 }}
                         />
                       )}
-                      <Icon className={cn("h-4 w-4 relative z-10", active && "text-white")} />
+                      <Icon
+                        className={cn(
+                          nested ? "h-3.5 w-3.5" : "h-4 w-4",
+                          "relative z-10",
+                          active && "text-white",
+                        )}
+                      />
                       {!collapsed && (
                         <span className="relative z-10 truncate">
                           {lang === "sw" ? it.sw : it.label}
                         </span>
                       )}
                     </Link>
-                  </li>
-                );
-              })}
+                  );
+                };
+
+                return topItems.map((it) => {
+                  const children = childrenOf(it.to);
+                  const isOpen = openParents.has(it.to);
+                  return (
+                    <li key={it.to}>
+                      {children.length === 0 ? (
+                        renderRow(it, false)
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <div className="flex-1 min-w-0">{renderRow(it, false)}</div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenParents((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(it.to)) next.delete(it.to);
+                                else next.add(it.to);
+                                return next;
+                              })
+                            }
+                            aria-label={isOpen ? t("Kunja", "Collapse") : t("Panua", "Expand")}
+                            className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-foreground/60 hover:bg-accent hover:text-foreground"
+                          >
+                            <ChevronDown
+                              className={cn(
+                                "h-3.5 w-3.5 transition-transform",
+                                isOpen && "rotate-180",
+                              )}
+                            />
+                          </button>
+                        </div>
+                      )}
+                      {children.length > 0 && !collapsed && (
+                        <AnimatePresence initial={false}>
+                          {isOpen && (
+                            <motion.ul
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.15 }}
+                              className="overflow-hidden space-y-0.5 mt-0.5"
+                            >
+                              {children.map((c) => (
+                                <li key={c.to}>{renderRow(c, true)}</li>
+                              ))}
+                            </motion.ul>
+                          )}
+                        </AnimatePresence>
+                      )}
+                    </li>
+                  );
+                });
+              })()}
               {/* Sits directly under Dashboard: opens the shortcut flyout
                   rather than navigating anywhere itself. */}
               {g.group === "Overview" && (

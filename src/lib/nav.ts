@@ -9,6 +9,10 @@ export interface NavItem {
   sw: string;
   icon: string;
   cap: Capability;
+  /** Sidebar-display only: nests this item as a dropdown under the item
+   *  whose `to` matches, instead of showing it as its own row. Search,
+   *  the command palette and quick jump still see every item flat. */
+  childOf?: string;
 }
 
 export interface NavGroup {
@@ -107,6 +111,15 @@ export const NAV_GROUPS: NavGroup[] = [
         sw: "Mauzo ya M-Pesa",
         icon: "Smartphone",
         cap: "finance:read",
+        childOf: "/sales-deposits",
+      },
+      {
+        to: "/expenses",
+        label: "Expenses",
+        sw: "Matumizi",
+        icon: "Receipt",
+        cap: "finance:read",
+        childOf: "/sales-deposits",
       },
       {
         to: "/joseph-summary",
@@ -115,7 +128,6 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: "UserRound",
         cap: "finance:read",
       },
-      { to: "/expenses", label: "Expenses", sw: "Matumizi", icon: "Receipt", cap: "finance:read" },
       {
         to: "/books",
         label: "Books",

@@ -12,6 +12,7 @@ export interface MpesaEntry {
   date: string;
   litres: number;
   amountTZS: number;
+  channel: "mpesa" | "bank";
   note: string | null;
 }
 
@@ -19,6 +20,8 @@ export interface MpesaDay {
   date: string;
   litres: number;
   amountTZS: number;
+  mpesaTZS: number;
+  bankTZS: number;
   perLitre: number;
   entries: number;
 }
@@ -38,12 +41,20 @@ export const mpesaRepo = {
         .lte("date", to)
         .order("date", { ascending: false })
         .order("created_at", { ascending: false }),
-    ) as { id: string; date: string; litres: number; amount_tzs: number; note: string | null }[];
+    ) as {
+      id: string;
+      date: string;
+      litres: number;
+      amount_tzs: number;
+      channel: "mpesa" | "bank";
+      note: string | null;
+    }[];
     return rows.map((r) => ({
       id: r.id,
       date: r.date,
       litres: Number(r.litres),
       amountTZS: Number(r.amount_tzs),
+      channel: r.channel,
       note: r.note,
     }));
   },
@@ -61,6 +72,8 @@ export const mpesaRepo = {
         date: string;
         litres: number;
         amount_tzs: number;
+        mpesa_tzs: number;
+        bank_tzs: number;
         per_litre: number;
         entries: number;
       }[]
@@ -68,16 +81,27 @@ export const mpesaRepo = {
       date: r.date,
       litres: Number(r.litres),
       amountTZS: Number(r.amount_tzs),
+      mpesaTZS: Number(r.mpesa_tzs),
+      bankTZS: Number(r.bank_tzs),
       perLitre: Number(r.per_litre),
       entries: Number(r.entries),
     }));
   },
 
-  async record(input: { date: string; litres: number; amountTZS: number; note?: string }) {
+  /** Litres is the one required figure. Money defaults to zero and gets
+   *  filled in, or corrected, later through `update`. */
+  async record(input: {
+    date: string;
+    litres: number;
+    amountTZS?: number;
+    channel?: "mpesa" | "bank";
+    note?: string;
+  }) {
     const { error } = await supabase.rpc("record_mpesa_day", {
       p_date: input.date,
       p_litres: input.litres,
-      p_amount: input.amountTZS,
+      p_amount: input.amountTZS ?? null,
+      p_channel: input.channel ?? "mpesa",
       p_note: input.note ?? null,
     });
     if (error) throw new Error(error.message);
@@ -88,6 +112,7 @@ export const mpesaRepo = {
     date: string;
     litres: number;
     amountTZS: number;
+    channel: "mpesa" | "bank";
     note?: string;
   }) {
     const { error } = await supabase.rpc("update_mpesa_day", {
@@ -95,6 +120,7 @@ export const mpesaRepo = {
       p_date: input.date,
       p_litres: input.litres,
       p_amount: input.amountTZS,
+      p_channel: input.channel,
       p_note: input.note ?? null,
     });
     if (error) throw new Error(error.message);
