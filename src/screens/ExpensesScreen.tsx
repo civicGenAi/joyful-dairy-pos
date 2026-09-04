@@ -8,6 +8,7 @@ import {
   useExpenseCategories,
   useExpenseSites,
 } from "@/lib/data/hooks/finance";
+import { useExpenseMonthBalance, useSetExpenseOpening } from "@/lib/data/hooks/mpesaDaily";
 import { uploadHardCopy } from "@/lib/data/uploads";
 import { todayISO } from "@/lib/data/dates";
 import { Pill, SectionCard, StatCard } from "@/components/ui/data-bits";
@@ -139,6 +140,13 @@ export function ExpensesScreen() {
   );
 
   const total = expenses.reduce((a, e) => a + e.amountTZS, 0);
+  // The expense book runs like a float: money in hand at the start of the
+  // month, spending against it, and whatever is left carries into the next
+  // month. Without the opening figure a month always looked as though it
+  // started from nothing.
+  const thisMonth = todayISO().slice(0, 7);
+  const balanceSite = site === "all" || site === UNASSIGNED ? "all" : site;
+  const { data: monthBal } = useExpenseMonthBalance(thisMonth, balanceSite);
   const todayIso = todayISO();
   const today = expenses.filter((e) => e.date === todayIso).reduce((a, e) => a + e.amountTZS, 0);
   const byCategory = useMemo(() => {
@@ -209,6 +217,48 @@ export function ExpensesScreen() {
           accent="green"
         />
       </div>
+
+      {monthBal && (
+        <SectionCard
+          title={t(`Salio la mwezi ${thisMonth}`, `Month balance, ${thisMonth}`)}
+          className="mb-5"
+          action={<SetOpeningSheet month={thisMonth} site={balanceSite} balance={monthBal} />}
+        >
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-xl border border-border p-3">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                {t("Salio la kuanzia", "Opening balance")}
+              </div>
+              <div className="font-num font-bold text-lg mt-0.5">{tzs(monthBal.opening)}</div>
+              {!monthBal.isSet && (
+                <div className="text-[11px] text-[#8a5a00] mt-1">
+                  {t("Halijawekwa bado", "Not set yet")}
+                </div>
+              )}
+            </div>
+            <div className="rounded-xl border border-border p-3">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                {t("Kimetumika", "Spent")}
+              </div>
+              <div className="font-num font-bold text-lg mt-0.5 text-[#E11B22]">
+                {tzs(monthBal.spent)}
+              </div>
+            </div>
+            <div
+              className="rounded-xl border-2 p-3 bg-[#F4F6F2]"
+              style={{ borderColor: "#1E6B3A" }}
+            >
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                {t("Salio la kubaki", "Closing balance")}
+              </div>
+              <div className="font-num font-bold text-lg mt-0.5">{tzs(monthBal.closing)}</div>
+              <div className="text-[11px] text-muted-foreground mt-1">
+                {t("Linaendelea mwezi ujao", "Carries into next month")}
+              </div>
+            </div>
+          </div>
+        </SectionCard>
+      )}
 
       <SectionCard
         title={
@@ -506,6 +556,107 @@ export function ExpensesScreen() {
         </TabsContent>
       </Tabs>
     </AppShell>
+  );
+}
+
+// Setting the opening balance. The figure people actually want is last
+// month's closing, so it is offered as one click rather than left to be
+// looked up and retyped.
+function SetOpeningSheet({
+  month,
+  site,
+  balance,
+}: {
+  month: string;
+  site: string;
+  balance: { opening: number; suggestedOpening: number; previousMonth: string; isSet: boolean };
+}) {
+  const { t } = useApp();
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState<number | "">(balance.opening || "");
+  const [note, setNote] = useState("");
+  const save = useSetExpenseOpening();
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button size="sm" variant="outline" className="h-8 text-xs">
+          {balance.isSet
+            ? t("Badilisha salio la kuanzia", "Change opening balance")
+            : t("Weka salio la kuanzia", "Set opening balance")}
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Salio la kuanzia", "Opening balance")}</SheetTitle>
+        </SheetHeader>
+        <div className="grid gap-3">
+          <div className="rounded-xl bg-secondary/60 px-3 py-2.5 text-[11px] text-muted-foreground">
+            {t(
+              "Hii ni fedha uliyokuwa nayo mwanzoni mwa mwezi, kabla ya matumizi ya mwezi huu.",
+              "This is the money you had in hand at the start of the month, before this month's spending.",
+            )}
+          </div>
+
+          <div className="rounded-xl border border-border p-3 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-semibold">
+                {t(
+                  `Salio la mwisho la ${balance.previousMonth}`,
+                  `Closing balance for ${balance.previousMonth}`,
+                )}
+              </div>
+              <div className="font-num font-bold">{tzs(balance.suggestedOpening)}</div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs shrink-0"
+              onClick={() => setAmount(balance.suggestedOpening)}
+            >
+              {t("Tumia hii", "Use this")}
+            </Button>
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label>{t("Kiasi (TZS)", "Amount (TZS)")}</Label>
+            <Input
+              type="number"
+              step="any"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value === "" ? "" : Number(e.target.value))}
+              className="font-num"
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>{t("Maelezo (hiari)", "Note (optional)")}</Label>
+            <Input value={note} onChange={(e) => setNote(e.target.value)} />
+          </div>
+        </div>
+        <SheetFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            {t("Ghairi", "Cancel")}
+          </Button>
+          <Button
+            disabled={amount === "" || save.isPending}
+            onClick={() =>
+              save.mutate(
+                { month, site, amount: Number(amount), note: note || undefined },
+                {
+                  onSuccess: () => {
+                    toast.success(t("Imehifadhiwa", "Saved"));
+                    setOpen(false);
+                  },
+                  onError: () => toast.error(t("Imeshindikana", "Could not save it")),
+                },
+              )
+            }
+          >
+            {save.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
