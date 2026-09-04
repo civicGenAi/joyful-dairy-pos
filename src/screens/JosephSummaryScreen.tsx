@@ -41,8 +41,10 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
 import { ExportMenu } from "@/components/ui/ExportMenu";
+import { PaginationBar } from "@/components/ui/PaginationBar";
+import { usePagination } from "@/hooks/use-pagination";
 import { ChevronLeft, ChevronRight, Plus, Wallet, Smartphone, ArrowUpRight } from "lucide-react";
-import { Fragment, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 function startOfWeek(dateStr: string): Date {
@@ -131,40 +133,43 @@ export function JosephSummaryScreen() {
   const totalLitres = sales.reduce((a, s) => a + s.litres, 0);
   const totalDeposited = deposits.reduce((a, dep) => a + dep.amountTZS, 0);
 
-  // One table, grouped by date, the way someone would actually read it:
-  // the date gets its own row, then every rate sold that day gets its own
-  // row underneath, and a totals line at the bottom of that date shows
-  // the day's litres and the amount actually deposited, together. Nothing
-  // here is rate times litres; the deposited figure is only ever what
-  // was typed in.
-  const salesByDate = new Map<string, typeof sales>();
-  for (const s of sales) {
-    const arr = salesByDate.get(s.date) ?? [];
-    arr.push(s);
-    salesByDate.set(s.date, arr);
-  }
-  const depositsByDate = new Map<string, typeof deposits>();
-  for (const dep of deposits) {
-    const arr = depositsByDate.get(dep.date) ?? [];
-    arr.push(dep);
-    depositsByDate.set(dep.date, arr);
-  }
+  // One row per date, so a long history stays a fixed height per day
+  // instead of growing several rows for it: every rate is its own column,
+  // then a litres total, then the deposit (the amount someone actually
+  // typed in, never rate times litres). Paginated so a long run of days
+  // does not turn into endless scrolling.
+  const dayBlocks = useMemo(() => {
+    const salesByDate = new Map<string, typeof sales>();
+    for (const s of sales) {
+      const arr = salesByDate.get(s.date) ?? [];
+      arr.push(s);
+      salesByDate.set(s.date, arr);
+    }
+    const depositsByDate = new Map<string, typeof deposits>();
+    for (const dep of deposits) {
+      const arr = depositsByDate.get(dep.date) ?? [];
+      arr.push(dep);
+      depositsByDate.set(dep.date, arr);
+    }
+    const allDates = new Set<string>([...salesByDate.keys(), ...depositsByDate.keys()]);
+    return [...allDates]
+      .sort()
+      .reverse()
+      .map((date) => {
+        const litresByRate = new Map<number, number>();
+        for (const s of salesByDate.get(date) ?? []) litresByRate.set(s.rateTZS, s.litres);
+        const dayDeposits = depositsByDate.get(date) ?? [];
+        return {
+          date,
+          litresByRate,
+          dayLitres: [...litresByRate.values()].reduce((a, v) => a + v, 0),
+          dayDeposits,
+          dayDeposited: dayDeposits.reduce((a, dep) => a + dep.amountTZS, 0),
+        };
+      });
+  }, [sales, deposits]);
 
-  const allDates = new Set<string>([...salesByDate.keys(), ...depositsByDate.keys()]);
-  const dayBlocks = [...allDates]
-    .sort()
-    .reverse()
-    .map((date) => {
-      const rateRows = (salesByDate.get(date) ?? []).slice().sort((a, b) => b.rateTZS - a.rateTZS);
-      const dayDeposits = depositsByDate.get(date) ?? [];
-      return {
-        date,
-        rateRows,
-        dayLitres: rateRows.reduce((a, r) => a + r.litres, 0),
-        dayDeposits,
-        dayDeposited: dayDeposits.reduce((a, dep) => a + dep.amountTZS, 0),
-      };
-    });
+  const { page, setPage, totalPages, paged, pageSize, total, start } = usePagination(dayBlocks, 15);
 
   const hasAnything = sales.length > 0 || deposits.length > 0;
 
@@ -217,27 +222,40 @@ export function JosephSummaryScreen() {
             formats={["csv", "excel", "pdf"]}
             filename={`joseph-${range.from}-to-${range.to}`}
             data={() => {
-              const rows: (string | number)[][] = [];
-              for (const day of dayBlocks) {
-                if (day.rateRows.length === 0) {
-                  rows.push([day.date, "", "", "", ""]);
-                } else {
-                  for (const r of day.rateRows) {
-                    rows.push([day.date, r.rateTZS, r.litres, "", ""]);
-                  }
-                }
-                const channels = day.dayDeposits.map((dep) => dep.channel).join("+");
-                rows.push(["Total", "", day.dayLitres, day.dayDeposited || "", channels]);
-              }
-              rows.push(["Grand total", "", totalLitres, totalDeposited, ""]);
+              const rows: (string | number)[][] = dayBlocks.map((day) => [
+                day.date,
+                ...rates.map((r) => day.litresByRate.get(r) ?? ""),
+                day.dayLitres,
+                day.dayDeposited || "",
+                day.dayDeposits.map((dep) => dep.channel).join("+"),
+              ]);
+              rows.push(["Grand total", ...rates.map(() => ""), totalLitres, totalDeposited, ""]);
               return {
                 title: t(`Muhtasari wa Joseph, ${windowLabel}`, `Joseph summary, ${windowLabel}`),
-                headers: ["Date", "Rate", "Litres", "Deposited (TZS)", "Channel"],
+                headers: [
+                  "Date",
+                  ...rates.map((r) => `Rate ${r}`),
+                  "Litres",
+                  "Deposited (TZS)",
+                  "Channel",
+                ],
                 rows,
               };
             }}
           />
-          <RecordJosephDaySheet rates={rates} />
+          <JosephDaySheet
+            rates={rates}
+            trigger={
+              <Button
+                size="sm"
+                className="h-8 text-white"
+                style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                {t("Mauzo ya siku", "Day's sales")}
+              </Button>
+            }
+          />
         </div>
       </div>
 
@@ -256,11 +274,11 @@ export function JosephSummaryScreen() {
             />
           </div>
 
-          {/* One table, grouped by date: the date gets its own row, every
-              rate sold that day gets its own row under it, and a totals
-              line at the bottom of that date shows the day's litres and
-              what was actually deposited, together. No system-computed
-              revenue anywhere, only the manually recorded deposit. */}
+          {/* One row per date, rate as columns: fixed height per day no
+              matter how many rates were sold, and no scrolling that grows
+              with the data the way a multi-row-per-date table would. No
+              system-computed revenue anywhere, only the manually recorded
+              deposit, with edit/delete right on the row. */}
           <SectionCard title={t("Mauzo na amana za Joseph", "Joseph's sales and deposits")}>
             {!hasAnything ? (
               <EmptyState
@@ -268,70 +286,70 @@ export function JosephSummaryScreen() {
                 title={t("Hakuna kumbukumbu bado", "No records in this period")}
               />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                      <th className="py-2 px-3">{t("Bei", "Rate")}</th>
-                      <th className="text-right">{t("Lita", "Litres")}</th>
-                      <th className="text-right px-3">{t("Kilichowekwa", "Deposited")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dayBlocks.map((day) => (
-                      <Fragment key={day.date}>
-                        <tr>
-                          <td
-                            colSpan={3}
-                            className="pt-4 pb-1 px-3 first:pt-0 border-b border-border"
-                          >
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                        <th className="py-2 px-3" rowSpan={2}>
+                          {t("Tarehe", "Date")}
+                        </th>
+                        <th className="text-center border-b border-border" colSpan={rates.length}>
+                          {t("Bei kwa lita", "Rate per litre")}
+                        </th>
+                        <th className="text-right" rowSpan={2}>
+                          {t("Lita", "Litres")}
+                        </th>
+                        <th className="text-right" rowSpan={2}>
+                          {t("Kilichowekwa", "Deposited")}
+                        </th>
+                        <th className="text-right px-3" rowSpan={2}>
+                          {t("Kitendo", "Action")}
+                        </th>
+                      </tr>
+                      <tr className="text-right text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                        {rates.map((r) => (
+                          <th key={r} className="font-num">
+                            {tzs(r, false)}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paged.map((day) => (
+                        <tr key={day.date} className="border-b border-border last:border-0">
+                          <td className="py-2 px-3 font-num text-xs">
                             <button
                               type="button"
                               onClick={() => {
                                 setGrain("day");
                                 setAnchor(day.date);
                               }}
-                              className="font-num text-xs font-bold hover:underline"
+                              className="text-muted-foreground hover:underline"
                             >
                               {day.date}
                             </button>
                           </td>
-                        </tr>
-                        {day.rateRows.length === 0 ? (
-                          <tr>
-                            <td
-                              colSpan={2}
-                              className="py-2 px-3 text-xs text-muted-foreground italic"
-                            >
-                              {t("Hakuna mauzo yaliyorekodiwa", "No sales recorded")}
-                            </td>
-                            <td className="py-2 px-3" />
-                          </tr>
-                        ) : (
-                          day.rateRows.map((r) => (
-                            <tr key={r.id} className="border-b border-border/50 last:border-0">
-                              <td className="py-2 px-3 font-num">{tzs(r.rateTZS, false)}</td>
-                              <td className="py-2 text-right font-num">{num(r.litres)}</td>
-                              <td className="py-2 px-3" />
-                            </tr>
-                          ))
-                        )}
-                        <tr className="bg-secondary/40">
-                          <td className="py-1.5 px-3 text-xs font-semibold">
-                            {t("Jumla ya siku", "Day's total")}
-                          </td>
-                          <td className="py-1.5 text-right font-num text-xs font-bold">
+                          {rates.map((r) => {
+                            const v = day.litresByRate.get(r);
+                            return (
+                              <td key={r} className="py-2 text-right font-num">
+                                {v ? num(v) : <span className="text-muted-foreground">-</span>}
+                              </td>
+                            );
+                          })}
+                          <td className="py-2 text-right font-num font-bold">
                             {num(day.dayLitres)}
                           </td>
-                          <td className="py-1.5 text-right px-3">
+                          <td className="py-2 text-right">
                             {day.dayDeposits.length === 0 ? (
                               <span className="text-muted-foreground text-xs">
-                                {t("hakuna amana", "not deposited yet")}
+                                {t("bado", "not yet")}
                               </span>
                             ) : (
                               <div className="flex flex-col items-end gap-1">
                                 {day.dayDeposits.map((dep) => (
-                                  <div key={dep.id} className="flex items-center gap-2">
+                                  <div key={dep.id} className="flex items-center gap-1.5">
                                     <Pill tone="info">
                                       <span className="inline-flex items-center gap-1">
                                         {dep.channel === "mpesa" ? (
@@ -345,26 +363,50 @@ export function JosephSummaryScreen() {
                                     <span className="font-num font-bold">
                                       {tzs(dep.amountTZS, false)}
                                     </span>
-                                    <EditJosephDepositSheet deposit={dep} />
                                   </div>
                                 ))}
                               </div>
                             )}
                           </td>
+                          <td className="py-2 px-3 text-right">
+                            <JosephDaySheet
+                              rates={rates}
+                              editing={{
+                                date: day.date,
+                                litresByRate: day.litresByRate,
+                                deposit: day.dayDeposits[0],
+                              }}
+                              trigger={
+                                <Button size="sm" variant="ghost" className="h-7 text-xs">
+                                  {t("Hariri", "Edit")}
+                                </Button>
+                              }
+                            />
+                          </td>
                         </tr>
-                      </Fragment>
-                    ))}
-
-                    <tr className="border-t-2" style={{ borderColor: "#1E6B3A" }}>
-                      <td className="py-3 px-3 font-bold">{t("Jumla kuu", "Grand total")}</td>
-                      <td className="py-3 text-right font-num font-bold">{num(totalLitres)}</td>
-                      <td className="py-3 text-right px-3 font-num font-bold">
-                        {tzs(totalDeposited, false)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+                      ))}
+                      <tr className="border-t-2" style={{ borderColor: "#1E6B3A" }}>
+                        <td className="py-3 px-3 font-bold" colSpan={1 + rates.length}>
+                          {t("Jumla kuu", "Grand total")}
+                        </td>
+                        <td className="py-3 text-right font-num font-bold">{num(totalLitres)}</td>
+                        <td className="py-3 text-right font-num font-bold">
+                          {tzs(totalDeposited, false)}
+                        </td>
+                        <td className="py-3 px-3" />
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <PaginationBar
+                  page={page}
+                  totalPages={totalPages}
+                  total={total}
+                  pageSize={pageSize}
+                  start={start}
+                  onPageChange={setPage}
+                />
+              </>
             )}
           </SectionCard>
         </div>
@@ -373,32 +415,53 @@ export function JosephSummaryScreen() {
   );
 }
 
-// One form for a whole day: litres across every rate, and what was
-// actually deposited (amount typed in by hand, not the figure the rates
-// imply) plus the channel it came through. A rate left blank or at zero
-// clears that rate's row for the day; leaving litres blank entirely (only
-// filling in the deposit) leaves that day's sales untouched rather than
-// wiping them.
-function RecordJosephDaySheet({ rates }: { rates: number[] }) {
+// One form for a whole day, used both to record a fresh one (from the
+// toolbar, date defaults to today) and to correct an existing one (from a
+// row's Edit action, prefilled with what is already there, date fixed
+// since the table's row identity is that date). Litres across every rate,
+// and what was actually deposited: an amount typed in by hand, never the
+// figure the rates imply. A rate left at zero clears that rate's row for
+// the day; leaving litres untouched while only editing the deposit
+// leaves the day's sales alone.
+function JosephDaySheet({
+  rates,
+  trigger,
+  editing,
+}: {
+  rates: number[];
+  trigger: React.ReactNode;
+  editing?: { date: string; litresByRate: Map<number, number>; deposit?: JosephDeposit };
+}) {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
-  const [date, setDate] = useState(todayISO());
-  const [values, setValues] = useState<Record<number, number>>({});
-  const [amount, setAmount] = useState<number | "">("");
-  const [channel, setChannel] = useState<"mpesa" | "bank">("mpesa");
+  const [date, setDate] = useState(editing?.date ?? todayISO());
+  const [values, setValues] = useState<Record<number, number>>(() => {
+    const v: Record<number, number> = {};
+    editing?.litresByRate.forEach((litres, rate) => {
+      v[rate] = litres;
+    });
+    return v;
+  });
+  const [amount, setAmount] = useState<number | "">(editing?.deposit?.amountTZS ?? "");
+  const [channel, setChannel] = useState<"mpesa" | "bank">(editing?.deposit?.channel ?? "mpesa");
   const recordDay = useRecordJosephDay();
   const recordDeposit = useRecordJosephDeposit();
+  const updateDeposit = useUpdateJosephDeposit();
+  const removeDeposit = useDeleteJosephDeposit();
 
   const total = Object.values(values).reduce((a, v) => a + (v || 0), 0);
   const impliedRevenue = rates.reduce((a, r) => a + (values[r] ?? 0) * r, 0);
   const hasDeposit = amount !== "" && Number(amount) > 0;
-  const canSave = total > 0 || hasDeposit;
-  const saving = recordDay.isPending || recordDeposit.isPending;
+  const hadSalesOriginally = (editing?.litresByRate.size ?? 0) > 0;
+  const canSave = !!editing || total > 0 || hasDeposit;
+  const saving = recordDay.isPending || recordDeposit.isPending || updateDeposit.isPending;
 
   const reset = () => {
     setOpen(false);
-    setValues({});
-    setAmount("");
+    if (!editing) {
+      setValues({});
+      setAmount("");
+    }
   };
 
   const finish = () => {
@@ -407,21 +470,24 @@ function RecordJosephDaySheet({ rates }: { rates: number[] }) {
       reset();
       return;
     }
-    recordDeposit.mutate(
-      { date, amountTZS: Number(amount), channel },
-      {
-        onSuccess: () => {
-          toast.success(t("Imerekodiwa", "Recorded"));
-          reset();
-        },
-        onError: () => toast.error(t("Amana haikuhifadhiwa", "The deposit could not be saved")),
-      },
-    );
+    const onSuccess = () => {
+      toast.success(t("Imerekodiwa", "Recorded"));
+      reset();
+    };
+    const onError = () => toast.error(t("Amana haikuhifadhiwa", "The deposit could not be saved"));
+    if (editing?.deposit) {
+      updateDeposit.mutate(
+        { id: editing.deposit.id, date, amountTZS: Number(amount), channel },
+        { onSuccess, onError },
+      );
+    } else {
+      recordDeposit.mutate({ date, amountTZS: Number(amount), channel }, { onSuccess, onError });
+    }
   };
 
   const save = () => {
     if (!canSave) return;
-    if (total > 0) {
+    if (total > 0 || hadSalesOriginally) {
       recordDay.mutate(
         { date, rates: rates.map((r) => ({ rateTZS: r, litres: values[r] ?? 0 })) },
         {
@@ -441,29 +507,28 @@ function RecordJosephDaySheet({ rates }: { rates: number[] }) {
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button
-          size="sm"
-          className="h-8 text-white"
-          style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
-        >
-          <Plus className="h-3.5 w-3.5 mr-1" />
-          {t("Mauzo ya siku", "Day's sales")}
-        </Button>
-      </SheetTrigger>
+      <SheetTrigger asChild>{trigger}</SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
         <SheetHeader>
-          <SheetTitle>{t("Rekodi siku ya Joseph", "Record Joseph's day")}</SheetTitle>
+          <SheetTitle>
+            {editing
+              ? t("Rekebisha siku ya Joseph", "Correct Joseph's day")
+              : t("Rekodi siku ya Joseph", "Record Joseph's day")}
+          </SheetTitle>
         </SheetHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label>{t("Tarehe", "Date")}</Label>
-            <Input
-              type="date"
-              value={date}
-              max={todayISO()}
-              onChange={(e) => setDate(e.target.value)}
-            />
+            {editing ? (
+              <div className="font-num text-sm font-semibold px-1 py-1.5">{date}</div>
+            ) : (
+              <Input
+                type="date"
+                value={date}
+                max={todayISO()}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            )}
           </div>
           <div className="grid gap-1.5">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -532,113 +597,37 @@ function RecordJosephDaySheet({ rates }: { rates: number[] }) {
             </div>
           </div>
         </div>
-        <SheetFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            {t("Ghairi", "Cancel")}
-          </Button>
-          <Button onClick={save} disabled={!canSave || saving}>
-            {saving ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-function EditJosephDepositSheet({ deposit }: { deposit: JosephDeposit }) {
-  const { t } = useApp();
-  const [open, setOpen] = useState(false);
-  const [date, setDate] = useState(deposit.date);
-  const [amount, setAmount] = useState<number>(deposit.amountTZS);
-  const [channel, setChannel] = useState<"mpesa" | "bank">(deposit.channel);
-  const update = useUpdateJosephDeposit();
-  const remove = useDeleteJosephDeposit();
-
-  const changed =
-    date !== deposit.date || amount !== deposit.amountTZS || channel !== deposit.channel;
-
-  return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button size="sm" variant="ghost" className="h-7 text-xs">
-          {t("Hariri", "Edit")}
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
-        <SheetHeader>
-          <SheetTitle>{t("Rekebisha amana", "Correct this deposit")}</SheetTitle>
-        </SheetHeader>
-        <div className="grid gap-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
-              <Label>{t("Tarehe", "Date")}</Label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            </div>
-            <div className="grid gap-1.5">
-              <Label>{t("Kiasi (TZS)", "Amount (TZS)")}</Label>
-              <Input
-                type="number"
-                step="any"
-                value={amount}
-                onChange={(e) => setAmount(Number(e.target.value))}
-                className="font-num"
-              />
-            </div>
-          </div>
-          <div className="grid gap-1.5">
-            <Label>{t("Njia", "Channel")}</Label>
-            <Select value={channel} onValueChange={(v) => setChannel(v as typeof channel)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mpesa">M-Pesa</SelectItem>
-                <SelectItem value="bank">{t("Benki", "Bank")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
         <SheetFooter className="flex-col sm:flex-row sm:justify-between gap-2">
-          <ConfirmDialog
-            destructive
-            title={t("Futa amana hii?", "Remove this deposit?")}
-            description={t("Haiwezi kurudishwa.", "This cannot be undone.")}
-            confirmLabel={t("Futa", "Remove")}
-            onConfirm={() =>
-              remove.mutate(deposit.id, {
-                onSuccess: () => {
-                  toast.success(t("Imefutwa", "Removed"));
-                  setOpen(false);
-                },
-                onError: () => toast.error(t("Imeshindikana", "Could not remove it")),
-              })
-            }
-            trigger={
-              <Button variant="outline" className="text-[#E11B22] border-[#E11B22]/40">
-                {t("Futa", "Remove")}
-              </Button>
-            }
-          />
+          {editing?.deposit ? (
+            <ConfirmDialog
+              destructive
+              title={t("Futa amana hii?", "Remove this deposit?")}
+              description={t("Haiwezi kurudishwa.", "This cannot be undone.")}
+              confirmLabel={t("Futa", "Remove")}
+              onConfirm={() =>
+                removeDeposit.mutate(editing.deposit!.id, {
+                  onSuccess: () => {
+                    toast.success(t("Imefutwa", "Removed"));
+                    setOpen(false);
+                  },
+                  onError: () => toast.error(t("Imeshindikana", "Could not remove it")),
+                })
+              }
+              trigger={
+                <Button variant="outline" className="text-[#E11B22] border-[#E11B22]/40">
+                  {t("Futa amana", "Remove deposit")}
+                </Button>
+              }
+            />
+          ) : (
+            <span />
+          )}
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>
               {t("Ghairi", "Cancel")}
             </Button>
-            <Button
-              disabled={!changed || amount <= 0 || update.isPending}
-              onClick={() =>
-                update.mutate(
-                  { id: deposit.id, date, amountTZS: amount, channel },
-                  {
-                    onSuccess: () => {
-                      toast.success(t("Imerekebishwa", "Corrected"));
-                      setOpen(false);
-                    },
-                    onError: () => toast.error(t("Imeshindikana", "Could not save the change")),
-                  },
-                )
-              }
-            >
-              {update.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
+            <Button onClick={save} disabled={!canSave || saving}>
+              {saving ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
             </Button>
           </div>
         </SheetFooter>
