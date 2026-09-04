@@ -8,8 +8,7 @@ import { useApp } from "@/app/context";
 // not belong in.
 import {
   useJosephRates,
-  useJosephDailySummary,
-  useJosephRateBreakdown,
+  useJosephSales,
   useJosephDeposits,
   useRecordJosephDay,
   useRecordJosephDeposit,
@@ -43,7 +42,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { ChevronLeft, ChevronRight, Plus, Wallet, Smartphone, ArrowUpRight } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { toast } from "sonner";
 
 function startOfWeek(dateStr: string): Date {
@@ -122,14 +121,63 @@ export function JosephSummaryScreen() {
   const atLatest = grain === "year" ? y >= Number(today.slice(0, 4)) : anchor >= today;
 
   const { data: rates = [] } = useJosephRates();
-  const { data: days = [], isPending } = useJosephDailySummary(range.from, range.to);
-  const { data: breakdown = [] } = useJosephRateBreakdown(range.from, range.to);
-  const { data: deposits = [] } = useJosephDeposits(range.from, range.to);
+  const { data: sales = [], isPending: salesPending } = useJosephSales(range.from, range.to);
+  const { data: deposits = [], isPending: depositsPending } = useJosephDeposits(
+    range.from,
+    range.to,
+  );
+  const isPending = salesPending || depositsPending;
 
-  const totalLitres = days.reduce((a, x) => a + x.litres, 0);
-  const totalRevenue = days.reduce((a, x) => a + x.revenueTZS, 0);
-  const totalDeposited = days.reduce((a, x) => a + x.depositedTZS, 0);
-  const totalDifference = totalRevenue - totalDeposited;
+  const totalLitres = sales.reduce((a, s) => a + s.litres, 0);
+  const totalDeposited = deposits.reduce((a, dep) => a + dep.amountTZS, 0);
+
+  // One table: rate is the primary grouping (matching the fixed-price
+  // reality of the book), each date's litres at that rate is its own row,
+  // and the deposited amount is the figure someone actually typed in, not
+  // litres times rate. A deposit is a whole-day thing, not tied to one
+  // rate, so it is only shown once, on the first row for that date across
+  // the whole table, so the grand total does not double count it.
+  const salesByRate = new Map<number, typeof sales>();
+  for (const s of sales) {
+    const arr = salesByRate.get(s.rateTZS) ?? [];
+    arr.push(s);
+    salesByRate.set(s.rateTZS, arr);
+  }
+  const depositsByDate = new Map<string, typeof deposits>();
+  for (const dep of deposits) {
+    const arr = depositsByDate.get(dep.date) ?? [];
+    arr.push(dep);
+    depositsByDate.set(dep.date, arr);
+  }
+  const shownDepositDates = new Set<string>();
+
+  const sections = rates.map((rate) => {
+    const rows = (salesByRate.get(rate) ?? [])
+      .slice()
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map((s) => {
+        const showDeposit = !shownDepositDates.has(s.date) && depositsByDate.has(s.date);
+        if (showDeposit) shownDepositDates.add(s.date);
+        return {
+          id: s.id,
+          date: s.date,
+          litres: s.litres,
+          deposits: showDeposit ? (depositsByDate.get(s.date) ?? []) : [],
+        };
+      });
+    return { rate, rows, subtotal: rows.reduce((a, r) => a + r.litres, 0) };
+  });
+
+  // Days Joseph banked money without any litres logged against a rate,
+  // so that money is still visible somewhere rather than silently dropped.
+  const salesDates = new Set(sales.map((s) => s.date));
+  const depositOnlyRows = [...depositsByDate.keys()]
+    .filter((dt) => !salesDates.has(dt))
+    .sort()
+    .reverse()
+    .map((dt) => ({ date: dt, deposits: depositsByDate.get(dt) ?? [] }));
+
+  const hasAnything = sales.length > 0 || deposits.length > 0;
 
   return (
     <AppShell title={t("Muhtasari wa Joseph", "Joseph summary")}>
@@ -179,19 +227,28 @@ export function JosephSummaryScreen() {
           <ExportMenu
             formats={["csv", "excel", "pdf"]}
             filename={`joseph-${range.from}-to-${range.to}`}
-            data={() => ({
-              title: t(`Muhtasari wa Joseph, ${windowLabel}`, `Joseph summary, ${windowLabel}`),
-              headers: ["Date", "Litres", "Revenue", "M-Pesa", "Bank", "Deposited", "Difference"],
-              rows: days.map((x) => [
-                x.date,
-                x.litres,
-                x.revenueTZS,
-                x.mpesaTZS,
-                x.bankTZS,
-                x.depositedTZS,
-                x.differenceTZS,
-              ]),
-            })}
+            data={() => {
+              const rows: (string | number)[][] = [];
+              for (const sec of sections) {
+                for (const r of sec.rows) {
+                  const depAmt = r.deposits.reduce((a, dep) => a + dep.amountTZS, 0);
+                  const channels = r.deposits.map((dep) => dep.channel).join("+");
+                  rows.push([r.date, sec.rate, r.litres, depAmt || "", channels]);
+                }
+                rows.push([`Subtotal at ${sec.rate}`, "", sec.subtotal, "", ""]);
+              }
+              for (const r of depositOnlyRows) {
+                const depAmt = r.deposits.reduce((a, dep) => a + dep.amountTZS, 0);
+                const channels = r.deposits.map((dep) => dep.channel).join("+");
+                rows.push([r.date, "", "", depAmt, channels]);
+              }
+              rows.push(["Grand total", "", totalLitres, totalDeposited, ""]);
+              return {
+                title: t(`Muhtasari wa Joseph, ${windowLabel}`, `Joseph summary, ${windowLabel}`),
+                headers: ["Date", "Rate", "Litres", "Deposited (TZS)", "Channel"],
+                rows,
+              };
+            }}
           />
           <RecordJosephDaySheet rates={rates} />
         </div>
@@ -199,77 +256,26 @@ export function JosephSummaryScreen() {
 
       {isPending ? (
         <SectionSkeleton>
-          <TableSkeleton rows={8} cols={6} />
+          <TableSkeleton rows={8} cols={4} />
         </SectionSkeleton>
       ) : (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <StatCard label={t("Lita zote", "Total litres")} value={L(totalLitres)} accent="info" />
             <StatCard
-              label={t("Mauzo (kwa bei)", "Revenue (at rate)")}
-              value={tzs(totalRevenue)}
-              accent="green"
-            />
-            <StatCard
-              label={t("Kiasi kilichowekwa", "Deposited")}
+              label={t("Kiasi kilichowekwa", "Amount deposited")}
               value={tzs(totalDeposited)}
-              accent="amber"
-            />
-            <StatCard
-              label={t("Tofauti", "Difference")}
-              value={tzs(totalDifference)}
-              sub={
-                Math.abs(totalDifference) < 1
-                  ? t("Inalingana", "Matches")
-                  : t("Chunguza", "Worth checking")
-              }
-              accent={Math.abs(totalDifference) < 1 ? "green" : "red"}
+              accent="green"
             />
           </div>
 
-          {/* Litres and revenue at each rate, over whatever window is
-              selected: the exact "how much at 1700, how much at 1600" view. */}
-          <SectionCard title={t("Kwa kila bei", "By rate")}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                    <th className="py-2 px-3">{t("Bei kwa lita", "Rate per litre")}</th>
-                    <th className="text-right">{t("Lita", "Litres")}</th>
-                    <th className="text-right px-3">{t("Mauzo", "Revenue")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {breakdown.map((r) => (
-                    <tr
-                      key={r.rateTZS}
-                      className={`border-b border-border last:border-0 ${r.litres === 0 ? "opacity-45" : ""}`}
-                    >
-                      <td className="py-2.5 px-3 font-num font-medium">{tzs(r.rateTZS, false)}</td>
-                      <td className="py-2.5 text-right font-num">
-                        {r.litres > 0 ? num(r.litres) : ""}
-                      </td>
-                      <td className="py-2.5 text-right px-3 font-num font-semibold">
-                        {r.revenueTZS > 0 ? tzs(r.revenueTZS, false) : "-"}
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="border-t-2" style={{ borderColor: "#1E6B3A" }}>
-                    <td className="py-3 px-3 font-bold">{t("Jumla", "Total")}</td>
-                    <td className="py-3 text-right font-num font-bold">{num(totalLitres)}</td>
-                    <td className="py-3 text-right px-3 font-num font-bold text-base">
-                      {tzs(totalRevenue, false)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </SectionCard>
-
-          {/* Day by day, so a longer window can still answer a question
-              about one date, and the difference is visible per day. */}
-          <SectionCard title={t("Kila siku", "Day by day")}>
-            {days.length === 0 ? (
+          {/* One table: date, rate, litres, and the deposit someone
+              actually typed in, grouped by rate with a subtotal of litres
+              at the bottom of each rate and a grand total at the very
+              end. No system-computed revenue figure, only what was
+              manually recorded as deposited. */}
+          <SectionCard title={t("Mauzo na amana za Joseph", "Joseph's sales and deposits")}>
+            {!hasAnything ? (
               <EmptyState
                 icon={Wallet}
                 title={t("Hakuna kumbukumbu bado", "No records in this period")}
@@ -280,125 +286,155 @@ export function JosephSummaryScreen() {
                   <thead>
                     <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
                       <th className="py-2 px-3">{t("Tarehe", "Date")}</th>
+                      <th>{t("Bei", "Rate")}</th>
                       <th className="text-right">{t("Lita", "Litres")}</th>
-                      <th className="text-right">{t("Mauzo", "Revenue")}</th>
-                      <th className="text-right">M-Pesa</th>
-                      <th className="text-right">{t("Benki", "Bank")}</th>
-                      <th className="text-right">{t("Kilichowekwa", "Deposited")}</th>
-                      <th className="text-right px-3">{t("Tofauti", "Difference")}</th>
+                      <th className="text-right px-3">{t("Kilichowekwa", "Deposited")}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {days.map((x) => (
-                      <tr key={x.date} className="border-b border-border last:border-0">
-                        <td className="py-2.5 px-3 font-num text-xs">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setGrain("day");
-                              setAnchor(x.date);
-                            }}
-                            className="hover:underline"
-                          >
-                            {x.date}
-                          </button>
-                        </td>
-                        <td className="py-2.5 text-right font-num">{num(x.litres)}</td>
-                        <td className="py-2.5 text-right font-num font-semibold">
-                          {tzs(x.revenueTZS, false)}
-                        </td>
-                        <td className="py-2.5 text-right font-num">
-                          {x.mpesaTZS > 0 ? tzs(x.mpesaTZS, false) : ""}
-                        </td>
-                        <td className="py-2.5 text-right font-num">
-                          {x.bankTZS > 0 ? tzs(x.bankTZS, false) : ""}
-                        </td>
-                        <td className="py-2.5 text-right font-num">{tzs(x.depositedTZS, false)}</td>
-                        <td
-                          className="py-2.5 text-right px-3 font-num font-semibold"
-                          style={Math.abs(x.differenceTZS) >= 1 ? { color: "#E11B22" } : undefined}
-                        >
-                          {tzs(x.differenceTZS, false)}
-                        </td>
-                      </tr>
+                    {sections.map((sec) => (
+                      <Fragment key={sec.rate}>
+                        {sec.rows.length === 0 ? (
+                          <tr className="opacity-40">
+                            <td className="py-2 px-3 text-xs text-muted-foreground"></td>
+                            <td className="py-2 font-num text-xs text-muted-foreground">
+                              {tzs(sec.rate, false)}
+                            </td>
+                            <td className="py-2 text-right text-xs text-muted-foreground">-</td>
+                            <td className="py-2 text-right px-3 text-xs text-muted-foreground">
+                              {t("Hakuna mauzo", "No sales")}
+                            </td>
+                          </tr>
+                        ) : (
+                          sec.rows.map((r, idx) => (
+                            <tr key={r.id} className="border-b border-border last:border-0">
+                              <td className="py-2 px-3 font-num text-xs">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setGrain("day");
+                                    setAnchor(r.date);
+                                  }}
+                                  className="text-muted-foreground hover:underline"
+                                >
+                                  {r.date}
+                                </button>
+                              </td>
+                              {idx === 0 && (
+                                <td
+                                  className="py-2 font-num font-medium align-top"
+                                  rowSpan={sec.rows.length}
+                                >
+                                  {tzs(sec.rate, false)}
+                                </td>
+                              )}
+                              <td className="py-2 text-right font-num">{num(r.litres)}</td>
+                              <td className="py-2 text-right px-3">
+                                {r.deposits.length === 0 ? (
+                                  <span className="text-muted-foreground text-xs">—</span>
+                                ) : (
+                                  <div className="flex flex-col items-end gap-1">
+                                    {r.deposits.map((dep) => (
+                                      <div key={dep.id} className="flex items-center gap-2">
+                                        <Pill tone="info">
+                                          <span className="inline-flex items-center gap-1">
+                                            {dep.channel === "mpesa" ? (
+                                              <Smartphone className="h-3 w-3" />
+                                            ) : (
+                                              <ArrowUpRight className="h-3 w-3" />
+                                            )}
+                                            {dep.channel}
+                                          </span>
+                                        </Pill>
+                                        <span className="font-num font-semibold">
+                                          {tzs(dep.amountTZS, false)}
+                                        </span>
+                                        <EditJosephDepositSheet deposit={dep} />
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                        <tr className="bg-secondary/40">
+                          <td className="py-1.5 px-3 text-xs font-semibold" colSpan={2}>
+                            {t("Jumla ya", "Subtotal at")} {tzs(sec.rate, false)}
+                          </td>
+                          <td className="py-1.5 text-right font-num text-xs font-semibold">
+                            {num(sec.subtotal)}
+                          </td>
+                          <td className="py-1.5 px-3" />
+                        </tr>
+                      </Fragment>
                     ))}
+
+                    {depositOnlyRows.length > 0 && (
+                      <>
+                        <tr>
+                          <td
+                            colSpan={4}
+                            className="py-2 px-3 text-[11px] uppercase tracking-wider text-muted-foreground font-semibold"
+                          >
+                            {t(
+                              "Amana bila mauzo yaliyorekodiwa",
+                              "Deposits with no sales recorded",
+                            )}
+                          </td>
+                        </tr>
+                        {depositOnlyRows.map((r) => (
+                          <tr key={r.date} className="border-b border-border last:border-0">
+                            <td className="py-2 px-3 font-num text-xs">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setGrain("day");
+                                  setAnchor(r.date);
+                                }}
+                                className="text-muted-foreground hover:underline"
+                              >
+                                {r.date}
+                              </button>
+                            </td>
+                            <td className="py-2 text-xs text-muted-foreground">—</td>
+                            <td className="py-2 text-right text-xs text-muted-foreground">—</td>
+                            <td className="py-2 text-right px-3">
+                              <div className="flex flex-col items-end gap-1">
+                                {r.deposits.map((dep) => (
+                                  <div key={dep.id} className="flex items-center gap-2">
+                                    <Pill tone="info">
+                                      <span className="inline-flex items-center gap-1">
+                                        {dep.channel === "mpesa" ? (
+                                          <Smartphone className="h-3 w-3" />
+                                        ) : (
+                                          <ArrowUpRight className="h-3 w-3" />
+                                        )}
+                                        {dep.channel}
+                                      </span>
+                                    </Pill>
+                                    <span className="font-num font-semibold">
+                                      {tzs(dep.amountTZS, false)}
+                                    </span>
+                                    <EditJosephDepositSheet deposit={dep} />
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </>
+                    )}
+
                     <tr className="border-t-2" style={{ borderColor: "#1E6B3A" }}>
-                      <td className="py-3 px-3 font-bold">{t("Jumla", "Total")}</td>
+                      <td className="py-3 px-3 font-bold" colSpan={2}>
+                        {t("Jumla kuu", "Grand total")}
+                      </td>
                       <td className="py-3 text-right font-num font-bold">{num(totalLitres)}</td>
-                      <td className="py-3 text-right font-num font-bold">
-                        {tzs(totalRevenue, false)}
-                      </td>
-                      <td className="py-3 text-right font-num font-bold">
-                        {tzs(
-                          days.reduce((a, x) => a + x.mpesaTZS, 0),
-                          false,
-                        )}
-                      </td>
-                      <td className="py-3 text-right font-num font-bold">
-                        {tzs(
-                          days.reduce((a, x) => a + x.bankTZS, 0),
-                          false,
-                        )}
-                      </td>
-                      <td className="py-3 text-right font-num font-bold">
+                      <td className="py-3 text-right px-3 font-num font-bold">
                         {tzs(totalDeposited, false)}
                       </td>
-                      <td className="py-3 text-right px-3 font-num font-bold">
-                        {tzs(totalDifference, false)}
-                      </td>
                     </tr>
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <div className="mt-3 text-[11px] text-muted-foreground">
-              {t(
-                "Tofauti ni mauzo (kwa bei aliyouza) kasoro kilichowekwa benki au M-Pesa. Si hitilafu, ni kitu cha kuangalia.",
-                "Difference is revenue at the rate sold, less what was actually banked. Not an error, something worth checking.",
-              )}
-            </div>
-          </SectionCard>
-
-          <SectionCard title={t("Amana za Joseph", "Joseph's deposits")}>
-            {deposits.length === 0 ? (
-              <EmptyState title={t("Hakuna amana", "No deposits in this period")} />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                      <th className="py-2 px-3">{t("Tarehe", "Date")}</th>
-                      <th>{t("Njia", "Channel")}</th>
-                      <th className="text-right">{t("Kiasi", "Amount")}</th>
-                      <th className="px-3" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {deposits.map((dep) => (
-                      <tr key={dep.id} className="border-b border-border last:border-0">
-                        <td className="py-2.5 px-3 font-num text-xs text-muted-foreground">
-                          {dep.date}
-                        </td>
-                        <td className="py-2.5">
-                          <Pill tone="info">
-                            <span className="inline-flex items-center gap-1">
-                              {dep.channel === "mpesa" ? (
-                                <Smartphone className="h-3 w-3" />
-                              ) : (
-                                <ArrowUpRight className="h-3 w-3" />
-                              )}
-                              {dep.channel}
-                            </span>
-                          </Pill>
-                        </td>
-                        <td className="py-2.5 text-right font-num font-semibold">
-                          {tzs(dep.amountTZS)}
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
-                          <EditJosephDepositSheet deposit={dep} />
-                        </td>
-                      </tr>
-                    ))}
                   </tbody>
                 </table>
               </div>
