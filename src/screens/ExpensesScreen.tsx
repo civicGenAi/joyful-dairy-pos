@@ -2,9 +2,13 @@ import { AppShell } from "@/components/shell/AppShell";
 import { useApp } from "@/app/context";
 // BACKEND: data now flows through src/lib/data/finance (was @/mock/data).
 import type { ExpenseCategory } from "@/mock/data";
+import type { ExpenseWithRefs } from "@/lib/data/finance";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   useExpenses,
   useCreateExpense,
+  useUpdateExpense,
+  useDeleteExpense,
   useExpenseCategories,
   useExpenseSites,
 } from "@/lib/data/hooks/finance";
@@ -412,6 +416,7 @@ export function ExpensesScreen() {
                     <th>{t("Maelezo", "Description")}</th>
                     <th>{t("Njia", "Method")}</th>
                     <th className="text-right">{t("Kiasi", "Amount")}</th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
@@ -489,13 +494,18 @@ export function ExpensesScreen() {
                         <td className="py-2.5 text-right font-num font-semibold text-[#E11B22]">
                           -{tzs(e.amountTZS)}
                         </td>
+                        <td className="py-2.5 px-3 text-right">
+                          {can("finance:write") && (
+                            <EditExpenseSheet expense={e} categories={categories} sites={sites} />
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2 border-border">
-                    <td colSpan={6} className="py-3 px-3 font-semibold">
+                    <td colSpan={7} className="py-3 px-3 font-semibold">
                       {t("Jumla", "Total")}
                     </td>
                     <td className="py-3 text-right font-num font-bold">
@@ -556,6 +566,191 @@ export function ExpensesScreen() {
         </TabsContent>
       </Tabs>
     </AppShell>
+  );
+}
+
+// Correcting an expense in place. Deleting and retyping would lose the
+// system reference the paperwork was filed under, and would leave two
+// rows where one thing was bought.
+function EditExpenseSheet({
+  expense,
+  categories,
+  sites,
+}: {
+  expense: ExpenseWithRefs;
+  categories: string[];
+  sites: string[];
+}) {
+  const { t, lang } = useApp();
+  const [open, setOpen] = useState(false);
+  const [date, setDate] = useState(expense.date);
+  const [category, setCategory] = useState(expense.category);
+  const [site, setSite] = useState(expense.site ?? "");
+  const [vendor, setVendor] = useState(expense.vendor);
+  const [description, setDescription] = useState(expense.description);
+  const [amount, setAmount] = useState<number>(expense.amountTZS);
+  const [method, setMethod] = useState<"cash" | "mpesa" | "bank">(expense.method);
+  const [invoiceRef, setInvoiceRef] = useState(expense.invoiceRef ?? "");
+  const update = useUpdateExpense();
+  const remove = useDeleteExpense();
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button size="sm" variant="ghost" className="h-7 text-xs">
+          {t("Hariri", "Edit")}
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Rekebisha matumizi", "Correct this expense")}</SheetTitle>
+        </SheetHeader>
+        <div className="grid gap-3">
+          {expense.refNo && (
+            <div className="rounded-xl bg-secondary/60 px-3 py-2.5 text-[11px] text-muted-foreground font-num">
+              {expense.refNo}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>{t("Tarehe", "Date")}</Label>
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{t("Kategoria", "Category")}</Label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {categoryLabel(c, lang)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid gap-1.5">
+            <Label>{t("Mahali", "Place")}</Label>
+            <Select value={site} onValueChange={setSite}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("Chagua mahali", "Pick a place")} />
+              </SelectTrigger>
+              <SelectContent>
+                {sites.map((sName) => (
+                  <SelectItem key={sName} value={sName}>
+                    {siteLabel(sName, lang)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label>{t("Muuzaji", "Vendor")}</Label>
+            <Input value={vendor} onChange={(e) => setVendor(e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>{t("Maelezo", "Description")}</Label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="grid gap-1.5">
+              <Label>{t("Kiasi", "Amount")}</Label>
+              <Input
+                type="number"
+                step="any"
+                value={amount}
+                onChange={(e) => setAmount(Number(e.target.value))}
+                className="font-num"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{t("Njia", "Method")}</Label>
+              <Select value={method} onValueChange={(v) => setMethod(v as typeof method)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="mpesa">M-Pesa</SelectItem>
+                  <SelectItem value="bank">Bank</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{t("Ankara", "Invoice")}</Label>
+              <Input value={invoiceRef} onChange={(e) => setInvoiceRef(e.target.value)} />
+            </div>
+          </div>
+        </div>
+        <SheetFooter className="flex-col sm:flex-row sm:justify-between gap-2">
+          <ConfirmDialog
+            destructive
+            title={t("Futa matumizi haya?", "Delete this expense?")}
+            description={t(
+              "Yatatoweka kwenye orodha na vitabu vitarekebishwa. Unaweza kuyarudisha kutoka Mipangilio, Takataka.",
+              "It comes off the list and the books are corrected. You can restore it from Settings, Trash.",
+            )}
+            confirmLabel={t("Futa", "Delete")}
+            onConfirm={() =>
+              remove.mutate(
+                { id: expense.id, vendor: expense.vendor },
+                {
+                  onSuccess: () => {
+                    toast.success(t("Yamefutwa", "Deleted"));
+                    setOpen(false);
+                  },
+                  onError: () => toast.error(t("Imeshindikana", "Could not delete it")),
+                },
+              )
+            }
+            trigger={
+              <Button variant="outline" className="text-[#E11B22] border-[#E11B22]/40">
+                {t("Futa", "Delete")}
+              </Button>
+            }
+          />
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              {t("Ghairi", "Cancel")}
+            </Button>
+            <Button
+              disabled={!vendor.trim() || amount <= 0 || update.isPending}
+              onClick={() =>
+                update.mutate(
+                  {
+                    id: expense.id,
+                    date,
+                    category,
+                    site: site || undefined,
+                    vendor,
+                    description,
+                    amountTZS: amount,
+                    method,
+                    invoiceRef: invoiceRef || undefined,
+                  },
+                  {
+                    onSuccess: () => {
+                      toast.success(t("Yamerekebishwa", "Corrected"));
+                      setOpen(false);
+                    },
+                    onError: () => toast.error(t("Imeshindikana", "Could not save the change")),
+                  },
+                )
+              }
+            >
+              {update.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
+            </Button>
+          </div>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 

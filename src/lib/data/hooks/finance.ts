@@ -54,6 +54,20 @@ export function useExpenseSites() {
   return useQuery({ queryKey: expenseSiteKey, queryFn: expenseSitesRepo.list });
 }
 
+export function useUpdateExpense() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: expensesRepo.update,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: financeKeys.all });
+      qc.invalidateQueries({ queryKey: expenseCategoryKey });
+      qc.invalidateQueries({ queryKey: expenseSiteKey });
+      qc.invalidateQueries({ queryKey: ["expenseOpening"] });
+      qc.invalidateQueries({ queryKey: ["ledger"] });
+    },
+  });
+}
+
 export function useDeleteExpense() {
   const qc = useQueryClient();
   return useMutation({

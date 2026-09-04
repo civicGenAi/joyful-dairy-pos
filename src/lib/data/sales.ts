@@ -371,13 +371,14 @@ export const salesDepositCategoriesRepo = {
     return rows.map((r) => r.name);
   },
 
-  /** Safe to call with an already-existing name, just does nothing. */
+  /** Safe to call with an already-existing name, just does nothing.
+   *  DO NOTHING rather than DO UPDATE: this table has no update policy, so
+   *  the update path would be refused by RLS on any name already there. */
   async create(name: string): Promise<void> {
     unwrap(
       await supabase
         .from("sales_deposit_categories")
-        .upsert({ name }, { onConflict: "name" })
-        .select(),
+        .upsert({ name }, { onConflict: "name", ignoreDuplicates: true }),
     );
   },
 };

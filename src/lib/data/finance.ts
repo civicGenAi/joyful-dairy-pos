@@ -110,10 +110,18 @@ export const expenseCategoriesRepo = {
   },
 
   /** Adds a new category so it's offered again next time. Safe to call
-   *  with an already-existing name, just does nothing. */
+   *  with an already-existing name, just does nothing.
+   *
+   *  ignoreDuplicates makes this ON CONFLICT DO NOTHING rather than DO
+   *  UPDATE. That is what we mean, and it is also the only form that works:
+   *  the table has select and insert policies but no update policy, so the
+   *  DO UPDATE path is refused by RLS the moment the name already exists,
+   *  which used to take the whole expense save down with it. */
   async create(name: string): Promise<void> {
     unwrap(
-      await supabase.from("expense_categories").upsert({ name }, { onConflict: "name" }).select(),
+      await supabase
+        .from("expense_categories")
+        .upsert({ name }, { onConflict: "name", ignoreDuplicates: true }),
     );
   },
 };
@@ -131,7 +139,11 @@ export const expenseSitesRepo = {
 
   /** Safe to call with an already-existing name, just does nothing. */
   async create(name: string): Promise<void> {
-    unwrap(await supabase.from("expense_sites").upsert({ name }, { onConflict: "name" }).select());
+    unwrap(
+      await supabase
+        .from("expense_sites")
+        .upsert({ name }, { onConflict: "name", ignoreDuplicates: true }),
+    );
   },
 };
 
@@ -195,6 +207,34 @@ export const expensesRepo = {
       `Amerekodi matumizi TZS ${input.amountTZS} (${input.vendor})`,
       `Recorded expense TZS ${input.amountTZS} (${input.vendor})`,
     );
+  },
+
+  /** Corrects an expense in place. Deleting and retyping would lose the
+   *  system reference the paperwork was filed under, and the ledger entry
+   *  is reversed so the corrected figures post fresh. */
+  async update(input: {
+    id: string;
+    date: string;
+    category: string;
+    site?: string;
+    vendor: string;
+    description: string;
+    amountTZS: number;
+    method: "cash" | "mpesa" | "bank";
+    invoiceRef?: string;
+  }): Promise<void> {
+    const { error } = await supabase.rpc("update_expense", {
+      p_id: input.id,
+      p_date: input.date,
+      p_category: input.category,
+      p_site: input.site ?? null,
+      p_vendor: input.vendor,
+      p_description: input.description,
+      p_amount: input.amountTZS,
+      p_method: input.method,
+      p_invoice_ref: input.invoiceRef ?? null,
+    });
+    if (error) throw new Error(error.message);
   },
 
   /** Soft delete. Restore from Settings -> Trash. */

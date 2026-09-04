@@ -194,6 +194,36 @@ export const farmersRepo = {
     if (error) throw new Error(error.message);
   },
 
+  /** Corrects a payout. Gives the farmer back what the old payment took
+   *  before applying the new figure, and still refuses to pay more than
+   *  is owed, measured against the balance once the old one is undone. */
+  async updatePayout(input: {
+    id: string;
+    date: string;
+    amountTZS: number;
+    method: "cash" | "mpesa" | "bank";
+    attachmentUrl?: string;
+  }): Promise<void> {
+    const { error } = await supabase.rpc("update_payout", {
+      p_id: input.id,
+      p_date: input.date,
+      p_amount: input.amountTZS,
+      p_method: input.method,
+      p_attachment_url: input.attachmentUrl ?? null,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  /** Removes a payout entirely, returning the money to the farmer's
+   *  balance and reversing the ledger. For one entered twice. */
+  async deletePayout(id: string, reason?: string): Promise<void> {
+    const { error } = await supabase.rpc("delete_payout", {
+      p_id: id,
+      p_reason: reason ?? null,
+    });
+    if (error) throw new Error(error.message);
+  },
+
   /** The open monthly payout cycle plus what has already been paid inside it. */
   async cycleSummary(): Promise<CycleSummary | null> {
     const { data: cycle, error } = await supabase

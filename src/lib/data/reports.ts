@@ -142,7 +142,13 @@ export const alertReadsRepo = {
     if (alertIds.length === 0) return;
     const { error } = await supabase
       .from("alert_reads")
-      .upsert(alertIds.map((alert_id) => ({ profile_id: profileId, alert_id })));
+      // Same reason as the name registries: alert_reads has no update
+      // policy, so re-marking an alert already read must do nothing rather
+      // than attempt an update RLS will refuse.
+      .upsert(
+        alertIds.map((alert_id) => ({ profile_id: profileId, alert_id })),
+        { ignoreDuplicates: true },
+      );
     if (error) throw new Error(error.message);
   },
 };

@@ -102,3 +102,28 @@ export function useReviewAdjustment() {
     onSuccess: () => qc.invalidateQueries({ queryKey: farmerKeys.all }),
   });
 }
+
+export function useUpdatePayout() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: farmersRepo.updatePayout,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: farmerKeys.all });
+      qc.invalidateQueries({ queryKey: ["ledger"] });
+      qc.invalidateQueries({ queryKey: ["finance"] });
+    },
+  });
+}
+
+export function useDeletePayout() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      farmersRepo.deletePayout(id, reason),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: farmerKeys.all });
+      qc.invalidateQueries({ queryKey: ["ledger"] });
+      qc.invalidateQueries({ queryKey: ["finance"] });
+    },
+  });
+}
