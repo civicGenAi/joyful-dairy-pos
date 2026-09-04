@@ -97,3 +97,30 @@ export function useCreateSalesDepositCategory() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["salesDepositCategories"] }),
   });
 }
+
+export function useUpdateDeposit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: depositsRepo.update,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: depositKeys.all });
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["ledger"] });
+      qc.invalidateQueries({ queryKey: ["finance"] });
+    },
+  });
+}
+
+export function useDeleteDeposit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      depositsRepo.remove(id, reason),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: depositKeys.all });
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["ledger"] });
+      qc.invalidateQueries({ queryKey: ["finance"] });
+    },
+  });
+}

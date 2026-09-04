@@ -257,7 +257,8 @@ export const depositsRepo = {
     return toDeposit(row);
   },
 
-  /** All deposits within a date range, uncapped, for a monthly view. */
+  /** All deposits within a date range, uncapped. Used for the day,
+   *  month and year views on the sales-deposit screen. */
   async listByRange(fromDate: string, toDate: string): Promise<DepositRecord[]> {
     const rows = unwrap(
       await supabase
@@ -293,6 +294,43 @@ export const depositsRepo = {
       p_note: input.note ?? null,
       p_attachment_url: input.attachmentUrl ?? null,
       ...(input.date ? { p_date: input.date } : {}),
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  /** Corrects a deposit already recorded. Moves the customer's balance
+   *  back before applying the new figures, and reverses the ledger entry
+   *  so the corrected amount posts fresh. */
+  async update(input: {
+    id: string;
+    date: string;
+    amountTZS: number;
+    method: DepositRecord["method"];
+    source?: string;
+    note?: string;
+    customerId?: string | null;
+    attachmentUrl?: string;
+  }): Promise<void> {
+    const { error } = await supabase.rpc("update_deposit", {
+      p_id: input.id,
+      p_date: input.date,
+      p_amount: input.amountTZS,
+      p_method: input.method,
+      p_source: input.source ?? null,
+      p_note: input.note ?? null,
+      p_customer_id: input.customerId ?? null,
+      p_attachment_url: input.attachmentUrl ?? null,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  /** Removes a deposit entirely, giving the customer their balance back
+   *  and reversing the ledger. For one entered twice, or against the
+   *  wrong account. */
+  async remove(id: string, reason?: string): Promise<void> {
+    const { error } = await supabase.rpc("delete_deposit", {
+      p_id: id,
+      p_reason: reason ?? null,
     });
     if (error) throw new Error(error.message);
   },
