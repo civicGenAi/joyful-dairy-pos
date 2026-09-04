@@ -131,17 +131,17 @@ export function JosephSummaryScreen() {
   const totalLitres = sales.reduce((a, s) => a + s.litres, 0);
   const totalDeposited = deposits.reduce((a, dep) => a + dep.amountTZS, 0);
 
-  // One table: rate is the primary grouping (matching the fixed-price
-  // reality of the book), each date's litres at that rate is its own row,
-  // and the deposited amount is the figure someone actually typed in, not
-  // litres times rate. A deposit is a whole-day thing, not tied to one
-  // rate, so it is only shown once, on the first row for that date across
-  // the whole table, so the grand total does not double count it.
-  const salesByRate = new Map<number, typeof sales>();
+  // One table, grouped by date, the way someone would actually read it:
+  // the date gets its own row, then every rate sold that day gets its own
+  // row underneath, and a totals line at the bottom of that date shows
+  // the day's litres and the amount actually deposited, together. Nothing
+  // here is rate times litres; the deposited figure is only ever what
+  // was typed in.
+  const salesByDate = new Map<string, typeof sales>();
   for (const s of sales) {
-    const arr = salesByRate.get(s.rateTZS) ?? [];
+    const arr = salesByDate.get(s.date) ?? [];
     arr.push(s);
-    salesByRate.set(s.rateTZS, arr);
+    salesByDate.set(s.date, arr);
   }
   const depositsByDate = new Map<string, typeof deposits>();
   for (const dep of deposits) {
@@ -149,33 +149,22 @@ export function JosephSummaryScreen() {
     arr.push(dep);
     depositsByDate.set(dep.date, arr);
   }
-  const shownDepositDates = new Set<string>();
 
-  const sections = rates.map((rate) => {
-    const rows = (salesByRate.get(rate) ?? [])
-      .slice()
-      .sort((a, b) => b.date.localeCompare(a.date))
-      .map((s) => {
-        const showDeposit = !shownDepositDates.has(s.date) && depositsByDate.has(s.date);
-        if (showDeposit) shownDepositDates.add(s.date);
-        return {
-          id: s.id,
-          date: s.date,
-          litres: s.litres,
-          deposits: showDeposit ? (depositsByDate.get(s.date) ?? []) : [],
-        };
-      });
-    return { rate, rows, subtotal: rows.reduce((a, r) => a + r.litres, 0) };
-  });
-
-  // Days Joseph banked money without any litres logged against a rate,
-  // so that money is still visible somewhere rather than silently dropped.
-  const salesDates = new Set(sales.map((s) => s.date));
-  const depositOnlyRows = [...depositsByDate.keys()]
-    .filter((dt) => !salesDates.has(dt))
+  const allDates = new Set<string>([...salesByDate.keys(), ...depositsByDate.keys()]);
+  const dayBlocks = [...allDates]
     .sort()
     .reverse()
-    .map((dt) => ({ date: dt, deposits: depositsByDate.get(dt) ?? [] }));
+    .map((date) => {
+      const rateRows = (salesByDate.get(date) ?? []).slice().sort((a, b) => b.rateTZS - a.rateTZS);
+      const dayDeposits = depositsByDate.get(date) ?? [];
+      return {
+        date,
+        rateRows,
+        dayLitres: rateRows.reduce((a, r) => a + r.litres, 0),
+        dayDeposits,
+        dayDeposited: dayDeposits.reduce((a, dep) => a + dep.amountTZS, 0),
+      };
+    });
 
   const hasAnything = sales.length > 0 || deposits.length > 0;
 
@@ -229,18 +218,16 @@ export function JosephSummaryScreen() {
             filename={`joseph-${range.from}-to-${range.to}`}
             data={() => {
               const rows: (string | number)[][] = [];
-              for (const sec of sections) {
-                for (const r of sec.rows) {
-                  const depAmt = r.deposits.reduce((a, dep) => a + dep.amountTZS, 0);
-                  const channels = r.deposits.map((dep) => dep.channel).join("+");
-                  rows.push([r.date, sec.rate, r.litres, depAmt || "", channels]);
+              for (const day of dayBlocks) {
+                if (day.rateRows.length === 0) {
+                  rows.push([day.date, "", "", "", ""]);
+                } else {
+                  for (const r of day.rateRows) {
+                    rows.push([day.date, r.rateTZS, r.litres, "", ""]);
+                  }
                 }
-                rows.push([`Subtotal at ${sec.rate}`, "", sec.subtotal, "", ""]);
-              }
-              for (const r of depositOnlyRows) {
-                const depAmt = r.deposits.reduce((a, dep) => a + dep.amountTZS, 0);
-                const channels = r.deposits.map((dep) => dep.channel).join("+");
-                rows.push([r.date, "", "", depAmt, channels]);
+                const channels = day.dayDeposits.map((dep) => dep.channel).join("+");
+                rows.push(["Total", "", day.dayLitres, day.dayDeposited || "", channels]);
               }
               rows.push(["Grand total", "", totalLitres, totalDeposited, ""]);
               return {
@@ -269,11 +256,11 @@ export function JosephSummaryScreen() {
             />
           </div>
 
-          {/* One table: date, rate, litres, and the deposit someone
-              actually typed in, grouped by rate with a subtotal of litres
-              at the bottom of each rate and a grand total at the very
-              end. No system-computed revenue figure, only what was
-              manually recorded as deposited. */}
+          {/* One table, grouped by date: the date gets its own row, every
+              rate sold that day gets its own row under it, and a totals
+              line at the bottom of that date shows the day's litres and
+              what was actually deposited, together. No system-computed
+              revenue anywhere, only the manually recorded deposit. */}
           <SectionCard title={t("Mauzo na amana za Joseph", "Joseph's sales and deposits")}>
             {!hasAnything ? (
               <EmptyState
@@ -285,123 +272,65 @@ export function JosephSummaryScreen() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                      <th className="py-2 px-3">{t("Tarehe", "Date")}</th>
-                      <th>{t("Bei", "Rate")}</th>
+                      <th className="py-2 px-3">{t("Bei", "Rate")}</th>
                       <th className="text-right">{t("Lita", "Litres")}</th>
                       <th className="text-right px-3">{t("Kilichowekwa", "Deposited")}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sections.map((sec) => (
-                      <Fragment key={sec.rate}>
-                        {sec.rows.length === 0 ? (
-                          <tr className="opacity-40">
-                            <td className="py-2 px-3 text-xs text-muted-foreground"></td>
-                            <td className="py-2 font-num text-xs text-muted-foreground">
-                              {tzs(sec.rate, false)}
+                    {dayBlocks.map((day) => (
+                      <Fragment key={day.date}>
+                        <tr>
+                          <td
+                            colSpan={3}
+                            className="pt-4 pb-1 px-3 first:pt-0 border-b border-border"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setGrain("day");
+                                setAnchor(day.date);
+                              }}
+                              className="font-num text-xs font-bold hover:underline"
+                            >
+                              {day.date}
+                            </button>
+                          </td>
+                        </tr>
+                        {day.rateRows.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={2}
+                              className="py-2 px-3 text-xs text-muted-foreground italic"
+                            >
+                              {t("Hakuna mauzo yaliyorekodiwa", "No sales recorded")}
                             </td>
-                            <td className="py-2 text-right text-xs text-muted-foreground">-</td>
-                            <td className="py-2 text-right px-3 text-xs text-muted-foreground">
-                              {t("Hakuna mauzo", "No sales")}
-                            </td>
+                            <td className="py-2 px-3" />
                           </tr>
                         ) : (
-                          sec.rows.map((r, idx) => (
-                            <tr key={r.id} className="border-b border-border last:border-0">
-                              <td className="py-2 px-3 font-num text-xs">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setGrain("day");
-                                    setAnchor(r.date);
-                                  }}
-                                  className="text-muted-foreground hover:underline"
-                                >
-                                  {r.date}
-                                </button>
-                              </td>
-                              {idx === 0 && (
-                                <td
-                                  className="py-2 font-num font-medium align-top"
-                                  rowSpan={sec.rows.length}
-                                >
-                                  {tzs(sec.rate, false)}
-                                </td>
-                              )}
+                          day.rateRows.map((r) => (
+                            <tr key={r.id} className="border-b border-border/50 last:border-0">
+                              <td className="py-2 px-3 font-num">{tzs(r.rateTZS, false)}</td>
                               <td className="py-2 text-right font-num">{num(r.litres)}</td>
-                              <td className="py-2 text-right px-3">
-                                {r.deposits.length === 0 ? (
-                                  <span className="text-muted-foreground text-xs">—</span>
-                                ) : (
-                                  <div className="flex flex-col items-end gap-1">
-                                    {r.deposits.map((dep) => (
-                                      <div key={dep.id} className="flex items-center gap-2">
-                                        <Pill tone="info">
-                                          <span className="inline-flex items-center gap-1">
-                                            {dep.channel === "mpesa" ? (
-                                              <Smartphone className="h-3 w-3" />
-                                            ) : (
-                                              <ArrowUpRight className="h-3 w-3" />
-                                            )}
-                                            {dep.channel}
-                                          </span>
-                                        </Pill>
-                                        <span className="font-num font-semibold">
-                                          {tzs(dep.amountTZS, false)}
-                                        </span>
-                                        <EditJosephDepositSheet deposit={dep} />
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </td>
+                              <td className="py-2 px-3" />
                             </tr>
                           ))
                         )}
                         <tr className="bg-secondary/40">
-                          <td className="py-1.5 px-3 text-xs font-semibold" colSpan={2}>
-                            {t("Jumla ya", "Subtotal at")} {tzs(sec.rate, false)}
+                          <td className="py-1.5 px-3 text-xs font-semibold">
+                            {t("Jumla ya siku", "Day's total")}
                           </td>
-                          <td className="py-1.5 text-right font-num text-xs font-semibold">
-                            {num(sec.subtotal)}
+                          <td className="py-1.5 text-right font-num text-xs font-bold">
+                            {num(day.dayLitres)}
                           </td>
-                          <td className="py-1.5 px-3" />
-                        </tr>
-                      </Fragment>
-                    ))}
-
-                    {depositOnlyRows.length > 0 && (
-                      <>
-                        <tr>
-                          <td
-                            colSpan={4}
-                            className="py-2 px-3 text-[11px] uppercase tracking-wider text-muted-foreground font-semibold"
-                          >
-                            {t(
-                              "Amana bila mauzo yaliyorekodiwa",
-                              "Deposits with no sales recorded",
-                            )}
-                          </td>
-                        </tr>
-                        {depositOnlyRows.map((r) => (
-                          <tr key={r.date} className="border-b border-border last:border-0">
-                            <td className="py-2 px-3 font-num text-xs">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setGrain("day");
-                                  setAnchor(r.date);
-                                }}
-                                className="text-muted-foreground hover:underline"
-                              >
-                                {r.date}
-                              </button>
-                            </td>
-                            <td className="py-2 text-xs text-muted-foreground">—</td>
-                            <td className="py-2 text-right text-xs text-muted-foreground">—</td>
-                            <td className="py-2 text-right px-3">
+                          <td className="py-1.5 text-right px-3">
+                            {day.dayDeposits.length === 0 ? (
+                              <span className="text-muted-foreground text-xs">
+                                {t("hakuna amana", "not deposited yet")}
+                              </span>
+                            ) : (
                               <div className="flex flex-col items-end gap-1">
-                                {r.deposits.map((dep) => (
+                                {day.dayDeposits.map((dep) => (
                                   <div key={dep.id} className="flex items-center gap-2">
                                     <Pill tone="info">
                                       <span className="inline-flex items-center gap-1">
@@ -413,23 +342,21 @@ export function JosephSummaryScreen() {
                                         {dep.channel}
                                       </span>
                                     </Pill>
-                                    <span className="font-num font-semibold">
+                                    <span className="font-num font-bold">
                                       {tzs(dep.amountTZS, false)}
                                     </span>
                                     <EditJosephDepositSheet deposit={dep} />
                                   </div>
                                 ))}
                               </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </>
-                    )}
+                            )}
+                          </td>
+                        </tr>
+                      </Fragment>
+                    ))}
 
                     <tr className="border-t-2" style={{ borderColor: "#1E6B3A" }}>
-                      <td className="py-3 px-3 font-bold" colSpan={2}>
-                        {t("Jumla kuu", "Grand total")}
-                      </td>
+                      <td className="py-3 px-3 font-bold">{t("Jumla kuu", "Grand total")}</td>
                       <td className="py-3 text-right font-num font-bold">{num(totalLitres)}</td>
                       <td className="py-3 text-right px-3 font-num font-bold">
                         {tzs(totalDeposited, false)}
