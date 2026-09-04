@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { useMemo, useState } from "react";
 import { BookOpen, Search, ExternalLink, Keyboard, Languages } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
 
 /**
  * SW ↔ EN glossary surfaced from the brief, with a search box. Helps anyone
@@ -351,6 +352,29 @@ export function HelpScreen() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* The full manual: a document rather than a screen, meant to be
+          printed and handed to someone on their first day. */}
+      <div className="mb-5 rounded-2xl border-2 border-border bg-card p-5 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div className="font-display text-lg font-bold">
+            {t("Mwongozo kamili wa mtumiaji", "The full user manual")}
+          </div>
+          <p className="text-sm text-muted-foreground mt-1 max-w-xl">
+            {t(
+              "Kila kitu kwa mpangilio, kutoka kupokea maziwa hadi kufunga vitabu. Unaweza kuchapisha au kupakua kama PDF ili kumpa mfanyakazi mpya siku ya kwanza.",
+              "Everything in order, from taking in milk to closing the books. Print it or download the PDF to hand to someone on their first day.",
+            )}
+          </p>
+        </div>
+        <Button
+          asChild
+          className="text-white shrink-0"
+          style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+        >
+          <Link to="/manual">{t("Fungua mwongozo", "Open the manual")}</Link>
+        </Button>
       </div>
 
       <div className="mb-4">

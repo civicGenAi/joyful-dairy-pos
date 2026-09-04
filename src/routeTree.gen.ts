@@ -24,6 +24,7 @@ import { Route as ProductionRouteImport } from './routes/production'
 import { Route as PosRouteImport } from './routes/pos'
 import { Route as PayrollRouteImport } from './routes/payroll'
 import { Route as OfflineRouteImport } from './routes/offline'
+import { Route as ManualRouteImport } from './routes/manual'
 import { Route as MaintenanceRouteImport } from './routes/maintenance'
 import { Route as HelpRouteImport } from './routes/help'
 import { Route as HealthRouteImport } from './routes/health'
@@ -125,6 +126,11 @@ const PayrollRoute = PayrollRouteImport.update({
 const OfflineRoute = OfflineRouteImport.update({
   id: '/offline',
   path: '/offline',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ManualRoute = ManualRouteImport.update({
+  id: '/manual',
+  path: '/manual',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MaintenanceRoute = MaintenanceRouteImport.update({
@@ -281,6 +287,7 @@ export interface FileRoutesByFullPath {
   '/health': typeof HealthRoute
   '/help': typeof HelpRoute
   '/maintenance': typeof MaintenanceRoute
+  '/manual': typeof ManualRoute
   '/offline': typeof OfflineRoute
   '/payroll': typeof PayrollRoute
   '/pos': typeof PosRoute
@@ -325,6 +332,7 @@ export interface FileRoutesByTo {
   '/health': typeof HealthRoute
   '/help': typeof HelpRoute
   '/maintenance': typeof MaintenanceRoute
+  '/manual': typeof ManualRoute
   '/offline': typeof OfflineRoute
   '/payroll': typeof PayrollRoute
   '/pos': typeof PosRoute
@@ -370,6 +378,7 @@ export interface FileRoutesById {
   '/health': typeof HealthRoute
   '/help': typeof HelpRoute
   '/maintenance': typeof MaintenanceRoute
+  '/manual': typeof ManualRoute
   '/offline': typeof OfflineRoute
   '/payroll': typeof PayrollRoute
   '/pos': typeof PosRoute
@@ -416,6 +425,7 @@ export interface FileRouteTypes {
     | '/health'
     | '/help'
     | '/maintenance'
+    | '/manual'
     | '/offline'
     | '/payroll'
     | '/pos'
@@ -460,6 +470,7 @@ export interface FileRouteTypes {
     | '/health'
     | '/help'
     | '/maintenance'
+    | '/manual'
     | '/offline'
     | '/payroll'
     | '/pos'
@@ -504,6 +515,7 @@ export interface FileRouteTypes {
     | '/health'
     | '/help'
     | '/maintenance'
+    | '/manual'
     | '/offline'
     | '/payroll'
     | '/pos'
@@ -549,6 +561,7 @@ export interface RootRouteChildren {
   HealthRoute: typeof HealthRoute
   HelpRoute: typeof HelpRoute
   MaintenanceRoute: typeof MaintenanceRoute
+  ManualRoute: typeof ManualRoute
   OfflineRoute: typeof OfflineRoute
   PayrollRoute: typeof PayrollRoute
   PosRoute: typeof PosRoute
@@ -680,6 +693,13 @@ declare module '@tanstack/react-router' {
       path: '/offline'
       fullPath: '/offline'
       preLoaderRoute: typeof OfflineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/manual': {
+      id: '/manual'
+      path: '/manual'
+      fullPath: '/manual'
+      preLoaderRoute: typeof ManualRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/maintenance': {
@@ -903,6 +923,7 @@ const rootRouteChildren: RootRouteChildren = {
   HealthRoute: HealthRoute,
   HelpRoute: HelpRoute,
   MaintenanceRoute: MaintenanceRoute,
+  ManualRoute: ManualRoute,
   OfflineRoute: OfflineRoute,
   PayrollRoute: PayrollRoute,
   PosRoute: PosRoute,

@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const PANEL_WIDTH = 660;
+const PANEL_WIDTH = 900;
 const GAP = 8;
 const EDGE = 12;
 
@@ -112,21 +112,21 @@ export function QuickJump({
                 top: pos?.top ?? -9999,
                 width: `min(${PANEL_WIDTH}px, calc(100vw - ${EDGE * 2}px))`,
               }}
-              className="fixed z-[61] max-h-[70vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-elevated p-4"
+              className="fixed z-[61] max-h-[82vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-elevated p-6"
             >
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-7">
                 {groups.map((group) => (
                   <div key={group.group}>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-1.5 px-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-2.5 px-2.5">
                       {lang === "sw" ? group.sw : group.group}
                     </div>
-                    <ul className="space-y-0.5">
+                    <ul className="space-y-1">
                       {group.items.map((item) => (
                         <li key={item.to}>
                           <button
                             type="button"
                             onClick={() => go(item.to)}
-                            className="w-full text-left rounded-lg px-2 py-1.5 text-sm hover:bg-accent transition"
+                            className="w-full text-left rounded-lg px-2.5 py-2 text-[15px] hover:bg-accent transition"
                           >
                             {lang === "sw" ? item.sw : item.label}
                           </button>
