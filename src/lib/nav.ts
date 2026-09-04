@@ -127,6 +127,7 @@ export const NAV_GROUPS: NavGroup[] = [
         sw: "Muhtasari wa Joseph",
         icon: "UserRound",
         cap: "finance:read",
+        childOf: "/sales-deposits",
       },
       {
         to: "/books",

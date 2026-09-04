@@ -194,7 +194,6 @@ export function JosephSummaryScreen() {
             })}
           />
           <RecordJosephDaySheet rates={rates} />
-          <RecordJosephDepositSheet />
         </div>
       </div>
 
@@ -411,38 +410,70 @@ export function JosephSummaryScreen() {
   );
 }
 
-// Recording a whole day's litres, one grid across every rate, rather than
-// five separate saves. A rate left blank or at zero clears that rate's
-// row for the day, so a mistake is corrected by re-entering, not by
-// finding and deleting a row.
+// One form for a whole day: litres across every rate, and what was
+// actually deposited (amount typed in by hand, not the figure the rates
+// imply) plus the channel it came through. A rate left blank or at zero
+// clears that rate's row for the day; leaving litres blank entirely (only
+// filling in the deposit) leaves that day's sales untouched rather than
+// wiping them.
 function RecordJosephDaySheet({ rates }: { rates: number[] }) {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(todayISO());
   const [values, setValues] = useState<Record<number, number>>({});
-  const record = useRecordJosephDay();
+  const [amount, setAmount] = useState<number | "">("");
+  const [channel, setChannel] = useState<"mpesa" | "bank">("mpesa");
+  const recordDay = useRecordJosephDay();
+  const recordDeposit = useRecordJosephDeposit();
 
   const total = Object.values(values).reduce((a, v) => a + (v || 0), 0);
-  const revenue = rates.reduce((a, r) => a + (values[r] ?? 0) * r, 0);
+  const impliedRevenue = rates.reduce((a, r) => a + (values[r] ?? 0) * r, 0);
+  const hasDeposit = amount !== "" && Number(amount) > 0;
+  const canSave = total > 0 || hasDeposit;
+  const saving = recordDay.isPending || recordDeposit.isPending;
 
-  const save = () => {
-    if (total <= 0) return;
-    record.mutate(
-      { date, rates: rates.map((r) => ({ rateTZS: r, litres: values[r] ?? 0 })) },
+  const reset = () => {
+    setOpen(false);
+    setValues({});
+    setAmount("");
+  };
+
+  const finish = () => {
+    if (!hasDeposit) {
+      toast.success(t("Imerekodiwa", "Recorded"));
+      reset();
+      return;
+    }
+    recordDeposit.mutate(
+      { date, amountTZS: Number(amount), channel },
       {
         onSuccess: () => {
           toast.success(t("Imerekodiwa", "Recorded"));
-          setOpen(false);
-          setValues({});
+          reset();
         },
-        onError: (e: Error) =>
-          toast.error(
-            e.message.includes("future-date")
-              ? t("Huwezi kurekodi tarehe ijayo", "You cannot record a future date")
-              : t("Imeshindikana kurekodi", "Could not record it"),
-          ),
+        onError: () => toast.error(t("Amana haikuhifadhiwa", "The deposit could not be saved")),
       },
     );
+  };
+
+  const save = () => {
+    if (!canSave) return;
+    if (total > 0) {
+      recordDay.mutate(
+        { date, rates: rates.map((r) => ({ rateTZS: r, litres: values[r] ?? 0 })) },
+        {
+          onSuccess: finish,
+          onError: (e: Error) =>
+            toast.error(
+              e.message.includes("future-date")
+                ? t("Huwezi kurekodi tarehe ijayo", "You cannot record a future date")
+                : t("Imeshindikana kurekodi", "Could not record it"),
+            ),
+        },
+      );
+    } else {
+      finish();
+    }
   };
 
   return (
@@ -459,7 +490,7 @@ function RecordJosephDaySheet({ rates }: { rates: number[] }) {
       </SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
         <SheetHeader>
-          <SheetTitle>{t("Rekodi mauzo ya Joseph", "Record Joseph's sales")}</SheetTitle>
+          <SheetTitle>{t("Rekodi siku ya Joseph", "Record Joseph's day")}</SheetTitle>
         </SheetHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
@@ -471,123 +502,79 @@ function RecordJosephDaySheet({ rates }: { rates: number[] }) {
               onChange={(e) => setDate(e.target.value)}
             />
           </div>
-          <div className="grid gap-2">
-            {rates.map((r) => (
-              <div key={r} className="grid grid-cols-[110px_1fr] gap-3 items-center">
-                <Label className="text-xs font-num">{tzs(r, false)}/L</Label>
+          <div className="grid gap-1.5">
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+              {t("Lita kwa kila bei", "Litres at each rate")}
+            </Label>
+            <div className="grid gap-2">
+              {rates.map((r) => (
+                <div key={r} className="grid grid-cols-[110px_1fr] gap-3 items-center">
+                  <Label className="text-xs font-num">{tzs(r, false)}/L</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    min={0}
+                    placeholder="0"
+                    value={values[r] ?? ""}
+                    onChange={(e) => setValues((v) => ({ ...v, [r]: Number(e.target.value) || 0 }))}
+                    className="font-num"
+                  />
+                </div>
+              ))}
+            </div>
+            {total > 0 && (
+              <div className="rounded-xl bg-secondary/60 px-3 py-2 flex items-center justify-between text-xs text-muted-foreground">
+                <span>{t(`Jumla ya lita ${num(total)}`, `Total ${num(total)} L`)}</span>
+                <span>
+                  {t("Mauzo kwa bei", "At the rates sold, that is")}{" "}
+                  <span className="font-num">{tzs(impliedRevenue, false)}</span>
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="grid gap-1.5 pt-1 border-t border-border">
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground mt-2">
+              {t("Amana ya siku", "Deposit for the day")}
+            </Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label className="text-xs">
+                  {t("Kiasi (TZS)", "Amount (TZS)")}{" "}
+                  <span className="text-muted-foreground normal-case font-normal">
+                    {t("(si lazima, andika mwenyewe)", "(optional, type it in)")}
+                  </span>
+                </Label>
                 <Input
                   type="number"
                   step="any"
                   min={0}
-                  placeholder="0"
-                  value={values[r] ?? ""}
-                  onChange={(e) => setValues((v) => ({ ...v, [r]: Number(e.target.value) || 0 }))}
+                  placeholder={t("Kiasi halisi", "Actual amount")}
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value === "" ? "" : Number(e.target.value))}
                   className="font-num"
                 />
               </div>
-            ))}
-          </div>
-          <div className="rounded-xl bg-secondary/60 px-3 py-2.5 flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              {t(`Jumla ya lita ${num(total)}`, `Total ${num(total)} L`)}
-            </span>
-            <span className="font-num font-bold">{tzs(revenue)}</span>
+              <div className="grid gap-1.5">
+                <Label className="text-xs">{t("Njia", "Channel")}</Label>
+                <Select value={channel} onValueChange={(v) => setChannel(v as typeof channel)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mpesa">M-Pesa</SelectItem>
+                    <SelectItem value="bank">{t("Benki", "Bank")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
         </div>
         <SheetFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("Ghairi", "Cancel")}
           </Button>
-          <Button onClick={save} disabled={total <= 0 || record.isPending}>
-            {record.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-function RecordJosephDepositSheet() {
-  const { t } = useApp();
-  const [open, setOpen] = useState(false);
-  const [date, setDate] = useState(todayISO());
-  const [amount, setAmount] = useState<number | "">("");
-  const [channel, setChannel] = useState<"mpesa" | "bank">("mpesa");
-  const record = useRecordJosephDeposit();
-
-  const save = () => {
-    if (amount === "" || amount <= 0) return;
-    record.mutate(
-      { date, amountTZS: Number(amount), channel },
-      {
-        onSuccess: () => {
-          toast.success(t("Imerekodiwa", "Recorded"));
-          setOpen(false);
-          setAmount("");
-        },
-        onError: (e: Error) =>
-          toast.error(
-            e.message.includes("future-date")
-              ? t("Huwezi kurekodi tarehe ijayo", "You cannot record a future date")
-              : t("Imeshindikana kurekodi", "Could not record it"),
-          ),
-      },
-    );
-  };
-
-  return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button size="sm" variant="outline" className="h-8 text-xs">
-          <Plus className="h-3.5 w-3.5 mr-1" />
-          {t("Amana", "Deposit")}
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
-        <SheetHeader>
-          <SheetTitle>{t("Rekodi amana ya Joseph", "Record a deposit for Joseph")}</SheetTitle>
-        </SheetHeader>
-        <div className="grid gap-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
-              <Label>{t("Tarehe", "Date")}</Label>
-              <Input
-                type="date"
-                value={date}
-                max={todayISO()}
-                onChange={(e) => setDate(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label>{t("Kiasi (TZS)", "Amount (TZS)")}</Label>
-              <Input
-                type="number"
-                step="any"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value === "" ? "" : Number(e.target.value))}
-                className="font-num"
-              />
-            </div>
-          </div>
-          <div className="grid gap-1.5">
-            <Label>{t("Njia", "Channel")}</Label>
-            <Select value={channel} onValueChange={(v) => setChannel(v as typeof channel)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mpesa">M-Pesa</SelectItem>
-                <SelectItem value="bank">{t("Benki", "Bank")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <SheetFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            {t("Ghairi", "Cancel")}
-          </Button>
-          <Button onClick={save} disabled={amount === "" || amount <= 0 || record.isPending}>
-            {record.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
+          <Button onClick={save} disabled={!canSave || saving}>
+            {saving ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
           </Button>
         </SheetFooter>
       </SheetContent>
