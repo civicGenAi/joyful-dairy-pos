@@ -317,10 +317,18 @@ export function FarmersScreen() {
                         {num(view === "month" ? (m?.litres ?? 0) : f.litresThisCycle)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-num">
-                        {view === "month" ? tzs(m?.earnedTZS ?? 0, false) : num(f.ratePerL)}
+                        {view === "month"
+                          ? tzs(m?.earnedTZS ?? 0, false)
+                          : f.ratePerL > 0
+                            ? num(f.ratePerL)
+                            : t("hakuna", "n/a")}
                       </td>
                       <td className="py-2.5 px-3 text-right font-num font-semibold">
-                        {view === "month" ? tzs(m?.paidTZS ?? 0) : tzs(f.currentBalanceTZS)}
+                        {view === "month"
+                          ? tzs(m?.paidTZS ?? 0)
+                          : f.ratePerL > 0
+                            ? tzs(f.currentBalanceTZS)
+                            : t("Lita tu", "Litres only")}
                       </td>
                       <td className="py-2.5 px-3 text-xs">
                         {f.lastPaymentDate ? (
@@ -946,13 +954,17 @@ function FarmerDetailDrawer({
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
               {t("Inadaiwa", "Balance")}
             </div>
-            <div className="font-num font-bold">{tzs(f.currentBalanceTZS)}</div>
+            <div className="font-num font-bold">
+              {f.ratePerL > 0 ? tzs(f.currentBalanceTZS) : t("Lita tu", "Litres only")}
+            </div>
           </div>
           <div className="rounded-xl bg-secondary/60 p-3">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
               {t("Bei", "Rate")}
             </div>
-            <div className="font-num font-bold">{num(f.ratePerL)}/L</div>
+            <div className="font-num font-bold">
+              {f.ratePerL > 0 ? `${num(f.ratePerL)}/L` : t("hakuna", "n/a")}
+            </div>
           </div>
         </div>
 

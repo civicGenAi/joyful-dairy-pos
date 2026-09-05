@@ -25,6 +25,7 @@ import { Route as PosRouteImport } from './routes/pos'
 import { Route as PayrollRouteImport } from './routes/payroll'
 import { Route as OfflineRouteImport } from './routes/offline'
 import { Route as MpesaSalesRouteImport } from './routes/mpesa-sales'
+import { Route as MilkCollectionsRouteImport } from './routes/milk-collections'
 import { Route as ManualRouteImport } from './routes/manual'
 import { Route as MaintenanceRouteImport } from './routes/maintenance'
 import { Route as JosephSummaryRouteImport } from './routes/joseph-summary'
@@ -133,6 +134,11 @@ const OfflineRoute = OfflineRouteImport.update({
 const MpesaSalesRoute = MpesaSalesRouteImport.update({
   id: '/mpesa-sales',
   path: '/mpesa-sales',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MilkCollectionsRoute = MilkCollectionsRouteImport.update({
+  id: '/milk-collections',
+  path: '/milk-collections',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ManualRoute = ManualRouteImport.update({
@@ -301,6 +307,7 @@ export interface FileRoutesByFullPath {
   '/joseph-summary': typeof JosephSummaryRoute
   '/maintenance': typeof MaintenanceRoute
   '/manual': typeof ManualRoute
+  '/milk-collections': typeof MilkCollectionsRoute
   '/mpesa-sales': typeof MpesaSalesRoute
   '/offline': typeof OfflineRoute
   '/payroll': typeof PayrollRoute
@@ -348,6 +355,7 @@ export interface FileRoutesByTo {
   '/joseph-summary': typeof JosephSummaryRoute
   '/maintenance': typeof MaintenanceRoute
   '/manual': typeof ManualRoute
+  '/milk-collections': typeof MilkCollectionsRoute
   '/mpesa-sales': typeof MpesaSalesRoute
   '/offline': typeof OfflineRoute
   '/payroll': typeof PayrollRoute
@@ -396,6 +404,7 @@ export interface FileRoutesById {
   '/joseph-summary': typeof JosephSummaryRoute
   '/maintenance': typeof MaintenanceRoute
   '/manual': typeof ManualRoute
+  '/milk-collections': typeof MilkCollectionsRoute
   '/mpesa-sales': typeof MpesaSalesRoute
   '/offline': typeof OfflineRoute
   '/payroll': typeof PayrollRoute
@@ -445,6 +454,7 @@ export interface FileRouteTypes {
     | '/joseph-summary'
     | '/maintenance'
     | '/manual'
+    | '/milk-collections'
     | '/mpesa-sales'
     | '/offline'
     | '/payroll'
@@ -492,6 +502,7 @@ export interface FileRouteTypes {
     | '/joseph-summary'
     | '/maintenance'
     | '/manual'
+    | '/milk-collections'
     | '/mpesa-sales'
     | '/offline'
     | '/payroll'
@@ -539,6 +550,7 @@ export interface FileRouteTypes {
     | '/joseph-summary'
     | '/maintenance'
     | '/manual'
+    | '/milk-collections'
     | '/mpesa-sales'
     | '/offline'
     | '/payroll'
@@ -587,6 +599,7 @@ export interface RootRouteChildren {
   JosephSummaryRoute: typeof JosephSummaryRoute
   MaintenanceRoute: typeof MaintenanceRoute
   ManualRoute: typeof ManualRoute
+  MilkCollectionsRoute: typeof MilkCollectionsRoute
   MpesaSalesRoute: typeof MpesaSalesRoute
   OfflineRoute: typeof OfflineRoute
   PayrollRoute: typeof PayrollRoute
@@ -726,6 +739,13 @@ declare module '@tanstack/react-router' {
       path: '/mpesa-sales'
       fullPath: '/mpesa-sales'
       preLoaderRoute: typeof MpesaSalesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/milk-collections': {
+      id: '/milk-collections'
+      path: '/milk-collections'
+      fullPath: '/milk-collections'
+      preLoaderRoute: typeof MilkCollectionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/manual': {
@@ -965,6 +985,7 @@ const rootRouteChildren: RootRouteChildren = {
   JosephSummaryRoute: JosephSummaryRoute,
   MaintenanceRoute: MaintenanceRoute,
   ManualRoute: ManualRoute,
+  MilkCollectionsRoute: MilkCollectionsRoute,
   MpesaSalesRoute: MpesaSalesRoute,
   OfflineRoute: OfflineRoute,
   PayrollRoute: PayrollRoute,

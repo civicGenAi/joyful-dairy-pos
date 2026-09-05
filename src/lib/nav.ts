@@ -47,6 +47,13 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: "MapPin",
         cap: "collection:read",
       },
+      {
+        to: "/milk-collections",
+        label: "Milk collections",
+        sw: "Ukusanyaji wa maziwa",
+        icon: "Droplets",
+        cap: "collection:read",
+      },
     ],
   },
   {
