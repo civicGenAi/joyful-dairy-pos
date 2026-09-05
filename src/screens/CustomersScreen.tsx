@@ -922,6 +922,10 @@ function RecordIntakeDialog({ customerId }: { customerId: string }) {
   const [tier, setTier] = useState<PriceTier>("own");
   const [productId, setProductId] = useState("");
   const [pendingQty, setPendingQty] = useState<number | "">("");
+  // The tier price is only a starting suggestion. Staff type the actual
+  // agreed price for this sale, since the tier list does not always match
+  // what a specific customer was really charged.
+  const [pendingPrice, setPendingPrice] = useState<number | "">("");
   const [lines, setLines] = useState<IntakeLine[]>([]);
   const { data: products = [] } = useProducts();
   const { data: priceMatrix = {} } = usePriceMatrix();
@@ -936,16 +940,20 @@ function RecordIntakeDialog({ customerId }: { customerId: string }) {
     setLines([]);
     setProductId("");
     setPendingQty("");
+    setPendingPrice("");
   };
 
   const addLine = () => {
     const qty = Number(pendingQty);
-    if (!productId || !qty || qty <= 0) return;
-    const unitPrice = priceOf(productId, tier);
+    const unitPrice = pendingPrice === "" ? priceOf(productId, tier) : Number(pendingPrice);
+    if (!productId || !qty || qty <= 0 || unitPrice <= 0) return;
     setLines((ls) => {
-      // Same product at the same tier merges into one line, a tier change
-      // starts a new line so an earlier price is never silently overwritten.
-      const i = ls.findIndex((l) => l.productId === productId && l.tier === tier);
+      // Same product, tier and price merges into one line. Price is typed
+      // by hand now, not always the tier's price, so two entries only merge
+      // when the price actually matches too, not just the product and tier.
+      const i = ls.findIndex(
+        (l) => l.productId === productId && l.tier === tier && l.unitPrice === unitPrice,
+      );
       if (i >= 0) {
         const next = [...ls];
         next[i] = { ...next[i], qty: next[i].qty + qty };
@@ -954,6 +962,7 @@ function RecordIntakeDialog({ customerId }: { customerId: string }) {
       return [...ls, { productId, qty, tier, unitPrice }];
     });
     setPendingQty("");
+    setPendingPrice("");
   };
 
   const removeLine = (i: number) => setLines((ls) => ls.filter((_, idx) => idx !== i));
@@ -996,8 +1005,6 @@ function RecordIntakeDialog({ customerId }: { customerId: string }) {
     );
   };
 
-  const previewPrice = productId ? priceOf(productId, tier) : null;
-
   return (
     <Sheet
       open={open}
@@ -1029,7 +1036,14 @@ function RecordIntakeDialog({ customerId }: { customerId: string }) {
             </div>
             <div>
               <Label>{t("Aina ya bei", "Price tier")}</Label>
-              <Select value={tier} onValueChange={(v) => setTier(v as PriceTier)}>
+              <Select
+                value={tier}
+                onValueChange={(v) => {
+                  const tr = v as PriceTier;
+                  setTier(tr);
+                  if (productId) setPendingPrice(priceOf(productId, tr));
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -1047,7 +1061,13 @@ function RecordIntakeDialog({ customerId }: { customerId: string }) {
           <div className="rounded-lg border border-border p-3 space-y-2">
             <Label>{t("Ongeza bidhaa", "Add a product")}</Label>
             <div className="flex items-end gap-2">
-              <Select value={productId} onValueChange={setProductId}>
+              <Select
+                value={productId}
+                onValueChange={(v) => {
+                  setProductId(v);
+                  setPendingPrice(priceOf(v, tier));
+                }}
+              >
                 <SelectTrigger className="flex-1">
                   <SelectValue placeholder={t("Chagua bidhaa…", "Select a product…")} />
                 </SelectTrigger>
@@ -1063,6 +1083,17 @@ function RecordIntakeDialog({ customerId }: { customerId: string }) {
                 type="number"
                 step="any"
                 min={0}
+                placeholder={t("Bei", "Price")}
+                value={pendingPrice}
+                onChange={(e) =>
+                  setPendingPrice(e.target.value === "" ? "" : Number(e.target.value))
+                }
+                className="w-24 font-num"
+              />
+              <Input
+                type="number"
+                step="any"
+                min={0}
                 placeholder={t("Idadi", "Qty")}
                 value={pendingQty}
                 onChange={(e) => setPendingQty(e.target.value === "" ? "" : Number(e.target.value))}
@@ -1071,7 +1102,9 @@ function RecordIntakeDialog({ customerId }: { customerId: string }) {
               <Button
                 type="button"
                 variant="outline"
-                disabled={!productId || !pendingQty || Number(pendingQty) <= 0}
+                disabled={
+                  !productId || !pendingQty || Number(pendingQty) <= 0 || Number(pendingPrice) <= 0
+                }
                 onClick={addLine}
               >
                 {t("Ongeza", "Add")}
@@ -1079,9 +1112,10 @@ function RecordIntakeDialog({ customerId }: { customerId: string }) {
             </div>
             {productId && (
               <div className="text-xs text-muted-foreground">
-                {t("Bei", "Price")}:{" "}
-                <span className="font-num font-semibold">{num(previewPrice ?? 0)}</span>/
-                {productOf(productId)?.unit} · {TIER_LABEL[tier][lang]}
+                {t("Bei ya kawaida", "Standard price")}:{" "}
+                <span className="font-num">{num(priceOf(productId, tier))}</span>/
+                {productOf(productId)?.unit} · {TIER_LABEL[tier][lang]}{" "}
+                {t("(unaweza kubadilisha bei hapo juu)", "(you can change the price above)")}
               </div>
             )}
           </div>
