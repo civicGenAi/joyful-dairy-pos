@@ -31,6 +31,7 @@ export function useRecordCollectionDay() {
       qc.invalidateQueries({ queryKey: collectionKeys.all });
       qc.invalidateQueries({ queryKey: farmerKeys.all });
       qc.invalidateQueries({ queryKey: ["recon"] });
+      qc.invalidateQueries({ queryKey: ["milkCollections"] });
     },
   });
 }

@@ -14,6 +14,9 @@ import {
   useRecordManualMilkBill,
   useDeleteManualMilkBill,
 } from "@/lib/data/hooks/milkCollections";
+import { useFarmers } from "@/lib/data/hooks/farmers";
+import { useRecordCollectionDay } from "@/lib/data/hooks/collections";
+import { useLocations } from "@/lib/data/hooks/locations";
 import { todayISO } from "@/lib/data/dates";
 import { SectionCard, StatCard } from "@/components/ui/data-bits";
 import { num, L } from "@/lib/format";
@@ -21,6 +24,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SectionSkeleton, TableSkeleton } from "@/components/ui/Skeletons";
@@ -148,6 +166,7 @@ export function MilkCollectionsScreen() {
             </button>
           </div>
         </div>
+        {canWrite && <RecordBarakaMilkDialog defaultDate={grain === "day" ? anchor : today} />}
       </div>
 
       {isPending ? (
@@ -466,5 +485,150 @@ function DayBillReview({ date, canWrite }: { date: string; canWrite: boolean }) 
         )}
       </div>
     </SectionCard>
+  );
+}
+
+// Baraka Farm is a normal farmer underneath (rate 0, tracked but never
+// paid), so recording her milk reuses the exact same record_collection_day
+// RPC every other farmer's daily collection already goes through. This is
+// just a shortcut to it from the Milk collections page, so adding her
+// day's litres doesn't mean a detour to the Farmers screen.
+function RecordBarakaMilkDialog({ defaultDate }: { defaultDate: string }) {
+  const { t } = useApp();
+  const [open, setOpen] = useState(false);
+  const [date, setDate] = useState(defaultDate);
+  const [morningLitres, setMorningLitres] = useState<number | "">("");
+  const [eveningLitres, setEveningLitres] = useState<number | "">("");
+  const { data: farmers = [] } = useFarmers();
+  const { data: locations = [] } = useLocations();
+  const points = locations.filter(
+    (l) => l.active && (l.kind === "collection-point" || l.kind === "plant"),
+  );
+  const [locationId, setLocationId] = useState("");
+  const record = useRecordCollectionDay();
+
+  const baraka = farmers.find((f) => f.name === "Baraka Farm");
+  const total =
+    (morningLitres === "" ? 0 : morningLitres) + (eveningLitres === "" ? 0 : eveningLitres);
+
+  const save = () => {
+    if (!baraka || total <= 0) return;
+    record.mutate(
+      {
+        farmerId: baraka.id,
+        date,
+        locationId: locationId || points[0]?.id || "loc-main",
+        morningLitres: morningLitres === "" ? 0 : morningLitres,
+        eveningLitres: eveningLitres === "" ? 0 : eveningLitres,
+      },
+      {
+        onSuccess: () => {
+          toast.success(t("Imerekodiwa", "Recorded"));
+          setOpen(false);
+          setMorningLitres("");
+          setEveningLitres("");
+        },
+        onError: (e: Error) =>
+          toast.error(
+            e.message.includes("future-date")
+              ? t("Huwezi kurekodi tarehe ijayo", "You cannot record a future date")
+              : e.message.includes("day-locked")
+                ? t("Siku hii imefungwa", "This day is locked")
+                : t("Imeshindikana kurekodi", "Could not record it"),
+          ),
+      },
+    );
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button
+          size="sm"
+          className="h-8 text-white"
+          style={{ background: "linear-gradient(135deg, #1E7C3F, #8CC63F)" }}
+          disabled={!baraka}
+        >
+          <Plus className="h-3.5 w-3.5 mr-1" />
+          {t("Maziwa ya Baraka Farm", "Baraka Farm's milk")}
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col gap-4">
+        <SheetHeader>
+          <SheetTitle>{t("Rekodi maziwa ya Baraka Farm", "Record Baraka Farm's milk")}</SheetTitle>
+        </SheetHeader>
+        <div className="grid gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>{t("Tarehe", "Date")}</Label>
+              <Input
+                type="date"
+                value={date}
+                max={todayISO()}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{t("Sehemu", "Location")}</Label>
+              <Select value={locationId || points[0]?.id} onValueChange={setLocationId}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {points.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>{t("Asubuhi (L)", "Morning (L)")}</Label>
+              <Input
+                type="number"
+                step="any"
+                min={0}
+                placeholder="0"
+                value={morningLitres}
+                onChange={(e) =>
+                  setMorningLitres(e.target.value === "" ? "" : Number(e.target.value))
+                }
+                className="font-num"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{t("Jioni (L)", "Evening (L)")}</Label>
+              <Input
+                type="number"
+                step="any"
+                min={0}
+                placeholder="0"
+                value={eveningLitres}
+                onChange={(e) =>
+                  setEveningLitres(e.target.value === "" ? "" : Number(e.target.value))
+                }
+                className="font-num"
+              />
+            </div>
+          </div>
+          {total > 0 && (
+            <div className="rounded-xl bg-secondary/60 px-3 py-2 text-sm text-muted-foreground">
+              {t(`Jumla ya lita ${num(total)}`, `Total ${num(total)} L`)}
+            </div>
+          )}
+        </div>
+        <SheetFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            {t("Ghairi", "Cancel")}
+          </Button>
+          <Button onClick={save} disabled={total <= 0 || record.isPending}>
+            {record.isPending ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
