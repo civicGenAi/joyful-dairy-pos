@@ -39,6 +39,13 @@ export function useCustomerBalanceBefore(id: string | null, beforeDate: string |
   });
 }
 
+export function useCustomersMonthSummary(month: string) {
+  return useQuery({
+    queryKey: customerKeys.monthAll(month),
+    queryFn: () => customersRepo.monthSummary(month),
+  });
+}
+
 export function useCreateCustomer() {
   const qc = useQueryClient();
   return useMutation({

@@ -49,12 +49,25 @@ export interface CustomerDeposit {
   ref: string;
 }
 
+/** One customer's figures for a single chosen month: what they bought,
+ *  what they paid, and a paid/partial/unpaid/none status, so the main
+ *  Customers list can show a specific month instead of only the running
+ *  outstanding balance. */
+export interface CustomerMonthRow {
+  customerId: string;
+  customerName: string;
+  purchasedTZS: number;
+  paidTZS: number;
+  status: "paid" | "partial" | "unpaid" | "none";
+}
+
 export const customerKeys = {
   all: ["customers"] as const,
   list: () => ["customers", "list"] as const,
   byId: (id: string) => ["customers", "byId", id] as const,
   activities: (id: string) => ["customers", "activities", id] as const,
   deposits: (id: string) => ["customers", "deposits", id] as const,
+  monthAll: (month: string) => ["customers", "monthAll", month] as const,
 };
 
 export const customersRepo = {
@@ -71,6 +84,28 @@ export const customersRepo = {
       await supabase.from("customers").select("*").eq("id", id).single(),
     ) as CustomerRow;
     return toCustomer(row);
+  },
+
+  /** Every customer's purchases, payments and status for one chosen
+   *  month. `month` is any date within the target month. */
+  async monthSummary(month: string): Promise<CustomerMonthRow[]> {
+    const { data, error } = await supabase.rpc("customers_month_summary", { p_month: month });
+    if (error) throw new Error(error.message);
+    return (
+      data as {
+        customer_id: string;
+        customer_name: string;
+        purchased_tzs: number;
+        paid_tzs: number;
+        status: CustomerMonthRow["status"];
+      }[]
+    ).map((r) => ({
+      customerId: r.customer_id,
+      customerName: r.customer_name,
+      purchasedTZS: Number(r.purchased_tzs),
+      paidTZS: Number(r.paid_tzs),
+      status: r.status,
+    }));
   },
 
   /** Sale lines for this customer in the CustomerActivity shape the UI uses. */

@@ -11,6 +11,7 @@ import {
   useRecordCustomerDeposit,
   useSetCustomerSuspended,
   useSendReminder,
+  useCustomersMonthSummary,
 } from "@/lib/data/hooks/customers";
 import { useProducts, usePriceMatrix } from "@/lib/data/hooks/products";
 import { useCompleteSale, useUpdateSale, useVoidSale } from "@/lib/data/hooks/sales";
@@ -51,6 +52,8 @@ import {
   UserX,
   UserCheck,
   PackagePlus,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -112,11 +115,34 @@ function ageOfActivity(date: string, todayIso: string): "current" | "30d" | "60d
 }
 
 export function CustomersScreen() {
-  const { t, can } = useApp();
+  const { t, lang, can } = useApp();
   const canWrite = can("customers:write");
   const { data: customers = [], isPending, isError, refetch } = useCustomers();
   const [tab, setTab] = useState("all");
   const [q, setQ] = useState("");
+
+  // Outstanding is a running balance since whenever it was last paid
+  // down, which blurs more than one month together if a customer has
+  // carried a debt for a while. By month answers a different question,
+  // "what did this customer buy and pay in March", for every customer
+  // at once.
+  const [view, setView] = useState<"current" | "month">("current");
+  const [monthAnchor, setMonthAnchor] = useState(() => todayISO().slice(0, 7));
+  const { data: monthSummary = [] } = useCustomersMonthSummary(`${monthAnchor}-01`);
+  const monthByCustomer = useMemo(
+    () => new Map(monthSummary.map((m) => [m.customerId, m])),
+    [monthSummary],
+  );
+  const shiftMonth = (delta: number) => {
+    const [y, m] = monthAnchor.split("-").map(Number);
+    const dt = new Date(y, m - 1 + delta, 1);
+    setMonthAnchor(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`);
+  };
+  const monthLabel = new Date(`${monthAnchor}-01T00:00:00`).toLocaleDateString(
+    lang === "sw" ? "sw-TZ" : "en-GB",
+    { month: "long", year: "numeric" },
+  );
+  const atLatestMonth = monthAnchor >= todayISO().slice(0, 7);
 
   const filtered = useMemo(
     () =>
@@ -184,6 +210,44 @@ export function CustomersScreen() {
         <StatCard label={t("Wamechelewa kulipa", "Overdue")} value={num(overdue)} accent="red" />
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <div className="inline-flex rounded-lg border border-border overflow-hidden">
+          {(["current", "month"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setView(v)}
+              className={`px-3 py-1.5 text-xs font-semibold transition ${
+                view === v ? "text-white" : "hover:bg-accent"
+              }`}
+              style={view === v ? { background: "#1E7C3F" } : undefined}
+            >
+              {v === "current" ? t("Sasa", "Current") : t("Kwa mwezi", "By month")}
+            </button>
+          ))}
+        </div>
+        {view === "month" && (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => shiftMonth(-1)}
+              className="grid h-8 w-8 place-items-center rounded-lg border border-border hover:bg-accent"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-sm font-semibold min-w-[9rem] text-center">{monthLabel}</span>
+            <button
+              type="button"
+              onClick={() => shiftMonth(1)}
+              disabled={atLatestMonth}
+              className="grid h-8 w-8 place-items-center rounded-lg border border-border hover:bg-accent disabled:opacity-30"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </div>
+
       <SectionCard
         title={t("Orodha ya wateja", "Customer list")}
         action={
@@ -242,67 +306,102 @@ export function CustomersScreen() {
                     <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
                       <th className="py-2 px-3">{t("Mteja", "Customer")}</th>
                       <th className="py-2 px-3">{t("Aina", "Type")}</th>
-                      <th className="py-2 px-3 text-right">{t("Deni", "Outstanding")}</th>
+                      <th className="py-2 px-3 text-right">
+                        {view === "month"
+                          ? t(`Manunuzi, ${monthLabel}`, `Purchases, ${monthLabel}`)
+                          : t("Deni", "Outstanding")}
+                      </th>
+                      {view === "month" && (
+                        <th className="py-2 px-3 text-right">{t("Alilipa", "Paid")}</th>
+                      )}
                       <th className="py-2 px-3">{t("Mwisho", "Last activity")}</th>
                       <th className="py-2 px-3">{t("Hali", "Status")}</th>
                       <th />
                     </tr>
                   </thead>
                   <tbody>
-                    {paged.map((c) => (
-                      <tr
-                        key={c.id}
-                        className="border-b border-border last:border-0 hover:bg-accent/40"
-                      >
-                        <td className="py-2.5 px-3">
-                          <div className="font-medium">{c.name}</div>
-                          <div className="text-xs text-muted-foreground">{c.phone}</div>
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <Pill
-                            tone={
-                              c.type === "cash"
-                                ? "info"
+                    {paged.map((c) => {
+                      const m = monthByCustomer.get(c.id);
+                      return (
+                        <tr
+                          key={c.id}
+                          className="border-b border-border last:border-0 hover:bg-accent/40"
+                        >
+                          <td className="py-2.5 px-3">
+                            <div className="font-medium">{c.name}</div>
+                            <div className="text-xs text-muted-foreground">{c.phone}</div>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <Pill
+                              tone={
+                                c.type === "cash"
+                                  ? "info"
+                                  : c.type === "credit"
+                                    ? "warning"
+                                    : "success"
+                              }
+                            >
+                              {c.type === "cash"
+                                ? t("Cash", "Cash")
                                 : c.type === "credit"
-                                  ? "warning"
-                                  : "success"
-                            }
-                          >
-                            {c.type === "cash"
-                              ? t("Cash", "Cash")
-                              : c.type === "credit"
-                                ? t("Mkopo", "Credit")
-                                : t("Mwezi", "Monthly")}
-                          </Pill>
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-num font-semibold">
-                          {tzs(c.outstandingTZS)}
-                        </td>
-                        <td className="py-2.5 px-3 text-muted-foreground text-xs">
-                          {c.lastActivity}
-                          {c.nextDueDate && (
-                            <div className="text-[10px] text-[#8a5a00]">
-                              {t("Malipo", "Due")}: {c.nextDueDate}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3">
-                          {c.suspended ? (
-                            <Pill tone="slate">{t("Amesimamishwa", "Suspended")}</Pill>
-                          ) : (
-                            <Pill tone={c.status === "overdue" ? "danger" : "success"}>
-                              {c.status === "overdue" ? t("Imechelewa", "Overdue") : "OK"}
+                                  ? t("Mkopo", "Credit")
+                                  : t("Mwezi", "Monthly")}
                             </Pill>
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-num font-semibold">
+                            {view === "month" ? tzs(m?.purchasedTZS ?? 0) : tzs(c.outstandingTZS)}
+                          </td>
+                          {view === "month" && (
+                            <td className="py-2.5 px-3 text-right font-num">
+                              {tzs(m?.paidTZS ?? 0, false)}
+                            </td>
                           )}
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
-                          <div className="inline-flex items-center gap-1">
-                            <CustomerDrawer c={c} />
-                            {canWrite && <CustomerActions c={c} />}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          <td className="py-2.5 px-3 text-muted-foreground text-xs">
+                            {c.lastActivity}
+                            {c.nextDueDate && (
+                              <div className="text-[10px] text-[#8a5a00]">
+                                {t("Malipo", "Due")}: {c.nextDueDate}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            {view === "month" ? (
+                              <Pill
+                                tone={
+                                  m?.status === "paid"
+                                    ? "success"
+                                    : m?.status === "partial"
+                                      ? "warning"
+                                      : m?.status === "unpaid"
+                                        ? "danger"
+                                        : "info"
+                                }
+                              >
+                                {m?.status === "paid"
+                                  ? t("Imelipwa", "Paid")
+                                  : m?.status === "partial"
+                                    ? t("Sehemu", "Partial")
+                                    : m?.status === "unpaid"
+                                      ? t("Haijalipwa", "Unpaid")
+                                      : t("Hakuna", "None")}
+                              </Pill>
+                            ) : c.suspended ? (
+                              <Pill tone="slate">{t("Amesimamishwa", "Suspended")}</Pill>
+                            ) : (
+                              <Pill tone={c.status === "overdue" ? "danger" : "success"}>
+                                {c.status === "overdue" ? t("Imechelewa", "Overdue") : "OK"}
+                              </Pill>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <div className="inline-flex items-center gap-1">
+                              <CustomerDrawer c={c} />
+                              {canWrite && <CustomerActions c={c} />}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
                 <PaginationBar
