@@ -325,6 +325,21 @@ export function SalesDepositsScreen() {
                         </td>
                       </tr>
                     ))}
+                    {/* Column totals, so each product's total across the whole
+                        window is right here too, not just in the table above. */}
+                    <tr className="border-t-2" style={{ borderColor: "#1E6B3A" }}>
+                      <td className="py-3 px-3 font-bold">{t("Jumla kuu", "Grand total")}</td>
+                      {byCategory
+                        .filter((c) => c.total > 0)
+                        .map((c) => (
+                          <td key={c.category} className="py-3 text-right font-num font-bold">
+                            {tzs(c.total, false)}
+                          </td>
+                        ))}
+                      <td className="py-3 text-right px-3 font-num font-bold text-base">
+                        {tzs(grand.total, false)}
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>

@@ -381,7 +381,7 @@ export function JosephSummaryScreen() {
                                 editing={{
                                   date: day.date,
                                   litresByRate: day.litresByRate,
-                                  deposit: day.dayDeposits[0],
+                                  deposits: day.dayDeposits,
                                 }}
                                 trigger={
                                   <Button size="sm" variant="ghost" className="h-7 text-xs">
@@ -427,14 +427,22 @@ export function JosephSummaryScreen() {
   );
 }
 
+interface DepositLine {
+  id?: string;
+  amount: number | "";
+  channel: "mpesa" | "bank";
+}
+
 // One form for a whole day, used both to record a fresh one (from the
 // toolbar, date defaults to today) and to correct an existing one (from a
 // row's Edit action, prefilled with what is already there, date fixed
 // since the table's row identity is that date). Litres across every rate,
-// and what was actually deposited: an amount typed in by hand, never the
-// figure the rates imply. A rate left at zero clears that rate's row for
-// the day; leaving litres untouched while only editing the deposit
-// leaves the day's sales alone.
+// and what was actually deposited: a list of amounts typed in by hand,
+// never the figure the rates imply, because the total can arrive split
+// across more than one channel, part by M-Pesa and part by bank, on the
+// same day. A rate left at zero clears that rate's row for the day;
+// leaving litres untouched while only editing deposits leaves the day's
+// sales alone.
 function JosephDaySheet({
   rates,
   trigger,
@@ -442,10 +450,11 @@ function JosephDaySheet({
 }: {
   rates: number[];
   trigger: React.ReactNode;
-  editing?: { date: string; litresByRate: Map<number, number>; deposit?: JosephDeposit };
+  editing?: { date: string; litresByRate: Map<number, number>; deposits: JosephDeposit[] };
 }) {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [date, setDate] = useState(editing?.date ?? todayISO());
   const [values, setValues] = useState<Record<number, number>>(() => {
     const v: Record<number, number> = {};
@@ -454,8 +463,11 @@ function JosephDaySheet({
     });
     return v;
   });
-  const [amount, setAmount] = useState<number | "">(editing?.deposit?.amountTZS ?? "");
-  const [channel, setChannel] = useState<"mpesa" | "bank">(editing?.deposit?.channel ?? "mpesa");
+  const [depositLines, setDepositLines] = useState<DepositLine[]>(() =>
+    editing && editing.deposits.length > 0
+      ? editing.deposits.map((dep) => ({ id: dep.id, amount: dep.amountTZS, channel: dep.channel }))
+      : [{ amount: "", channel: "mpesa" }],
+  );
   const recordDay = useRecordJosephDay();
   const recordDeposit = useRecordJosephDeposit();
   const updateDeposit = useUpdateJosephDeposit();
@@ -463,57 +475,79 @@ function JosephDaySheet({
 
   const total = Object.values(values).reduce((a, v) => a + (v || 0), 0);
   const impliedRevenue = rates.reduce((a, r) => a + (values[r] ?? 0) * r, 0);
-  const hasDeposit = amount !== "" && Number(amount) > 0;
+  const depositTotal = depositLines.reduce(
+    (a, l) => a + (l.amount === "" ? 0 : Number(l.amount)),
+    0,
+  );
   const hadSalesOriginally = (editing?.litresByRate.size ?? 0) > 0;
-  const canSave = !!editing || total > 0 || hasDeposit;
-  const saving = recordDay.isPending || recordDeposit.isPending || updateDeposit.isPending;
+  const canSave = !!editing || total > 0 || depositTotal > 0;
 
   const reset = () => {
     setOpen(false);
     if (!editing) {
       setValues({});
-      setAmount("");
+      setDepositLines([{ amount: "", channel: "mpesa" }]);
     }
   };
 
-  const finish = () => {
-    if (!hasDeposit) {
-      toast.success(t("Imerekodiwa", "Recorded"));
-      reset();
-      return;
-    }
-    const onSuccess = () => {
-      toast.success(t("Imerekodiwa", "Recorded"));
-      reset();
-    };
-    const onError = () => toast.error(t("Amana haikuhifadhiwa", "The deposit could not be saved"));
-    if (editing?.deposit) {
-      updateDeposit.mutate(
-        { id: editing.deposit.id, date, amountTZS: Number(amount), channel },
-        { onSuccess, onError },
-      );
-    } else {
-      recordDeposit.mutate({ date, amountTZS: Number(amount), channel }, { onSuccess, onError });
-    }
-  };
+  const setLine = (i: number, patch: Partial<DepositLine>) =>
+    setDepositLines((lines) => lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 
-  const save = () => {
-    if (!canSave) return;
-    if (total > 0 || hadSalesOriginally) {
-      recordDay.mutate(
-        { date, rates: rates.map((r) => ({ rateTZS: r, litres: values[r] ?? 0 })) },
-        {
-          onSuccess: finish,
-          onError: (e: Error) =>
-            toast.error(
-              e.message.includes("future-date")
-                ? t("Huwezi kurekodi tarehe ijayo", "You cannot record a future date")
-                : t("Imeshindikana kurekodi", "Could not record it"),
-            ),
-        },
+  const addLine = () =>
+    setDepositLines((lines) => [
+      ...lines,
+      { amount: "", channel: lines.some((l) => l.channel === "mpesa") ? "bank" : "mpesa" },
+    ]);
+
+  const removeLine = (i: number) => setDepositLines((lines) => lines.filter((_, idx) => idx !== i));
+
+  const save = async () => {
+    if (!canSave || saving) return;
+    setSaving(true);
+    try {
+      if (total > 0 || hadSalesOriginally) {
+        await recordDay.mutateAsync({
+          date,
+          rates: rates.map((r) => ({ rateTZS: r, litres: values[r] ?? 0 })),
+        });
+      }
+
+      const keptIds = new Set(depositLines.filter((l) => l.id).map((l) => l.id));
+      const removedIds = (editing?.deposits ?? [])
+        .map((dep) => dep.id)
+        .filter((id) => !keptIds.has(id));
+
+      const ops: Promise<unknown>[] = removedIds.map((id) => removeDeposit.mutateAsync(id));
+      for (const line of depositLines) {
+        const amt = line.amount === "" ? 0 : Number(line.amount);
+        if (amt <= 0) {
+          if (line.id) ops.push(removeDeposit.mutateAsync(line.id));
+          continue;
+        }
+        ops.push(
+          line.id
+            ? updateDeposit.mutateAsync({
+                id: line.id,
+                date,
+                amountTZS: amt,
+                channel: line.channel,
+              })
+            : recordDeposit.mutateAsync({ date, amountTZS: amt, channel: line.channel }),
+        );
+      }
+      await Promise.all(ops);
+
+      toast.success(t("Imerekodiwa", "Recorded"));
+      reset();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      toast.error(
+        msg.includes("future-date")
+          ? t("Huwezi kurekodi tarehe ijayo", "You cannot record a future date")
+          : t("Imeshindikana kurekodi", "Could not record it"),
       );
-    } else {
-      finish();
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -572,31 +606,40 @@ function JosephDaySheet({
               </div>
             )}
           </div>
-          <div className="grid gap-1.5 pt-1 border-t border-border">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground mt-2">
-              {t("Amana ya siku", "Deposit for the day")}
-            </Label>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-1.5">
-                <Label className="text-xs">
-                  {t("Kiasi (TZS)", "Amount (TZS)")}{" "}
-                  <span className="text-muted-foreground normal-case font-normal">
-                    {t("(si lazima, andika mwenyewe)", "(optional, type it in)")}
-                  </span>
-                </Label>
+          <div className="grid gap-2 pt-1 border-t border-border">
+            <div className="flex items-center justify-between mt-2">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                {t("Amana ya siku", "Deposit for the day")}
+              </Label>
+              {depositLines.length > 1 && (
+                <span className="text-xs text-muted-foreground">
+                  {t(`Jumla TZS ${num(depositTotal)}`, `Total TZS ${num(depositTotal)}`)}
+                </span>
+              )}
+            </div>
+            <div className="text-[11px] text-muted-foreground -mt-1">
+              {t(
+                "Si lazima, andika mwenyewe. Ikigawanywa kati ya M-Pesa na benki, ongeza mstari mwingine.",
+                "Optional, type it in. If the total came in split between M-Pesa and bank, add another line.",
+              )}
+            </div>
+            {depositLines.map((line, i) => (
+              <div key={i} className="grid grid-cols-[1fr_140px_auto] gap-2 items-center">
                 <Input
                   type="number"
                   step="any"
                   min={0}
                   placeholder={t("Kiasi halisi", "Actual amount")}
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                  value={line.amount}
+                  onChange={(e) =>
+                    setLine(i, { amount: e.target.value === "" ? "" : Number(e.target.value) })
+                  }
                   className="font-num"
                 />
-              </div>
-              <div className="grid gap-1.5">
-                <Label className="text-xs">{t("Njia", "Channel")}</Label>
-                <Select value={channel} onValueChange={(v) => setChannel(v as typeof channel)}>
+                <Select
+                  value={line.channel}
+                  onValueChange={(v) => setLine(i, { channel: v as DepositLine["channel"] })}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -605,43 +648,39 @@ function JosephDaySheet({
                     <SelectItem value="bank">{t("Benki", "Bank")}</SelectItem>
                   </SelectContent>
                 </Select>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 text-[#E11B22]"
+                  disabled={depositLines.length === 1 && !line.id}
+                  onClick={() =>
+                    depositLines.length > 1 ? removeLine(i) : setLine(i, { amount: "" })
+                  }
+                >
+                  {t("Ondoa", "Remove")}
+                </Button>
               </div>
-            </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 w-fit text-xs"
+              onClick={addLine}
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              {t("Ongeza njia nyingine", "Add another channel")}
+            </Button>
           </div>
         </div>
-        <SheetFooter className="flex-col sm:flex-row sm:justify-between gap-2">
-          {editing?.deposit ? (
-            <ConfirmDialog
-              destructive
-              title={t("Futa amana hii?", "Remove this deposit?")}
-              description={t("Haiwezi kurudishwa.", "This cannot be undone.")}
-              confirmLabel={t("Futa", "Remove")}
-              onConfirm={() =>
-                removeDeposit.mutate(editing.deposit!.id, {
-                  onSuccess: () => {
-                    toast.success(t("Imefutwa", "Removed"));
-                    setOpen(false);
-                  },
-                  onError: () => toast.error(t("Imeshindikana", "Could not remove it")),
-                })
-              }
-              trigger={
-                <Button variant="outline" className="text-[#E11B22] border-[#E11B22]/40">
-                  {t("Futa amana", "Remove deposit")}
-                </Button>
-              }
-            />
-          ) : (
-            <span />
-          )}
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              {t("Ghairi", "Cancel")}
-            </Button>
-            <Button onClick={save} disabled={!canSave || saving}>
-              {saving ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
-            </Button>
-          </div>
+        <SheetFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            {t("Ghairi", "Cancel")}
+          </Button>
+          <Button onClick={save} disabled={!canSave || saving}>
+            {saving ? t("Inahifadhi…", "Saving…") : t("Hifadhi", "Save")}
+          </Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>
