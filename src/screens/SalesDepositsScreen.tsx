@@ -577,7 +577,7 @@ function RecordSalesDepositDialog({ categories }: { categories: string[] }) {
   const [newCategory, setNewCategory] = useState("");
   const [date, setDate] = useState(todayISO());
   const [amount, setAmount] = useState(0);
-  const [method, setMethod] = useState<"mpesa" | "bank">("mpesa");
+  const [method, setMethod] = useState<"cash" | "mpesa" | "bank">("mpesa");
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const record = useRecordDeposit();
@@ -705,7 +705,8 @@ function RecordSalesDepositDialog({ categories }: { categories: string[] }) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="mpesa">M-Pesa</SelectItem>
-                <SelectItem value="bank">Bank</SelectItem>
+                <SelectItem value="bank">{t("Benki", "Bank")}</SelectItem>
+                <SelectItem value="cash">{t("Taslimu", "Cash")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
