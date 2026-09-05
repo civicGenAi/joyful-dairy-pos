@@ -202,9 +202,34 @@ export const SOURCE_LABEL: Record<string, { sw: string; en: string }> = {
   yogurt: { sw: "Yogati", en: "Yoghurt" },
   butter: { sw: "Siagi", en: "Butter" },
   shambani: { sw: "Shambani", en: "Shambani" },
+  kiwanda: { sw: "Kiwanda", en: "Kiwanda" },
   masoko: { sw: "Masoko", en: "Masoko" },
   madumu: { sw: "Madumu", en: "Madumu" },
 };
+
+// Fixed display order rather than alphabetical or by-total: products
+// first (fresh milk, mtindi, yoghurt, butter), then outlets (Shambani,
+// Kiwanda, Masoko, Madumu). A category typed in fresh that isn't on this
+// list yet sorts after all of these, alphabetically among itself.
+const CATEGORY_ORDER = [
+  "fresh-milk",
+  "mtindi",
+  "yogurt",
+  "butter",
+  "shambani",
+  "kiwanda",
+  "masoko",
+  "madumu",
+];
+
+export function categorySort(a: string, b: string): number {
+  const ra = CATEGORY_ORDER.indexOf(a);
+  const rb = CATEGORY_ORDER.indexOf(b);
+  return (
+    (ra === -1 ? CATEGORY_ORDER.length : ra) - (rb === -1 ? CATEGORY_ORDER.length : rb) ||
+    a.localeCompare(b)
+  );
+}
 
 // "pos" | "route" | "customer" | "other" are the fixed, structural sources,
 // each already has its own dedicated recording flow elsewhere. Anything

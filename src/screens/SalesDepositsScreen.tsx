@@ -11,7 +11,7 @@ import {
   useUpdateDeposit,
   useDeleteDeposit,
 } from "@/lib/data/hooks/sales";
-import { SOURCE_LABEL } from "@/lib/data/sales";
+import { SOURCE_LABEL, categorySort } from "@/lib/data/sales";
 import type { DepositRecord } from "@/lib/data/sales";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { todayISO } from "@/lib/data/dates";
@@ -104,7 +104,7 @@ export function SalesDepositsScreen() {
         total: mine.reduce((a, x) => a + x.amountTZS, 0),
       };
     })
-    .sort((a, b) => b.total - a.total);
+    .sort((a, b) => categorySort(a.category, b.category));
 
   const grand = byCategory.reduce(
     (a, r) => ({
@@ -116,6 +116,16 @@ export function SalesDepositsScreen() {
     }),
     { mpesa: 0, bank: 0, cash: 0, total: 0, count: 0 },
   );
+
+  // Fresh milk and mtindi are dairy products sold at the same points, so
+  // their combined total is its own useful figure, alongside each on its
+  // own row above.
+  const showFreshMtindi = byCategory.some(
+    (c) => (c.category === "fresh-milk" || c.category === "mtindi") && c.total > 0,
+  );
+  const freshMtindiGrand = byCategory
+    .filter((c) => c.category === "fresh-milk" || c.category === "mtindi")
+    .reduce((a, c) => a + c.total, 0);
 
   // Within the window, the same figures broken down by day, so a month
   // view can still answer "what came in on the 14th" without switching.
@@ -295,6 +305,11 @@ export function SalesDepositsScreen() {
                             {label(c.category)}
                           </th>
                         ))}
+                      {showFreshMtindi && (
+                        <th className="text-right bg-secondary/30">
+                          {t("Maziwa + Mtindi", "Fresh milk + Mtindi")}
+                        </th>
+                      )}
                       <th className="text-right px-3">{t("Jumla", "Total")}</th>
                     </tr>
                   </thead>
@@ -320,6 +335,15 @@ export function SalesDepositsScreen() {
                               {vals[c.category] ? tzs(vals[c.category], false) : ""}
                             </td>
                           ))}
+                        {showFreshMtindi &&
+                          (() => {
+                            const combined = (vals["fresh-milk"] ?? 0) + (vals["mtindi"] ?? 0);
+                            return (
+                              <td className="py-2 text-right font-num bg-secondary/30">
+                                {combined > 0 ? tzs(combined, false) : ""}
+                              </td>
+                            );
+                          })()}
                         <td className="py-2 text-right px-3 font-num font-semibold">
                           {tzs(vals.__total ?? 0, false)}
                         </td>
@@ -336,6 +360,11 @@ export function SalesDepositsScreen() {
                             {tzs(c.total, false)}
                           </td>
                         ))}
+                      {showFreshMtindi && (
+                        <td className="py-3 text-right font-num font-bold bg-secondary/30">
+                          {tzs(freshMtindiGrand, false)}
+                        </td>
+                      )}
                       <td className="py-3 text-right px-3 font-num font-bold text-base">
                         {tzs(grand.total, false)}
                       </td>
@@ -489,7 +518,7 @@ function EditDepositSheet({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((c) => (
+                {[...categories].sort(categorySort).map((c) => (
                   <SelectItem key={c} value={c}>
                     {t(SOURCE_LABEL[c]?.sw ?? c, SOURCE_LABEL[c]?.en ?? c)}
                   </SelectItem>
@@ -658,7 +687,7 @@ function RecordSalesDepositDialog({ categories }: { categories: string[] }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((c) => (
+                {[...categories].sort(categorySort).map((c) => (
                   <SelectItem key={c} value={c}>
                     {t(SOURCE_LABEL[c]?.sw ?? c, SOURCE_LABEL[c]?.en ?? c)}
                   </SelectItem>
