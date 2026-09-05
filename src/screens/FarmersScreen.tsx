@@ -13,6 +13,7 @@ import {
   useRequestAdjustment,
   useReviewAdjustment,
   useFarmerMonthlySummary,
+  useFarmersMonthSummary,
 } from "@/lib/data/hooks/farmers";
 import { useRecordCollectionDay, useDeleteCollectionDay } from "@/lib/data/hooks/collections";
 import { useLocations } from "@/lib/data/hooks/locations";
@@ -72,7 +73,7 @@ import type { Farmer } from "@/mock/types";
 const VILLAGES = ["Olasiti", "Sakina", "Kisongo", "Ngaramtoni", "Tengeru", "Usa River"];
 
 export function FarmersScreen() {
-  const { t, can } = useApp();
+  const { t, lang, can } = useApp();
   const canWrite = can("farmers:write");
   const { data: farmers = [], isPending, isError, refetch } = useFarmers();
   const { data: cycle } = useCycleSummary();
@@ -81,6 +82,29 @@ export function FarmersScreen() {
   const [filter, setFilter] = useState<string>("all");
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // The list defaults to the running "since last payout" cycle, the
+  // right figure for "how much do I owe right now". Switching to Month
+  // instead answers a different question, "what happened in March",
+  // which the cycle total can blur together if a farmer went unpaid
+  // across a month boundary.
+  const [view, setView] = useState<"cycle" | "month">("cycle");
+  const [monthAnchor, setMonthAnchor] = useState(() => todayISO().slice(0, 7));
+  const { data: monthSummary = [] } = useFarmersMonthSummary(`${monthAnchor}-01`);
+  const monthByFarmer = useMemo(
+    () => new Map(monthSummary.map((m) => [m.farmerId, m])),
+    [monthSummary],
+  );
+  const shiftMonth = (delta: number) => {
+    const [y, m] = monthAnchor.split("-").map(Number);
+    const dt = new Date(y, m - 1 + delta, 1);
+    setMonthAnchor(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`);
+  };
+  const monthLabel = new Date(`${monthAnchor}-01T00:00:00`).toLocaleDateString(
+    lang === "sw" ? "sw-TZ" : "en-GB",
+    { month: "long", year: "numeric" },
+  );
+  const atLatestMonth = monthAnchor >= todayISO().slice(0, 7);
 
   const filtered = useMemo(
     () =>
@@ -147,6 +171,44 @@ export function FarmersScreen() {
           accent="amber"
         />
         <StatCard label={t("Wanaodai", "Awaiting payment")} value={num(dueCount)} accent="red" />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <div className="inline-flex rounded-lg border border-border overflow-hidden">
+          {(["cycle", "month"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setView(v)}
+              className={`px-3 py-1.5 text-xs font-semibold transition ${
+                view === v ? "text-white" : "hover:bg-accent"
+              }`}
+              style={view === v ? { background: "#1E7C3F" } : undefined}
+            >
+              {v === "cycle" ? t("Mzunguko", "Cycle") : t("Kwa mwezi", "By month")}
+            </button>
+          ))}
+        </div>
+        {view === "month" && (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => shiftMonth(-1)}
+              className="grid h-8 w-8 place-items-center rounded-lg border border-border hover:bg-accent"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-sm font-semibold min-w-[9rem] text-center">{monthLabel}</span>
+            <button
+              type="button"
+              onClick={() => shiftMonth(1)}
+              disabled={atLatestMonth}
+              className="grid h-8 w-8 place-items-center rounded-lg border border-border hover:bg-accent disabled:opacity-30"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       <SectionCard
@@ -220,92 +282,129 @@ export function FarmersScreen() {
                 <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
                   <th className="py-2 px-3">{t("Mfugaji", "Farmer")}</th>
                   <th className="py-2 px-3">{t("Kijiji", "Village")}</th>
-                  <th className="py-2 px-3 text-right">{t("Litre", "Litres")}</th>
-                  <th className="py-2 px-3 text-right">TZS/L</th>
-                  <th className="py-2 px-3 text-right">{t("Inadaiwa", "Balance")}</th>
+                  <th className="py-2 px-3 text-right">
+                    {view === "month"
+                      ? t(`Lita, ${monthLabel}`, `Litres, ${monthLabel}`)
+                      : t("Litre", "Litres")}
+                  </th>
+                  <th className="py-2 px-3 text-right">
+                    {view === "month" ? t("Alipata", "Earned") : "TZS/L"}
+                  </th>
+                  <th className="py-2 px-3 text-right">
+                    {view === "month" ? t("Alilipwa", "Paid") : t("Inadaiwa", "Balance")}
+                  </th>
                   <th className="py-2 px-3">{t("Malipo ya mwisho", "Last payment")}</th>
                   <th className="py-2 px-3">{t("Hali", "Status")}</th>
                   <th />
                 </tr>
               </thead>
               <tbody>
-                {paged.map((f) => (
-                  <tr
-                    key={f.id}
-                    className="border-b border-border last:border-0 hover:bg-accent/40"
-                  >
-                    <td className="py-2.5 px-3">
-                      <div className="font-medium">{f.name}</div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Phone className="h-3 w-3" /> {f.phone}
-                      </div>
-                    </td>
-                    <td className="py-2.5 px-3 text-muted-foreground">{f.village}</td>
-                    <td className="py-2.5 px-3 text-right font-num">{num(f.litresThisCycle)}</td>
-                    <td className="py-2.5 px-3 text-right font-num">{num(f.ratePerL)}</td>
-                    <td className="py-2.5 px-3 text-right font-num font-semibold">
-                      {tzs(f.currentBalanceTZS)}
-                    </td>
-                    <td className="py-2.5 px-3 text-xs">
-                      {f.lastPaymentDate ? (
-                        <Link
-                          to="/payments/farmer/$id"
-                          params={{ id: f.id }}
-                          className="text-[#1E7C3F] hover:underline font-num"
-                        >
-                          {f.lastPaymentDate}
-                        </Link>
-                      ) : (
-                        <span className="text-muted-foreground">–</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <Pill
-                        tone={
-                          f.status === "delayed"
-                            ? "danger"
-                            : f.status === "due"
-                              ? "warning"
-                              : f.status === "paid"
+                {paged.map((f) => {
+                  const m = monthByFarmer.get(f.id);
+                  return (
+                    <tr
+                      key={f.id}
+                      className="border-b border-border last:border-0 hover:bg-accent/40"
+                    >
+                      <td className="py-2.5 px-3">
+                        <div className="font-medium">{f.name}</div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Phone className="h-3 w-3" /> {f.phone}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 text-muted-foreground">{f.village}</td>
+                      <td className="py-2.5 px-3 text-right font-num">
+                        {num(view === "month" ? (m?.litres ?? 0) : f.litresThisCycle)}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-num">
+                        {view === "month" ? tzs(m?.earnedTZS ?? 0, false) : num(f.ratePerL)}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-num font-semibold">
+                        {view === "month" ? tzs(m?.paidTZS ?? 0) : tzs(f.currentBalanceTZS)}
+                      </td>
+                      <td className="py-2.5 px-3 text-xs">
+                        {f.lastPaymentDate ? (
+                          <Link
+                            to="/payments/farmer/$id"
+                            params={{ id: f.id }}
+                            className="text-[#1E7C3F] hover:underline font-num"
+                          >
+                            {f.lastPaymentDate}
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground">–</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        {view === "month" ? (
+                          <Pill
+                            tone={
+                              m?.status === "paid"
                                 ? "success"
-                                : "info"
-                        }
-                      >
-                        {f.status === "delayed"
-                          ? t("Imechelewa", "Delayed")
-                          : f.status === "due"
-                            ? t("Inadaiwa", "Due")
-                            : f.status === "paid"
+                                : m?.status === "partial"
+                                  ? "warning"
+                                  : m?.status === "unpaid"
+                                    ? "danger"
+                                    : "info"
+                            }
+                          >
+                            {m?.status === "paid"
                               ? t("Imelipwa", "Paid")
-                              : t("Hai", "Active")}
-                      </Pill>
-                    </td>
-                    <td className="py-2.5 px-3 text-right">
-                      <RowActions
-                        itemName={f.name}
-                        onView={() => setViewingId(f.id)}
-                        onEdit={canWrite ? () => setEditingId(f.id) : undefined}
-                        onDelete={
-                          !canWrite
-                            ? undefined
-                            : () => {
-                                deleteFarmer.mutate(
-                                  { id: f.id, name: f.name },
-                                  {
-                                    onSuccess: () =>
-                                      toast.success(t("Mfugaji amefutwa", "Farmer deleted")),
-                                    onError: () =>
-                                      toast.error(
-                                        t("Imeshindikana kufuta", "Could not delete farmer"),
-                                      ),
-                                  },
-                                );
-                              }
-                        }
-                      />
-                    </td>
-                  </tr>
-                ))}
+                              : m?.status === "partial"
+                                ? t("Sehemu", "Partial")
+                                : m?.status === "unpaid"
+                                  ? t("Haijalipwa", "Unpaid")
+                                  : t("Hakuna", "None")}
+                          </Pill>
+                        ) : (
+                          <Pill
+                            tone={
+                              f.status === "delayed"
+                                ? "danger"
+                                : f.status === "due"
+                                  ? "warning"
+                                  : f.status === "paid"
+                                    ? "success"
+                                    : "info"
+                            }
+                          >
+                            {f.status === "delayed"
+                              ? t("Imechelewa", "Delayed")
+                              : f.status === "due"
+                                ? t("Inadaiwa", "Due")
+                                : f.status === "paid"
+                                  ? t("Imelipwa", "Paid")
+                                  : t("Hai", "Active")}
+                          </Pill>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <RowActions
+                          itemName={f.name}
+                          onView={() => setViewingId(f.id)}
+                          onEdit={canWrite ? () => setEditingId(f.id) : undefined}
+                          onDelete={
+                            !canWrite
+                              ? undefined
+                              : () => {
+                                  deleteFarmer.mutate(
+                                    { id: f.id, name: f.name },
+                                    {
+                                      onSuccess: () =>
+                                        toast.success(t("Mfugaji amefutwa", "Farmer deleted")),
+                                      onError: () =>
+                                        toast.error(
+                                          t("Imeshindikana kufuta", "Could not delete farmer"),
+                                        ),
+                                    },
+                                  );
+                                }
+                          }
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             <PaginationBar

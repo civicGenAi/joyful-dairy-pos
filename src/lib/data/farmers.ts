@@ -49,6 +49,7 @@ export const farmerKeys = {
   cycle: () => ["farmers", "cycle"] as const,
   adjustments: () => ["farmers", "adjustments"] as const,
   monthly: (id: string, months: number) => ["farmers", "monthly", id, months] as const,
+  monthAll: (month: string) => ["farmers", "monthAll", month] as const,
 };
 
 export interface FarmerAdjustment {
@@ -75,6 +76,18 @@ export interface CycleSummary {
 
 export interface FarmerMonth {
   month: string;
+  litres: number;
+  earnedTZS: number;
+  paidTZS: number;
+  status: "paid" | "partial" | "unpaid" | "none";
+}
+
+/** One farmer's figures for a single chosen month, the transpose of
+ *  FarmerMonth: same shape, but one row per farmer instead of one row
+ *  per month, for the main Farmers list's month picker. */
+export interface FarmerMonthRow {
+  farmerId: string;
+  farmerName: string;
   litres: number;
   earnedTZS: number;
   paidTZS: number;
@@ -287,6 +300,32 @@ export const farmersRepo = {
     // (a genuine missed month) is left alone.
     const lastActive = rows.map((r) => r.status !== "none").lastIndexOf(true);
     return lastActive === -1 ? [] : rows.slice(0, lastActive + 1);
+  },
+
+  /** Every farmer's litres, earned, paid and status for one chosen
+   *  month, so the main list can answer "what happened in March" for
+   *  everyone at once instead of only the running since-last-payout
+   *  balance. `month` is any date within the target month. */
+  async monthSummary(month: string): Promise<FarmerMonthRow[]> {
+    const { data, error } = await supabase.rpc("farmers_month_summary", { p_month: month });
+    if (error) throw new Error(error.message);
+    return (
+      data as {
+        farmer_id: string;
+        farmer_name: string;
+        litres: number;
+        earned_tzs: number;
+        paid_tzs: number;
+        status: FarmerMonthRow["status"];
+      }[]
+    ).map((r) => ({
+      farmerId: r.farmer_id,
+      farmerName: r.farmer_name,
+      litres: Number(r.litres),
+      earnedTZS: Number(r.earned_tzs),
+      paidTZS: Number(r.paid_tzs),
+      status: r.status,
+    }));
   },
 
   async payouts(farmerId: string, limit = 12): Promise<PayoutEntry[]> {

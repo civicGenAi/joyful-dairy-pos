@@ -28,6 +28,13 @@ export function useFarmerMonthlySummary(farmerId: string | null, months = 12) {
   });
 }
 
+export function useFarmersMonthSummary(month: string) {
+  return useQuery({
+    queryKey: farmerKeys.monthAll(month),
+    queryFn: () => farmersRepo.monthSummary(month),
+  });
+}
+
 export function useFarmerPayouts(id: string | null, limit = 12) {
   return useQuery({
     queryKey: [...farmerKeys.payouts(id ?? ""), limit],
