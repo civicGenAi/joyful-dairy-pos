@@ -11,6 +11,7 @@ import {
   useJosephSales,
   useJosephDeposits,
   useRecordJosephDay,
+  useDeleteJosephSale,
   useRecordJosephDeposit,
   useUpdateJosephDeposit,
   useDeleteJosephDeposit,
@@ -157,11 +158,16 @@ export function JosephSummaryScreen() {
       .reverse()
       .map((date) => {
         const litresByRate = new Map<number, number>();
-        for (const s of salesByDate.get(date) ?? []) litresByRate.set(s.rateTZS, s.litres);
+        const saleIds: string[] = [];
+        for (const s of salesByDate.get(date) ?? []) {
+          litresByRate.set(s.rateTZS, s.litres);
+          saleIds.push(s.id);
+        }
         const dayDeposits = depositsByDate.get(date) ?? [];
         return {
           date,
           litresByRate,
+          saleIds,
           dayLitres: [...litresByRate.values()].reduce((a, v) => a + v, 0),
           dayDeposits,
           dayDeposited: dayDeposits.reduce((a, dep) => a + dep.amountTZS, 0),
@@ -369,19 +375,25 @@ export function JosephSummaryScreen() {
                             )}
                           </td>
                           <td className="py-2 px-3 text-right">
-                            <JosephDaySheet
-                              rates={rates}
-                              editing={{
-                                date: day.date,
-                                litresByRate: day.litresByRate,
-                                deposit: day.dayDeposits[0],
-                              }}
-                              trigger={
-                                <Button size="sm" variant="ghost" className="h-7 text-xs">
-                                  {t("Hariri", "Edit")}
-                                </Button>
-                              }
-                            />
+                            <div className="flex items-center justify-end gap-1">
+                              <JosephDaySheet
+                                rates={rates}
+                                editing={{
+                                  date: day.date,
+                                  litresByRate: day.litresByRate,
+                                  deposit: day.dayDeposits[0],
+                                }}
+                                trigger={
+                                  <Button size="sm" variant="ghost" className="h-7 text-xs">
+                                    {t("Hariri", "Edit")}
+                                  </Button>
+                                }
+                              />
+                              <DeleteJosephDayButton
+                                saleIds={day.saleIds}
+                                depositIds={day.dayDeposits.map((dep) => dep.id)}
+                              />
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -633,5 +645,54 @@ function JosephDaySheet({
         </SheetFooter>
       </SheetContent>
     </Sheet>
+  );
+}
+
+// Removes an entire day at once: every rate's sale row for that date and
+// any deposit(s) recorded against it. A day is one row in the table, so
+// deleting it means clearing all of it, not one rate at a time.
+function DeleteJosephDayButton({
+  saleIds,
+  depositIds,
+}: {
+  saleIds: string[];
+  depositIds: string[];
+}) {
+  const { t } = useApp();
+  const deleteSale = useDeleteJosephSale();
+  const deleteDeposit = useDeleteJosephDeposit();
+  const [pending, setPending] = useState(false);
+
+  const remove = async () => {
+    setPending(true);
+    try {
+      await Promise.all([
+        ...saleIds.map((id) => deleteSale.mutateAsync(id)),
+        ...depositIds.map((id) => deleteDeposit.mutateAsync(id)),
+      ]);
+      toast.success(t("Imefutwa", "Removed"));
+    } catch {
+      toast.error(t("Imeshindikana kufuta", "Could not remove it"));
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <ConfirmDialog
+      destructive
+      title={t("Futa siku hii yote?", "Remove this whole day?")}
+      description={t(
+        "Litafuta mauzo yote na amana zote za tarehe hii. Haiwezi kurudishwa.",
+        "This removes every sale and every deposit recorded for this date. This cannot be undone.",
+      )}
+      confirmLabel={t("Futa", "Remove")}
+      onConfirm={remove}
+      trigger={
+        <Button size="sm" variant="ghost" className="h-7 text-xs text-[#E11B22]" disabled={pending}>
+          {t("Futa", "Remove")}
+        </Button>
+      }
+    />
   );
 }
